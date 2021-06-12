@@ -3,4 +3,6 @@ pydantic==1.8.2
 uvicorn==0.14.0
 PyJWT==2.1.0 
 python-decouple==3.4
-autopep8
+autopep
+psutil==5.8.0
+sse_starlette==0.7.2
