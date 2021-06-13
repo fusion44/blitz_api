@@ -1,11 +1,12 @@
 from fastapi import FastAPI
-from app.routers import system
+from app.routers import bitcoin, system
 
 
 # start server with "uvicorn main:app --reload"
 
 app = FastAPI()
 
+app.include_router(bitcoin.router)
 app.include_router(system.router)
 
 
