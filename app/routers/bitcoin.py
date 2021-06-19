@@ -1,8 +1,16 @@
-from fastapi import APIRouter, HTTPException, status, Request
-from fastapi.params import Depends
+import binascii
+import json
+import struct
+from hashlib import sha256
 
-from app.utils import bitcoin_rpc
+import zmq
+import zmq.asyncio
 from app.auth.auth_bearer import JWTBearer
+from app.routers.bitcoin_docs import blocks_sub_doc
+from app.utils import bitcoin_config, bitcoin_rpc, bitcoin_rpc_async
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.params import Depends
+from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(
     prefix="/bitcoin",
@@ -43,3 +51,30 @@ def getblockchaininfo():
         return r.content
     else:
         raise HTTPException(r.status_code, detail=r.reason)
+
+
+@router.get("/block_sub", summary="Subscribe to incoming blocks.",
+            description=blocks_sub_doc,
+            response_description="A JSON object with  information.",
+            # dependencies=[Depends(JWTBearer())],
+            status_code=status.HTTP_200_OK)
+async def zmq_sub(request: Request, verbosity: int = 1):
+    return EventSourceResponse(handle_block_sub(request, verbosity))
+
+
+async def handle_block_sub(request: Request,  verbosity: int = 1) -> str:
+    ctx = zmq.asyncio.Context()
+    zmq_socket = ctx.socket(zmq.SUB)
+    zmq_socket.setsockopt(zmq.RCVHWM, 0)
+    zmq_socket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
+    zmq_socket.connect(bitcoin_config.zmq_url)
+
+    while True:
+        if await request.is_disconnected():
+            ctx.destroy()
+            break
+
+        _, body, _ = await zmq_socket.recv_multipart()
+        hash = binascii.hexlify(body).decode('utf-8')
+        r = await bitcoin_rpc_async('getblock', [hash, verbosity])
+        yield json.dumps(r["result"])
