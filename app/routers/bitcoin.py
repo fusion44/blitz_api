@@ -1,13 +1,7 @@
-import binascii
-import json
-import struct
-from hashlib import sha256
-
-import zmq
-import zmq.asyncio
 from app.auth.auth_bearer import JWTBearer
+from app.repositories.bitcoin import handle_block_sub
 from app.routers.bitcoin_docs import blocks_sub_doc
-from app.utils import bitcoin_config, bitcoin_rpc, bitcoin_rpc_async
+from app.utils import bitcoin_rpc
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
 from sse_starlette.sse import EventSourceResponse
@@ -60,21 +54,3 @@ def getblockchaininfo():
             status_code=status.HTTP_200_OK)
 async def zmq_sub(request: Request, verbosity: int = 1):
     return EventSourceResponse(handle_block_sub(request, verbosity))
-
-
-async def handle_block_sub(request: Request,  verbosity: int = 1) -> str:
-    ctx = zmq.asyncio.Context()
-    zmq_socket = ctx.socket(zmq.SUB)
-    zmq_socket.setsockopt(zmq.RCVHWM, 0)
-    zmq_socket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
-    zmq_socket.connect(bitcoin_config.zmq_url)
-
-    while True:
-        if await request.is_disconnected():
-            ctx.destroy()
-            break
-
-        _, body, _ = await zmq_socket.recv_multipart()
-        hash = binascii.hexlify(body).decode('utf-8')
-        r = await bitcoin_rpc_async('getblock', [hash, verbosity])
-        yield json.dumps(r["result"])
