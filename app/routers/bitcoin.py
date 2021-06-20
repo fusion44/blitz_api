@@ -55,8 +55,8 @@ def getblockchaininfo():
 
 @router.get("/block_sub", summary="Subscribe to incoming blocks.",
             description=blocks_sub_doc,
-            response_description="A JSON object with  information.",
-            # dependencies=[Depends(JWTBearer())],
+            response_description="A JSON object with information about the new block.",
+            dependencies=[Depends(JWTBearer())],
             status_code=status.HTTP_200_OK)
 async def zmq_sub(request: Request, verbosity: int = 1):
     return EventSourceResponse(handle_block_sub(request, verbosity))
