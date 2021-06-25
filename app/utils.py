@@ -1,8 +1,8 @@
-from app.routers import bitcoin
+import json
 from types import coroutine
+
 import aiohttp
 import requests
-import json
 from decouple import config
 
 

@@ -1,3 +1,4 @@
+from app.repositories.bitcoin import register_bitcoin_zmq_sub
 from aioredis import Channel, Redis
 from fastapi import FastAPI, Depends
 from fastapi_plugins import (get_config, depends_redis, registered_configuration,
@@ -25,6 +26,7 @@ app.include_router(system.router)
 async def on_startup() -> None:
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
+    await register_bitcoin_zmq_sub()
 
 
 @app.on_event('shutdown')
