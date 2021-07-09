@@ -1,9 +1,11 @@
 import json
 from types import coroutine
+from typing import Dict, Final
 
 import aiohttp
 import requests
 from decouple import config
+from fastapi_plugins import redis_plugin
 
 
 class BitcoinConfig:
@@ -57,3 +59,26 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
     async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
         async with session.post(bitcoin_config.rpc_url, data=data) as resp:
             return await resp.json()
+
+
+async def send_sse_message(id: str, json_data: Dict):
+    """Send a message to any SSE connections
+
+    Parameters
+    ----------
+    id : str
+        ID String von SSE class
+    data : list, optional
+        The data to include
+    """
+
+    await redis_plugin.redis.publish_json("default", {"id": id, "data": json_data})
+
+
+class SSE():
+    SYS_STATUS: Final = "sys_status"
+
+    BTC_NETWORK_STATUS: Final = "btc_network_status"
+    BTC_MEMPOOL_STATUS: Final = "btc_mempool_status"
+    BTC_NEW_BLOC: Final = "btc_new_bloc"
+    BTC_INFO: Final = "btc_info"

@@ -1,6 +1,6 @@
 from app.auth.auth_bearer import JWTBearer
-from app.repositories.bitcoin import handle_block_sub
-from app.routers.bitcoin_docs import blocks_sub_doc
+from app.repositories.bitcoin import get_bitcoin_info, handle_block_sub
+from app.routers.bitcoin_docs import blocks_sub_doc, get_bitcoin_info_desc
 from app.utils import bitcoin_rpc
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
@@ -40,6 +40,32 @@ def getblockcount():
             status_code=status.HTTP_200_OK)
 def getblockchaininfo():
     r = bitcoin_rpc("getblockchaininfo")
+
+    if(r.status_code == status.HTTP_200_OK):
+        return r.content
+    else:
+        raise HTTPException(r.status_code, detail=r.reason)
+
+
+@router.get("/getbitcoininfo", summary="Get general information about bitcoin core",
+            description=get_bitcoin_info_desc,
+            response_description="A JSON String with relevant information.",
+            dependencies=[Depends(JWTBearer())],
+            status_code=status.HTTP_200_OK)
+async def getbitcoininfo():
+    try:
+        return await get_bitcoin_info()
+    except HTTPException as r:
+        raise HTTPException(r.status_code, detail=r.reason)
+
+
+@router.get("/getnetworkinfo", summary="Get information about the network",
+            description="See documentation on [bitcoincore.org](https://bitcoincore.org/en/doc/0.21.0/rpc/network/getnetworkinfo/)",
+            response_description="A JSON String with relevant information.",
+            dependencies=[Depends(JWTBearer())],
+            status_code=status.HTTP_200_OK)
+def getnetworkinfo():
+    r = bitcoin_rpc("getnetworkinfo")
 
     if(r.status_code == status.HTTP_200_OK):
         return r.content
