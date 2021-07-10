@@ -13,3 +13,6 @@ requests==2.25.1
 pyzmq==22.1.0
 cchardet==2.1.7
 aiohttp==3.7.4
+grpcio==1.38.1
+grpcio-tools==1.38.1
+googleapis-common-protos==1.53.0

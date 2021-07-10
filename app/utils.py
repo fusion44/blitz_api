@@ -31,6 +31,31 @@ class BitcoinConfig:
 bitcoin_config = BitcoinConfig()
 
 
+class LightningConfig:
+    def __init__(self) -> None:
+        self.network = config("network")
+        self.ln_node = config("ln_node")
+
+        if(self.ln_node == "lnd"):
+            # TODO: if macaroon and cert is not set in .env
+            #       try to read it from the local drive
+            self.lnd_macaroon = config("lnd_macaroon")
+            self.lnd_cert = config("lnd_cert").encode('utf8')
+            self.lnd_grpc_ip = config("lnd_grpc_ip")
+            self.lnd_grpc_port = config("lnd_grpc_port")
+            self.lnd_rest_port = config("lnd_rest_port")
+            self.lnd_grpc_url = self.lnd_grpc_ip + ":" + self.lnd_grpc_port
+        elif(self.ln_node == "clightning"):
+            # TODO: implement c-lightning
+            pass
+        else:
+            raise NameError(
+                f"Node type \"{self.ln_node}\" is unknown. Use \"lnd\" or \"clightning\"")
+
+
+lightning_config = LightningConfig()
+
+
 def bitcoin_rpc(method: str, params: list = []) -> requests.Response:
     """Make an RPC request to the Bitcoin daemon 
 

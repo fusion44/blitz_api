@@ -1,10 +1,12 @@
-from app.repositories.bitcoin import register_bitcoin_info_gatherer, register_bitcoin_zmq_sub
 from aioredis import Channel, Redis
-from fastapi import FastAPI, Depends
-from fastapi_plugins import (get_config, depends_redis, registered_configuration,
-                             redis_plugin, RedisSettings)
+from fastapi import Depends, FastAPI
+from fastapi_plugins import (RedisSettings, depends_redis, get_config,
+                             redis_plugin, registered_configuration)
 from sse_starlette.sse import EventSourceResponse
-from app.routers import apps, bitcoin, system
+
+from app.repositories.bitcoin import (register_bitcoin_info_gatherer,
+                                      register_bitcoin_zmq_sub)
+from app.routers import apps, bitcoin, lightning, setup, system
 
 # start server with "uvicorn main:app --reload"
 
@@ -19,7 +21,9 @@ config = get_config()
 
 app.include_router(apps.router)
 app.include_router(bitcoin.router)
+app.include_router(lightning.router)
 app.include_router(system.router)
+app.include_router(setup.router)
 
 
 @app.on_event('startup')
