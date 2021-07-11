@@ -1,6 +1,8 @@
-import json
+import asyncio
 import time
+
 import psutil
+from app.utils import SSE, send_sse_message
 from fastapi import Request
 
 SLEEP_TIME = 1
@@ -80,4 +82,20 @@ def get_hardware_info() -> map:
     info['networks_bytes_sent'] = net_io.bytes_sent
     info['networks_bytes_received'] = net_io.bytes_recv
 
-    return json.dumps(info)
+    return info
+
+
+async def _handle_gather_hardware_info():
+    last_info = {}
+    while True:
+        info = get_hardware_info()
+        if last_info != info:
+            await send_sse_message(SSE.SYS_STATUS, info)
+            last_info = info
+
+        await asyncio.sleep(HW_INFO_YIELD_TIME)
+
+
+async def register_hardware_info_gatherer():
+    loop = asyncio.get_event_loop()
+    loop.create_task(_handle_gather_hardware_info())
