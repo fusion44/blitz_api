@@ -1,5 +1,5 @@
 from aioredis import Channel, Redis
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi_plugins import (RedisSettings, depends_redis, get_config,
                              redis_plugin, registered_configuration)
 from sse_starlette.sse import EventSourceResponse
@@ -30,8 +30,6 @@ app.include_router(setup.router)
 async def on_startup() -> None:
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
-    await register_bitcoin_zmq_sub()
-    await register_bitcoin_info_gatherer()
 
 
 @app.on_event('shutdown')
@@ -45,14 +43,32 @@ def index():
     return {'data': '123'}
 
 
+connections = []
+
+
 @app.get("/sse/subscribe")
-async def stream(channel: str = "default", redis: Redis = Depends(depends_redis)):
-    return EventSourceResponse(subscribe(channel, redis))
+async def stream(request: Request, channel: str = "default", redis: Redis = Depends(depends_redis)):
+    connections.append(request)
+    if len(connections) == 1:
+        # start all subscription activity
+        await register_all_handlers()
+
+    return EventSourceResponse(subscribe(request, channel, redis))
 
 
-async def subscribe(channel: str, redis: Redis):
+async def subscribe(request: Request, channel: str, redis: Redis):
     (sub,) = await redis.subscribe(channel=Channel(channel, False))
 
     while await sub.wait_message():
-        data = await sub.get(encoding='utf-8')
-        yield {"event": "event_id", "data": data}
+        if await request.is_disconnected():
+            connections.remove(request)
+            break
+
+        if len(connections) > 0:
+            data = await sub.get(encoding='utf-8')
+            yield data
+
+
+async def register_all_handlers():
+    await register_bitcoin_zmq_sub()
+    await register_bitcoin_info_gatherer()
