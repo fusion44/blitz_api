@@ -14,12 +14,12 @@ class BitcoinConfig:
 
         if(self.network == "testnet"):
             self.ip = config("bitcoind_ip_testnet")
-            self.rpc_port = config("bitcoind_port_testnet")
-            self.zmq_port = config("bitcoind_port_zmq_testnet")
+            self.rpc_port = config("bitcoind_port_rpc_testnet")
+            self.zmq_port = config("bitcoind_port_zmq_hashblock_testnet")
         else:
             self.ip = config("bitcoind_ip_mainnet")
-            self.rpc_port = config("bitcoind_port_mainnet")
-            self.zmq_port = config("bitcoind_port_zmq_mainnet")
+            self.rpc_port = config("bitcoind_port_rpc_mainnet")
+            self.zmq_port = config("bitcoind_port_zmq_hashblock_mainnet")
 
         self.rpc_url = f"http://{self.ip}:{self.rpc_port}"
         self.zmq_url = f"tcp://{self.ip}:{self.zmq_port}"
