@@ -1,10 +1,10 @@
 from app.auth.auth_bearer import JWTBearer
 from app.repositories.bitcoin import get_bitcoin_info, handle_block_sub
 from app.routers.bitcoin_docs import blocks_sub_doc, get_bitcoin_info_desc
+from app.sse_starlette import EventSourceResponse
 from app.utils import bitcoin_rpc
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
-from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(
     prefix="/bitcoin",

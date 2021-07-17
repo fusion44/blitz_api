@@ -8,6 +8,7 @@ from app.repositories.bitcoin import (register_bitcoin_info_gatherer,
                                       register_bitcoin_zmq_sub)
 from app.repositories.hardware_info import register_hardware_info_gatherer
 from app.routers import apps, bitcoin, lightning, setup, system
+from app.sse_starlette import EventSourceResponse
 
 # start server with "uvicorn main:app --reload"
 

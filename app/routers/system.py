@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, status, Request
-from fastapi.params import Depends
-from sse_starlette.sse import EventSourceResponse
-
-from app.auth.auth_handler import signJWT
 from app.auth.auth_bearer import JWTBearer
-from app.repositories.hardware_info import HW_INFO_YIELD_TIME, get_hardware_info, subscribe_hardware_info
+from app.auth.auth_handler import signJWT
+from app.repositories.hardware_info import (HW_INFO_YIELD_TIME,
+                                            get_hardware_info,
+                                            subscribe_hardware_info)
 from app.routers.system_docs import get_hw_info_json
+from app.sse_starlette import EventSourceResponse
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.params import Depends
 
 router = APIRouter(
     prefix="/system",
