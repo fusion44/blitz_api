@@ -1,6 +1,6 @@
 import json
 from types import coroutine
-from typing import Dict, Final
+from typing import Dict
 
 import aiohttp
 import requests
@@ -101,9 +101,9 @@ async def send_sse_message(id: str, json_data: Dict):
 
 
 class SSE():
-    SYS_STATUS: Final = "sys_status"
+    SYS_STATUS = "sys_status"
 
-    BTC_NETWORK_STATUS: Final = "btc_network_status"
-    BTC_MEMPOOL_STATUS: Final = "btc_mempool_status"
-    BTC_NEW_BLOC: Final = "btc_new_bloc"
-    BTC_INFO: Final = "btc_info"
+    BTC_NETWORK_STATUS = "btc_network_status"
+    BTC_MEMPOOL_STATUS = "btc_mempool_status"
+    BTC_NEW_BLOC = "btc_new_bloc"
+    BTC_INFO = "btc_info"
