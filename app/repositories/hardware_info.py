@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import psutil
 from app.utils import SSE, send_sse_message
@@ -16,7 +15,7 @@ async def subscribe_hardware_info(request: Request):
             # stop if client disconnects
             break
         yield get_hardware_info()
-        time.sleep(SLEEP_TIME)
+        await asyncio.sleep(SLEEP_TIME)
 
 
 def get_hardware_info() -> map:
