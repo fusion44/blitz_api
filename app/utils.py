@@ -1,11 +1,15 @@
 import json
+import os
 from types import coroutine
 from typing import Dict
 
 import aiohttp
+import grpc
 import requests
 from decouple import config
 from fastapi_plugins import redis_plugin
+
+import app.repositories.ln_impl.protos.rpc_pb2_grpc as lnrpc
 
 
 class BitcoinConfig:
@@ -37,20 +41,41 @@ class LightningConfig:
         self.ln_node = config("ln_node")
 
         if(self.ln_node == "lnd"):
-            # TODO: if macaroon and cert is not set in .env
-            #       try to read it from the local drive
+            # Due to updated ECDSA generated tls.cert we need to let gprc know that
+            # we need to use that cipher suite otherwise there will be a handshake
+            # error when we communicate with the lnd rpc server.
+            os.environ["GRPC_SSL_CIPHER_SUITES"] = 'HIGH+ECDSA'
+
+            # Uncomment to see full gRPC logs
+            # os.environ["GRPC_TRACE"] = 'all'
+            # os.environ["GRPC_VERBOSITY"] = 'DEBUG'
+
             self.lnd_macaroon = config("lnd_macaroon")
-            self.lnd_cert = config("lnd_cert").encode('utf8')
-            self.lnd_grpc_ip = config("lnd_grpc_ip")
-            self.lnd_grpc_port = config("lnd_grpc_port")
-            self.lnd_rest_port = config("lnd_rest_port")
-            self.lnd_grpc_url = self.lnd_grpc_ip + ":" + self.lnd_grpc_port
+            self._lnd_cert = bytes.fromhex(config("lnd_cert"))
+            self._lnd_grpc_ip = config("lnd_grpc_ip")
+            self._lnd_grpc_port = config("lnd_grpc_port")
+            self._lnd_rest_port = config("lnd_rest_port")
+            self._lnd_grpc_url = self._lnd_grpc_ip + ":" + self._lnd_grpc_port
+
+            auth_creds = grpc.metadata_call_credentials(self.metadata_callback)
+            ssl_creds = grpc.ssl_channel_credentials(self._lnd_cert)
+            combined_creds = grpc.composite_channel_credentials(
+                ssl_creds, auth_creds)
+
+            self._channel = grpc.secure_channel(
+                self._lnd_grpc_url, combined_creds)
+            self.lnd_stub = lnrpc.LightningStub(self._channel)
+
         elif(self.ln_node == "clightning"):
             # TODO: implement c-lightning
             pass
         else:
             raise NameError(
                 f"Node type \"{self.ln_node}\" is unknown. Use \"lnd\" or \"clightning\"")
+
+    def metadata_callback(self, context, callback):
+        # for more info see grpc docs
+        callback([('macaroon', self.lnd_macaroon)], None)
 
 
 lightning_config = LightningConfig()
