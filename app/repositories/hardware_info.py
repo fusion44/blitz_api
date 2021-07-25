@@ -2,11 +2,12 @@ import asyncio
 
 import psutil
 from app.utils import SSE, send_sse_message
+from decouple import config
 from fastapi import Request
 
-SLEEP_TIME = 1
-CPU_USAGE_INTERVAL = 0.5
-HW_INFO_YIELD_TIME = SLEEP_TIME+CPU_USAGE_INTERVAL
+SLEEP_TIME = config("gather_hw_info_interval", default=2, cast=float)
+CPU_AVG_PERIOD = config("cpu_usage_averaging_period", default=0.5, cast=float)
+HW_INFO_YIELD_TIME = SLEEP_TIME+CPU_AVG_PERIOD
 
 
 async def subscribe_hardware_info(request: Request):
@@ -22,9 +23,9 @@ def get_hardware_info() -> map:
     info = {}
 
     info['cpu_overall_percent'] = psutil.cpu_percent(
-        interval=CPU_USAGE_INTERVAL)
+        interval=CPU_AVG_PERIOD)
     info['cpu_per_cpu_percent'] = psutil.cpu_percent(
-        interval=CPU_USAGE_INTERVAL, percpu=True)
+        interval=CPU_AVG_PERIOD, percpu=True)
 
     v = psutil.virtual_memory()
     info['vram_total_bytes'] = v.total

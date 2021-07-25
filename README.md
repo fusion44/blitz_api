@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Update the `.env` file with your `bitcoind` and `lnd` configuration.
+Create a `.env` file with your `bitcoind` and `lnd` configuration. See the `.env_sample` file for all configuration options.  
 
 Please note that you will also need to install [Redis](https://redis.io/).
 
