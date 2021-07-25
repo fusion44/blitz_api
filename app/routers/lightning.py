@@ -15,9 +15,9 @@ router = APIRouter(
              dependencies=[Depends(JWTBearer())],
              status_code=status.HTTP_200_OK,
              response_model=Invoice)
-def addinvoice(value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False):
+async def addinvoice(value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False):
     try:
-        return add_invoice(memo, value_msat, expiry, is_keysend)
+        return await add_invoice(memo, value_msat, expiry, is_keysend)
     except HTTPException as r:
         raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:
@@ -28,9 +28,9 @@ def addinvoice(value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: 
             response_description="A JSON String with on chain wallet balances.",
             dependencies=[Depends(JWTBearer())],
             status_code=status.HTTP_200_OK)
-def getwalletbalance():
+async def getwalletbalance():
     try:
-        return get_wallet_balance()
+        return await get_wallet_balance()
     except HTTPException as r:
         raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:

@@ -62,7 +62,7 @@ class LightningConfig:
             combined_creds = grpc.composite_channel_credentials(
                 ssl_creds, auth_creds)
 
-            self._channel = grpc.secure_channel(
+            self._channel = grpc.aio.secure_channel(
                 self._lnd_grpc_url, combined_creds)
             self.lnd_stub = lnrpc.LightningStub(self._channel)
 

@@ -9,9 +9,9 @@ else:
                                                      get_wallet_balance_impl)
 
 
-def get_wallet_balance():
-    return get_wallet_balance_impl()
+async def get_wallet_balance():
+    return await get_wallet_balance_impl()
 
 
-def add_invoice(value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False) -> Invoice:
-    return add_invoice_impl(memo, value_msat, expiry, is_keysend)
+async def add_invoice(value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False) -> Invoice:
+    return await add_invoice_impl(memo, value_msat, expiry, is_keysend)
