@@ -10,6 +10,7 @@ from starlette import status
 from app.repositories.bitcoin import (register_bitcoin_info_gatherer,
                                       register_bitcoin_zmq_sub)
 from app.repositories.hardware_info import register_hardware_info_gatherer
+from app.repositories.lightning import register_lightning_listener
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse
 
@@ -82,3 +83,4 @@ async def register_all_handlers():
     await register_bitcoin_zmq_sub()
     await register_bitcoin_info_gatherer()
     await register_hardware_info_gatherer()
+    await register_lightning_listener()

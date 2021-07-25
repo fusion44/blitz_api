@@ -132,3 +132,5 @@ class SSE():
     BTC_MEMPOOL_STATUS = "btc_mempool_status"
     BTC_NEW_BLOC = "btc_new_bloc"
     BTC_INFO = "btc_info"
+
+    LN_INVOICE_STATUS = "ln_invoice_status"
