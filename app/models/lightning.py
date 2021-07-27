@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -351,4 +351,402 @@ def invoice_from_grpc(i) -> Invoice:
         is_keysend=i.is_keysend,
         payment_addr=i.payment_addr.hex(),
         is_amp=i.is_amp,
+    )
+
+
+class PaymentStatus(str, Enum):
+    UNKNOWN = "unknown"
+    IN_FLIGHT = "in_flight"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+def payment_status_from_grpc(id):
+    if id == 0:
+        return PaymentStatus.UNKNOWN
+    elif id == 1:
+        return PaymentStatus.IN_FLIGHT
+    elif id == 2:
+        return PaymentStatus.SUCCEEDED
+    elif id == 3:
+        return PaymentStatus.FAILED
+    else:
+        raise NotImplementedError(f"PaymentStatus {id} is not implemented")
+
+
+class PaymentFailureReason(str, Enum):
+    # Payment isn't failed(yet).
+    FAILURE_REASON_NONE = "FAILURE_REASON_NONE"
+
+    # There are more routes to try, but the payment timeout was exceeded.
+    FAILURE_REASON_TIMEOUT = "FAILURE_REASON_TIMEOUT"
+
+    # All possible routes were tried and failed permanently.
+    # Or were no routes to the destination at all.
+    FAILURE_REASON_NO_ROUTE = "FAILURE_REASON_NO_ROUTE"
+
+    # A non-recoverable error has occurred.
+    FAILURE_REASON_ERROR = "FAILURE_REASON_ERROR"
+
+    # Payment details incorrect(unknown hash, invalid amt or invalid final cltv delta)
+    FAILURE_REASON_INCORRECT_PAYMENT_DETAILS = "FAILURE_REASON_INCORRECT_PAYMENT_DETAILS"
+
+    # Insufficient local balance.
+    FAILURE_REASON_INSUFFICIENT_BALANCE = "FAILURE_REASON_INSUFFICIENT_BALANCE"
+
+
+def payment_failure_reason(f) -> PaymentFailureReason:
+    if f == 0:
+        return PaymentFailureReason.FAILURE_REASON_NONE
+    elif f == 1:
+        return PaymentFailureReason.FAILURE_REASON_TIMEOUT
+    elif f == 2:
+        return PaymentFailureReason.FAILURE_REASON_NO_ROUTE
+    elif f == 3:
+        return PaymentFailureReason.FAILURE_REASON_ERROR
+    elif f == 4:
+        return PaymentFailureReason.FAILURE_REASON_INCORRECT_PAYMENT_DETAILS
+    elif f == 5:
+        return PaymentFailureReason.FAILURE_REASON_INSUFFICIENT_BALANCE
+    else:
+        raise NotImplementedError(
+            f"PaymentFailureReason {id} is not implemented")
+
+
+class ChannelUpdate(BaseModel):
+    # The signature that validates the announced data and proves the ownership of node id.
+    signature: str
+
+    # The target chain that this channel was opened within. This value should be the
+    # genesis hash of the target chain. Along with the short channel ID, this uniquely
+    # identifies the channel globally in a blockchain.
+    chain_hash: str
+
+    # The unique description of the funding transaction.
+    chan_id: int
+
+    # A timestamp that allows ordering in the case of
+    # multiple announcements. We should ignore the message if
+    # timestamp is not greater than the last-received.
+    timestamp: int
+
+    # The bitfield that describes whether optional fields are present in this update.
+    # Currently, the least-significant bit must be set to 1 if the optional field MaxHtlc is present.
+    message_flags: int
+
+    # The bitfield that describes additional meta-data concerning how the update is to be interpreted.
+    # Currently, the least-significant bit must be set to 0 if the creating node corresponds to the
+    # first node in the previously sent channel announcement and 1 otherwise. If the second bit is set,
+    # then the channel is set to be disabled.
+    channel_flags: int
+
+    # The minimum number of blocks this node requires to be added to the expiry of HTLCs.
+    # This is a security parameter determined by the node operator. This value represents the
+    # required gap between the time locks of the incoming and outgoing HTLC's set to this node.
+    time_lock_delta: int
+
+    # The minimum HTLC value which will be accepted.
+    htlc_minimum_msat: int
+
+    # The base fee that must be used for incoming HTLC's to this particular channel.
+    # This value will be tacked onto the required for a payment independent of the size of the payment.
+    base_fee: int
+
+    # The fee rate that will be charged per millionth of a satoshi.
+    fee_rate: int
+
+    # The maximum HTLC value which will be accepted.
+    htlc_maximum_msat: int
+
+    # The set of data that was appended to this message, some of which we may not actually know how to
+    # iterate or parse. By holding onto this data, we ensure that we're able to properly validate the
+    # set of signatures that cover these new fields, and ensure we're able to make upgrades to the
+    # network in a forwards compatible manner.
+    extra_opaque_data: str
+
+
+def channel_update_from_grpc(u) -> ChannelUpdate:
+    return ChannelUpdate(
+        signature=u.signature,
+        chain_hash=u.chain_hash,
+        chan_id=u.chan_id,
+        timestamp=u.timestamp,
+        message_flags=u.message_flags,
+        channel_flags=u.channel_flags,
+        time_lock_delta=u.time_lock_delta,
+        htlc_minimum_msat=u.htlc_minimum_msat,
+        base_fee=u.base_fee,
+        fee_rate=u.fee_rate,
+        htlc_maximum_msat=u.htlc_maximum_msat,
+        extra_opaque_data=u.extra_opaque_data,
+    )
+
+
+class Hop(BaseModel):
+    # The unique channel ID for the channel. The first 3
+    # bytes are the block height, the next 3 the index within the
+    # block, and the last 2 bytes are the output index for the channel.
+    chan_id: int
+
+    chan_capacity: int
+    amt_to_forward: int
+    fee: int
+    expiry: int
+    amt_to_forward_msat: int
+    fee_msat: int
+
+    # An optional public key of the hop. If the public key is given,
+    # the payment can be executed without relying on a copy of the channel graph.
+    pub_key: str
+
+    # If set to true, then this hop will be encoded using the new variable length TLV format.
+    # Note that if any custom tlv_records below are specified, then this field MUST be set
+    # to true for them to be encoded properly.
+    tlv_payload: bool
+
+
+def hop_from_grpc(h) -> Hop:
+    return Hop(
+        chan_id=h.chan_id,
+        chan_capacity=h.chan_capacity,
+        amt_to_forward=h.amt_to_forward,
+        fee=h.fee,
+        expiry=h.expiry,
+        amt_to_forward_msat=h.amt_to_forward_msat,
+        fee_msat=h.fee_msat,
+        pub_key=h.pub_key,
+        tlv_payload=h.tlv_payload,
+    )
+
+
+class MPPRecord(BaseModel):
+    payment_addr: str
+    total_amt_msat: int
+
+
+def mpp_record_from_grpc(r) -> MPPRecord:
+    return MPPRecord(
+        payment_addr=r.payment_addr,
+        total_amt_msat=r.total_amt_msat,
+    )
+
+
+class AMPRecord(BaseModel):
+    root_share: str
+    set_id: str
+    child_index: int
+
+
+def amp_record_from_grpc(r) -> AMPRecord:
+    return AMPRecord(
+        root_share=r.root_share,
+        set_id=r.set_id,
+        child_index=r.child_index,
+    )
+
+
+class Route(BaseModel):
+    total_time_lock: int
+    total_fees: int
+    total_amt: int
+    hops: List[Hop]
+    total_fees_msat: int
+    total_amt_msat: int
+    mpp_record: Union[MPPRecord, None]
+    amp_record: Union[AMPRecord, None]
+    custom_records:	List[CustomRecordsEntry]
+
+
+def route_from_grpc(r):
+    def _crecords(recs):
+        l = []
+        for r in recs:
+            l.append(custom_record_entry_from_grpc(r))
+        return l
+
+    def _get_hops(hops) -> List[Hop]:
+        l = []
+        for h in hops:
+            l.append(hop_from_grpc(h))
+        return l
+
+    mpp = None
+    if hasattr(r, "mpp_record"):
+        mpp = mpp_record_from_grpc(r.mpp_record)
+
+    amp = None
+    if hasattr(r, "amp_record"):
+        amp = amp_record_from_grpc(r.amp_record)
+
+    crecords = []
+    if hasattr(r, "custom_records"):
+        crecords = _crecords(r.custom_records)
+
+    return Route(
+        total_time_lock=r.total_time_lock,
+        total_fees=r.total_fees,
+        total_amt=r.total_amt,
+        hops=_get_hops(r.hops),
+        total_fees_msat=r.total_fees_msat,
+        total_amt_msat=r.total_amt_msat,
+        mpp_record=mpp,
+        amp_record=amp,
+        custom_records=crecords
+    )
+
+
+class HTLCAttemptFailure(BaseModel):
+    # Failure code as defined in the Lightning spec
+    code: int
+
+    # An optional channel update message.
+    channel_update: ChannelUpdate
+
+    # A failure type-dependent htlc value.
+    htlc_msat: int
+
+    # The sha256 sum of the onion payload.
+    onion_sha_256: str
+
+    # A failure type-dependent cltv expiry value.
+    cltv_expiry: int
+
+    # A failure type-dependent flags value.
+    flags: int
+
+    # The position in the path of the intermediate
+    # or final node that generated the failure message.
+    # Position zero is the sender node.
+    failure_source_index: int
+
+    # A failure type-dependent block height.
+    height: int
+
+
+def htlc_attempt_failure_from_grpc(f) -> HTLCAttemptFailure:
+    code = None
+    if hasattr(f, "code"):
+        code = f.code
+
+    htlc_msat = None
+    if hasattr(f, "htlc_msat"):
+        htlc_msat = f.htlc_msat
+
+    return HTLCAttemptFailure(
+        code=code,
+        channel_update=channel_update_from_grpc(f.channel_update),
+        htlc_msat=htlc_msat,
+        onion_sha_256=f.onion_sha_256,
+        cltv_expiry=f.cltv_expiry,
+        flags=f.flags,
+        failure_source_index=f.failure_source_index,
+        height=f.height,
+    )
+
+
+class HTLCStatus(str, Enum):
+    IN_FLIGHT = "IN_FLIGHT"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+def htlc_status_from_grpc(s) -> HTLCStatus:
+    if s == 0:
+        return HTLCStatus.IN_FLIGHT
+    elif s == 1:
+        return HTLCStatus.SUCCEEDED
+    elif s == 2:
+        return HTLCStatus.FAILED
+    else:
+        raise NotImplementedError(f"HTLCStatus {id} is not implemented")
+
+
+class HTLCAttempt(BaseModel):
+    # The unique ID that is used for this attempt.
+    attempt_id: int
+
+    # The status of the HTLC.
+    status: HTLCStatus
+
+    # The route taken by this HTLC.
+    route: Route
+
+    # The time in UNIX nanoseconds at which this HTLC was sent.
+    attempt_time_ns: int
+
+    # The time in UNIX nanoseconds at which this HTLC was settled
+    # or failed. This value will not be set if the HTLC is still IN_FLIGHT.
+    resolve_time_ns: int
+
+    # Detailed htlc failure info.
+    failure: HTLCAttemptFailure
+
+    # The preimage that was used to settle the HTLC.
+    preimage: str
+
+
+def htlc_attempt_from_grpc(a: HTLCAttempt) -> HTLCAttempt:
+    return HTLCAttempt(
+        attempt_id=a.attempt_id,
+        status=htlc_status_from_grpc(a.status),
+        route=route_from_grpc(a.route),
+        attempt_time_ns=a.attempt_time_ns,
+        resolve_time_ns=a.resolve_time_ns,
+        failure=htlc_attempt_failure_from_grpc(a.failure),
+        preimage=a.preimage.hex(),
+    )
+
+
+class Payment(BaseModel):
+    # The payment hash
+    payment_hash: str
+
+    # The payment preimage
+    payment_preimage: Optional[str]
+
+    # The value of the payment in milli-satoshis
+    value_msat: int
+
+    # The optional payment request being fulfilled.
+    payment_request: Optional[str]
+
+    # The status of the payment.
+    status:	PaymentStatus = PaymentStatus.UNKNOWN
+
+    # The fee paid for this payment in milli-satoshis
+    fee_msat: int
+
+    # The time in UNIX nanoseconds at which the payment was created.
+    creation_time_ns: int
+
+    # The HTLCs made in attempt to settle the payment.
+    htlcs: List[HTLCAttempt] = []
+
+    # The creation index of this payment. Each payment can be uniquely
+    # identified by this index, which may not strictly increment by 1
+    # for payments made in older versions of lnd.
+    payment_index: int
+
+    # The failure reason
+    failure_reason:	PaymentFailureReason
+
+
+def payment_from_grpc(p) -> Payment:
+    def _get_attempts(attempts):
+        l = []
+        for a in attempts:
+            l.append(htlc_attempt_from_grpc(a))
+        return l
+
+    return Payment(
+        payment_hash=p.payment_hash,
+        payment_preimage=p.payment_preimage,
+        value_msat=p.value_msat,
+        payment_request=p.payment_request,
+        status=payment_status_from_grpc(p.status),
+        fee_msat=p.fee_msat,
+        creation_time_ns=p.creation_time_ns,
+        htlcs=_get_attempts(p.htlcs),
+        payment_index=p.payment_index,
+        failure_reason=payment_failure_reason(p.failure_reason),
     )

@@ -9,6 +9,7 @@ import requests
 from decouple import config
 from fastapi_plugins import redis_plugin
 
+import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
 import app.repositories.ln_impl.protos.rpc_pb2_grpc as lnrpc
 
 
@@ -65,6 +66,7 @@ class LightningConfig:
             self._channel = grpc.aio.secure_channel(
                 self._lnd_grpc_url, combined_creds)
             self.lnd_stub = lnrpc.LightningStub(self._channel)
+            self.router_stub = routerrpc.RouterStub(self._channel)
 
         elif(self.ln_node == "clightning"):
             # TODO: implement c-lightning
@@ -134,3 +136,4 @@ class SSE():
     BTC_INFO = "btc_info"
 
     LN_INVOICE_STATUS = "ln_invoice_status"
+    LN_PAYMENT_STATUS = "ln_payment_status"

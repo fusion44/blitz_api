@@ -1,6 +1,8 @@
 from app.auth.auth_bearer import JWTBearer
-from app.models.lightning import Invoice
-from app.repositories.lightning import add_invoice, get_wallet_balance
+from app.models.lightning import Invoice, Payment
+from app.repositories.lightning import (add_invoice, get_wallet_balance,
+                                        send_payment)
+from app.routers.lightning_docs import send_payment_desc
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 
@@ -33,5 +35,20 @@ async def getwalletbalance():
         return await get_wallet_balance()
     except HTTPException as r:
         raise HTTPException(r.status_code, detail=r.reason)
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.post("/sendpayment", summary="Attempt to pay a payment request.",
+             description=send_payment_desc,
+             response_description="Either an error or a Payment object on success",
+             dependencies=[Depends(JWTBearer())],
+             status_code=status.HTTP_200_OK,
+             response_model=Payment)
+async def sendpayment(pay_req: str, timeout_seconds: int = 5, fee_limit_msat: int = 8000):
+    try:
+        return await send_payment(pay_req, timeout_seconds, fee_limit_msat)
+    except HTTPException as r:
+        raise HTTPException(r.status_code, detail=r.detail)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
