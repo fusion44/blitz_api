@@ -37,6 +37,8 @@ async def get_bitcoin_info():
     info["headers"] = r["headers"]
     info["initialblockdownload"] = r["initialblockdownload"]
     info["size_on_disk"] = r["size_on_disk"]
+    info["verification_progress"] = r["verificationprogress"]
+    info["pruned"] = r["pruned"]
 
     return info
 

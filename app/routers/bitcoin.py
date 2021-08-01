@@ -1,6 +1,7 @@
 from app.auth.auth_bearer import JWTBearer
 from app.repositories.bitcoin import get_bitcoin_info, handle_block_sub
-from app.routers.bitcoin_docs import blocks_sub_doc, get_bitcoin_info_desc
+from app.routers.bitcoin_docs import (blocks_sub_doc, get_bitcoin_info_desc,
+                                      get_bitcoin_info_response_desc)
 from app.sse_starlette import EventSourceResponse
 from app.utils import bitcoin_rpc
 from fastapi import APIRouter, HTTPException, Request, status
@@ -49,7 +50,7 @@ def getblockchaininfo():
 
 @router.get("/getbitcoininfo", summary="Get general information about bitcoin core",
             description=get_bitcoin_info_desc,
-            response_description="A JSON String with relevant information.",
+            response_description=get_bitcoin_info_response_desc,
             dependencies=[Depends(JWTBearer())],
             status_code=status.HTTP_200_OK)
 async def getbitcoininfo():

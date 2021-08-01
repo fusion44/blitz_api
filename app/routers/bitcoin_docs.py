@@ -11,3 +11,48 @@ If verbosity is 2, returns an Object with information about block <hash> and inf
 get_bitcoin_info_desc = """
 This endpoint returns a combination of various Bitcoin Core calls for easy access.
 """
+
+get_bitcoin_info_response_desc = """
+A JSON object which combines information from Bitcoin Core RPC calls `getnetworkinfo` and `getblockchaininfo`
+
+```JSON
+{
+  "version": 210100,
+  "subversion": "/Satoshi:0.21.1/",
+  "networkactive": true,
+  "networks": [
+    {
+      "name": "ipv4",
+      "limited": false,
+      "reachable": true,
+      "proxy": "",
+      "proxy_randomize_credentials": false
+    },
+    {
+      "name": "ipv6",
+      "limited": false,
+      "reachable": true,
+      "proxy": "",
+      "proxy_randomize_credentials": false
+    },
+    {
+      "name": "onion",
+      "limited": true,
+      "reachable": false,
+      "proxy": "",
+      "proxy_randomize_credentials": false
+    }
+  ],
+  "connections": 3,
+  "connections_in": 1,
+  "connections_out": 3,
+  "chain": "regtest",
+  "blocks": 316,
+  "headers": 316,
+  "initialblockdownload": false,
+  "size_on_disk": 102295,
+  "verification_progress": 1,
+  "pruned":false
+}
+```
+"""
