@@ -5,7 +5,7 @@ get_hw_info_json = """
   "cpu_per_cpu_percent": [
     11.8,
     6.1,
-    12.5,
+    12.5
   ],
   "vram_total_bytes": 25134919680,
   "vram_available_bytes": 17240051712,
@@ -41,6 +41,26 @@ get_hw_info_json = """
   "disk_io_write_count": 133353,
   "disk_io_read_bytes": 5306839040,
   "disk_io_write_bytes": 5593076736,
+  "disks": [
+    {
+      "device": "/dev/sda1",
+      "mountpoint": "/boot/efi",
+      "filesystem_type": "vfat",
+      "partition_total_bytes": 535805952,
+      "partition_used_bytes": 8228864,
+      "partition_free_bytes": 527577088,
+      "partition_percent": 1.5
+    },
+    {
+      "device": "/dev/sda2",
+      "mountpoint": "/",
+      "filesystem_type": "ext4",
+      "partition_total_bytes": 250438021120,
+      "partition_used_bytes": 177157742592,
+      "partition_free_bytes": 60487389184,
+      "partition_percent": 74.5
+    }
+  ],
   "networks": [
     {
       "interface_name": "lo",
@@ -51,7 +71,7 @@ get_hw_info_json = """
       "interface_name": "enp4s0",
       "address": "192.168.1.23",
       "mac_address": "35:a3:5c:6a:4a:f0"
-    },
+    }
   ],
   "networks_bytes_sent": 137088249,
   "networks_bytes_received": 1603400654

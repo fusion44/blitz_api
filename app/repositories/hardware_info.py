@@ -57,13 +57,14 @@ def get_hardware_info() -> map:
 
         try:
             usage = psutil.disk_usage(partition.mountpoint)
-            p['partition_usage_bytes'] = usage.total
+            p['partition_total_bytes'] = usage.total
             p['partition_used_bytes'] = usage.used
             p['partition_free_bytes'] = usage.free
             p['partition_percent'] = usage.percent
         except PermissionError:
             continue
         disks.append(p)
+    info['disks'] = disks
 
     nets = []
     addresses = psutil.net_if_addrs()
