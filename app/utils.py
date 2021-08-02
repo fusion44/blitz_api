@@ -135,5 +135,6 @@ class SSE():
     BTC_NEW_BLOC = "btc_new_bloc"
     BTC_INFO = "btc_info"
 
+    LN_INFO = "ln_info"
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"

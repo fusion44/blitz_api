@@ -4,13 +4,18 @@ from os import error
 import app.repositories.ln_impl.protos.router_pb2 as router
 import app.repositories.ln_impl.protos.rpc_pb2 as ln
 import grpc
-from app.models.lightning import (Invoice, InvoiceState, Payment,
-                                  invoice_from_grpc, payment_from_grpc)
+from app.models.lightning import (Invoice, InvoiceState, LnInfo, Payment,
+                                  invoice_from_grpc, ln_info_from_grpc,
+                                  payment_from_grpc)
 from app.utils import SSE
 from app.utils import lightning_config as lncfg
 from app.utils import send_sse_message
+from decouple import config
 from fastapi.exceptions import HTTPException
 from starlette import status
+
+GATHER_INFO_INTERVALL = config(
+    "gather_ln_info_interval", default=5, cast=float)
 
 
 async def get_wallet_balance_impl() -> object:
@@ -72,9 +77,16 @@ async def send_payment_impl(pay_req: str, timeout_seconds: int, fee_limit_msat: 
                                 detail=error.details())
 
 
+async def get_ln_info_impl() -> LnInfo:
+    req = ln.GetInfoRequest()
+    response = await lncfg.lnd_stub.GetInfo(req)
+    return ln_info_from_grpc(response)
+
+
 async def register_lightning_listener_impl():
     loop = asyncio.get_event_loop()
-    t = loop.create_task(_handle_invoice_listener())
+    loop.create_task(_handle_invoice_listener())
+    loop.create_task(_handle_get_info_gatherer_impl())
 
 
 async def _handle_invoice_listener():
@@ -86,3 +98,15 @@ async def _handle_invoice_listener():
             await send_sse_message(SSE.LN_INVOICE_STATUS, i.dict())
     except error:
         print(error)
+
+
+async def _handle_get_info_gatherer_impl():
+    last_info = None
+    while True:
+        info = await get_ln_info_impl()
+
+        if last_info != info:
+            await send_sse_message(SSE.LN_INFO, info.dict())
+            last_info = info
+
+        await asyncio.sleep(GATHER_INFO_INTERVALL)

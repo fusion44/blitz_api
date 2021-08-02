@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Optional, Union
 
+from deepdiff import DeepDiff
 from pydantic import BaseModel
 
 
@@ -749,4 +750,108 @@ def payment_from_grpc(p) -> Payment:
         htlcs=_get_attempts(p.htlcs),
         payment_index=p.payment_index,
         failure_reason=payment_failure_reason(p.failure_reason),
+    )
+
+
+class Chain(BaseModel):
+    # The blockchain the node is on(eg bitcoin, litecoin)
+    chain: str
+
+    # The network the node is on(eg regtest, testnet, mainnet)
+    network: str
+
+
+class LnInfo(BaseModel):
+    # The version of the LND software that the node is running.
+    version: str
+
+    # The SHA1 commit hash that the daemon is compiled with.
+    commit_hash: str
+
+    # The identity pubkey of the current node.
+    identity_pubkey: str
+
+    # If applicable, the alias of the current node, e.g. "bob"
+    alias: str
+
+    # The color of the current node in hex code format
+    color: str
+
+    # Number of pending channels
+    num_pending_channels: int
+
+    # Number of active channels
+    num_active_channels: int
+
+    # Number of inactive channels
+    num_inactive_channels: int
+
+    # Number of peers
+    num_peers: int
+
+    # The node's current view of the height of the best block
+    block_height: int
+
+    # The node's current view of the hash of the best block
+    block_hash: str
+
+    # Timestamp of the block best known to the wallet
+    best_header_timestamp: int
+
+    # Whether the wallet's view is synced to the main chain
+    synced_to_chain: bool
+
+    # Whether we consider ourselves synced with the public channel graph.
+    synced_to_graph: bool
+
+    # A list of active chains the node is connected to
+    chains: List[Chain]
+
+    # The URIs of the current node.
+    uris: List[str]
+
+    # Features that our node has advertised in our init message,
+    # node announcements and invoices.
+    features: List[FeaturesEntry]
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            diff = DeepDiff(self, other, ignore_order=True)
+            return len(diff) == 0
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+def ln_info_from_grpc(i) -> LnInfo:
+    _chains = []
+    for c in i.chains:
+        _chains.append(Chain(chain=c.chain, network=c.network))
+
+    _features = []
+    for f in i.features:
+        _features.append(features_entry_from_grpc(f, i.features[f]))
+
+    _uris = [u for u in i.uris]
+
+    return LnInfo(
+        version=i.version,
+        commit_hash=i.commit_hash,
+        identity_pubkey=i.identity_pubkey,
+        alias=i.alias,
+        color=i.color,
+        num_pending_channels=i.num_pending_channels,
+        num_active_channels=i.num_active_channels,
+        num_inactive_channels=i.num_inactive_channels,
+        num_peers=i.num_peers,
+        block_height=i.block_height,
+        block_hash=i.block_hash,
+        best_header_timestamp=i.best_header_timestamp,
+        synced_to_chain=i.synced_to_chain,
+        synced_to_graph=i.synced_to_graph,
+        chains=_chains,
+        uris=_uris,
+        features=_features,
     )
