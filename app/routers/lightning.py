@@ -1,5 +1,5 @@
 from app.auth.auth_bearer import JWTBearer
-from app.models.lightning import Invoice, LnInfo, Payment
+from app.models.lightning import Invoice, LnInfo, Payment, WalletBalance
 from app.repositories.lightning import (add_invoice, get_ln_info,
                                         get_wallet_balance, send_payment)
 from app.routers.lightning_docs import send_payment_desc
@@ -26,10 +26,11 @@ async def addinvoice(value_msat: int, memo: str = "", expiry: int = 3600, is_key
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
-@router.get("/getwalletbalance", summary="Get the current on chain balances of the lighting wallet.",
+@router.get("/getbalance", summary="Get the current on chain and channel balances of the lighting wallet.",
             response_description="A JSON String with on chain wallet balances.",
             dependencies=[Depends(JWTBearer())],
-            status_code=status.HTTP_200_OK)
+            status_code=status.HTTP_200_OK,
+            response_model=WalletBalance)
 async def getwalletbalance():
     try:
         return await get_wallet_balance()

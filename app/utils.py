@@ -138,3 +138,5 @@ class SSE():
     LN_INFO = "ln_info"
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"
+
+    WALLET_BALANCE = "wallet_balance"

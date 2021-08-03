@@ -855,3 +855,42 @@ def ln_info_from_grpc(i) -> LnInfo:
         uris=_uris,
         features=_features,
     )
+
+
+class Amount(BaseModel):
+    sat: int
+    msat: int
+
+
+def amount_from_grpc(amount) -> Amount:
+    return Amount(sat=amount.sat, msat=amount.msat)
+
+
+class WalletBalance(BaseModel):
+    onchain_confirmed_balance: int
+    onchain_total_balance: int
+    onchain_unconfirmed_balance: int
+    local_balance: Amount
+    remote_balance: Amount
+    unsettled_local_balance: Amount
+    unsettled_remote_balance: Amount
+    pending_open_local_balance: Amount
+    pending_open_remote_balance: Amount
+
+
+def wallet_balance_from_grpc(onchain, channel) -> WalletBalance:
+    return WalletBalance(
+        onchain_confirmed_balance=onchain.confirmed_balance,
+        onchain_total_balance=onchain.total_balance,
+        onchain_unconfirmed_balance=onchain.unconfirmed_balance,
+        local_balance=amount_from_grpc(channel.local_balance),
+        remote_balance=amount_from_grpc(channel.remote_balance),
+        unsettled_local_balance=amount_from_grpc(
+            channel.unsettled_local_balance),
+        unsettled_remote_balance=amount_from_grpc(
+            channel.unsettled_remote_balance),
+        pending_open_local_balance=amount_from_grpc(
+            channel.pending_open_local_balance),
+        pending_open_remote_balance=amount_from_grpc(
+            channel.pending_open_remote_balance),
+    )

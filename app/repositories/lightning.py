@@ -1,5 +1,5 @@
 from app.models.lightning import Invoice, LnInfo, Payment
-from app.utils import lightning_config
+from app.utils import SSE, lightning_config, send_sse_message
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (add_invoice_impl,
@@ -22,7 +22,14 @@ async def add_invoice(value_msat: int, memo: str = "", expiry: int = 3600, is_ke
 
 
 async def send_payment(pay_req: str, timeout_seconds: int, fee_limit_msat: int) -> Payment:
-    return await send_payment_impl(pay_req, timeout_seconds, fee_limit_msat)
+    res = await send_payment_impl(pay_req, timeout_seconds, fee_limit_msat)
+    update_wallet_balance_via_sse()
+    return res
+
+
+async def update_wallet_balance_via_sse():
+    res = await get_wallet_balance_impl()
+    await send_sse_message(SSE.WALLET_BALANCE, res)
 
 
 async def get_ln_info() -> LnInfo:
