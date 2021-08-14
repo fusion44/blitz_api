@@ -17,30 +17,30 @@ class SignerStub(object):
             channel: A grpc.Channel.
         """
         self.SignOutputRaw = channel.unary_unary(
-                '/signrpc.Signer/SignOutputRaw',
-                request_serializer=signer__pb2.SignReq.SerializeToString,
-                response_deserializer=signer__pb2.SignResp.FromString,
-                )
+            '/signrpc.Signer/SignOutputRaw',
+            request_serializer=signer__pb2.SignReq.SerializeToString,
+            response_deserializer=signer__pb2.SignResp.FromString,
+        )
         self.ComputeInputScript = channel.unary_unary(
-                '/signrpc.Signer/ComputeInputScript',
-                request_serializer=signer__pb2.SignReq.SerializeToString,
-                response_deserializer=signer__pb2.InputScriptResp.FromString,
-                )
+            '/signrpc.Signer/ComputeInputScript',
+            request_serializer=signer__pb2.SignReq.SerializeToString,
+            response_deserializer=signer__pb2.InputScriptResp.FromString,
+        )
         self.SignMessage = channel.unary_unary(
-                '/signrpc.Signer/SignMessage',
-                request_serializer=signer__pb2.SignMessageReq.SerializeToString,
-                response_deserializer=signer__pb2.SignMessageResp.FromString,
-                )
+            '/signrpc.Signer/SignMessage',
+            request_serializer=signer__pb2.SignMessageReq.SerializeToString,
+            response_deserializer=signer__pb2.SignMessageResp.FromString,
+        )
         self.VerifyMessage = channel.unary_unary(
-                '/signrpc.Signer/VerifyMessage',
-                request_serializer=signer__pb2.VerifyMessageReq.SerializeToString,
-                response_deserializer=signer__pb2.VerifyMessageResp.FromString,
-                )
+            '/signrpc.Signer/VerifyMessage',
+            request_serializer=signer__pb2.VerifyMessageReq.SerializeToString,
+            response_deserializer=signer__pb2.VerifyMessageResp.FromString,
+        )
         self.DeriveSharedKey = channel.unary_unary(
-                '/signrpc.Signer/DeriveSharedKey',
-                request_serializer=signer__pb2.SharedKeyRequest.SerializeToString,
-                response_deserializer=signer__pb2.SharedKeyResponse.FromString,
-                )
+            '/signrpc.Signer/DeriveSharedKey',
+            request_serializer=signer__pb2.SharedKeyRequest.SerializeToString,
+            response_deserializer=signer__pb2.SharedKeyResponse.FromString,
+        )
 
 
 class SignerServicer(object):
@@ -122,38 +122,39 @@ class SignerServicer(object):
 
 def add_SignerServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'SignOutputRaw': grpc.unary_unary_rpc_method_handler(
-                    servicer.SignOutputRaw,
-                    request_deserializer=signer__pb2.SignReq.FromString,
-                    response_serializer=signer__pb2.SignResp.SerializeToString,
-            ),
-            'ComputeInputScript': grpc.unary_unary_rpc_method_handler(
-                    servicer.ComputeInputScript,
-                    request_deserializer=signer__pb2.SignReq.FromString,
-                    response_serializer=signer__pb2.InputScriptResp.SerializeToString,
-            ),
-            'SignMessage': grpc.unary_unary_rpc_method_handler(
-                    servicer.SignMessage,
-                    request_deserializer=signer__pb2.SignMessageReq.FromString,
-                    response_serializer=signer__pb2.SignMessageResp.SerializeToString,
-            ),
-            'VerifyMessage': grpc.unary_unary_rpc_method_handler(
-                    servicer.VerifyMessage,
-                    request_deserializer=signer__pb2.VerifyMessageReq.FromString,
-                    response_serializer=signer__pb2.VerifyMessageResp.SerializeToString,
-            ),
-            'DeriveSharedKey': grpc.unary_unary_rpc_method_handler(
-                    servicer.DeriveSharedKey,
-                    request_deserializer=signer__pb2.SharedKeyRequest.FromString,
-                    response_serializer=signer__pb2.SharedKeyResponse.SerializeToString,
-            ),
+        'SignOutputRaw': grpc.unary_unary_rpc_method_handler(
+            servicer.SignOutputRaw,
+            request_deserializer=signer__pb2.SignReq.FromString,
+            response_serializer=signer__pb2.SignResp.SerializeToString,
+        ),
+        'ComputeInputScript': grpc.unary_unary_rpc_method_handler(
+            servicer.ComputeInputScript,
+            request_deserializer=signer__pb2.SignReq.FromString,
+            response_serializer=signer__pb2.InputScriptResp.SerializeToString,
+        ),
+        'SignMessage': grpc.unary_unary_rpc_method_handler(
+            servicer.SignMessage,
+            request_deserializer=signer__pb2.SignMessageReq.FromString,
+            response_serializer=signer__pb2.SignMessageResp.SerializeToString,
+        ),
+        'VerifyMessage': grpc.unary_unary_rpc_method_handler(
+            servicer.VerifyMessage,
+            request_deserializer=signer__pb2.VerifyMessageReq.FromString,
+            response_serializer=signer__pb2.VerifyMessageResp.SerializeToString,
+        ),
+        'DeriveSharedKey': grpc.unary_unary_rpc_method_handler(
+            servicer.DeriveSharedKey,
+            request_deserializer=signer__pb2.SharedKeyRequest.FromString,
+            response_serializer=signer__pb2.SharedKeyResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'signrpc.Signer', rpc_method_handlers)
+        'signrpc.Signer', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
-
  # This class is part of an EXPERIMENTAL API.
+
+
 class Signer(object):
     """Signer is a service that gives access to the signing functionality of the
     daemon's wallet.
@@ -161,85 +162,85 @@ class Signer(object):
 
     @staticmethod
     def SignOutputRaw(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+                      target,
+                      options=(),
+                      channel_credentials=None,
+                      call_credentials=None,
+                      insecure=False,
+                      compression=None,
+                      wait_for_ready=None,
+                      timeout=None,
+                      metadata=None):
         return grpc.experimental.unary_unary(request, target, '/signrpc.Signer/SignOutputRaw',
-            signer__pb2.SignReq.SerializeToString,
-            signer__pb2.SignResp.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+                                             signer__pb2.SignReq.SerializeToString,
+                                             signer__pb2.SignResp.FromString,
+                                             options, channel_credentials,
+                                             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ComputeInputScript(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+                           target,
+                           options=(),
+                           channel_credentials=None,
+                           call_credentials=None,
+                           insecure=False,
+                           compression=None,
+                           wait_for_ready=None,
+                           timeout=None,
+                           metadata=None):
         return grpc.experimental.unary_unary(request, target, '/signrpc.Signer/ComputeInputScript',
-            signer__pb2.SignReq.SerializeToString,
-            signer__pb2.InputScriptResp.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+                                             signer__pb2.SignReq.SerializeToString,
+                                             signer__pb2.InputScriptResp.FromString,
+                                             options, channel_credentials,
+                                             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def SignMessage(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+                    target,
+                    options=(),
+                    channel_credentials=None,
+                    call_credentials=None,
+                    insecure=False,
+                    compression=None,
+                    wait_for_ready=None,
+                    timeout=None,
+                    metadata=None):
         return grpc.experimental.unary_unary(request, target, '/signrpc.Signer/SignMessage',
-            signer__pb2.SignMessageReq.SerializeToString,
-            signer__pb2.SignMessageResp.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+                                             signer__pb2.SignMessageReq.SerializeToString,
+                                             signer__pb2.SignMessageResp.FromString,
+                                             options, channel_credentials,
+                                             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def VerifyMessage(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+                      target,
+                      options=(),
+                      channel_credentials=None,
+                      call_credentials=None,
+                      insecure=False,
+                      compression=None,
+                      wait_for_ready=None,
+                      timeout=None,
+                      metadata=None):
         return grpc.experimental.unary_unary(request, target, '/signrpc.Signer/VerifyMessage',
-            signer__pb2.VerifyMessageReq.SerializeToString,
-            signer__pb2.VerifyMessageResp.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+                                             signer__pb2.VerifyMessageReq.SerializeToString,
+                                             signer__pb2.VerifyMessageResp.FromString,
+                                             options, channel_credentials,
+                                             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def DeriveSharedKey(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+                        target,
+                        options=(),
+                        channel_credentials=None,
+                        call_credentials=None,
+                        insecure=False,
+                        compression=None,
+                        wait_for_ready=None,
+                        timeout=None,
+                        metadata=None):
         return grpc.experimental.unary_unary(request, target, '/signrpc.Signer/DeriveSharedKey',
-            signer__pb2.SharedKeyRequest.SerializeToString,
-            signer__pb2.SharedKeyResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+                                             signer__pb2.SharedKeyRequest.SerializeToString,
+                                             signer__pb2.SharedKeyResponse.FromString,
+                                             options, channel_credentials,
+                                             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
