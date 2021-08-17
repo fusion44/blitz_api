@@ -16,11 +16,11 @@ router = APIRouter(
 )
 
 
-@router.post("/login", summary="Logs the user in with password A",
+@router.post("/login", summary="Logs the user in with the current password",
              response_description="JWT token for the current session.",
              status_code=status.HTTP_200_OK)
 def login(i: LoginInput):
-    if i.password_a == config("password_a", cast=str):
+    if i.password == config("login_password", cast=str):
         return signJWT()
 
     raise HTTPException(status.HTTP_401_UNAUTHORIZED,
