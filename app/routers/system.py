@@ -1,10 +1,12 @@
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
+from app.models.system import LoginInput
 from app.repositories.hardware_info import (HW_INFO_YIELD_TIME,
                                             get_hardware_info,
                                             subscribe_hardware_info)
 from app.routers.system_docs import get_hw_info_json
 from app.sse_starlette import EventSourceResponse
+from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
 
@@ -17,8 +19,8 @@ router = APIRouter(
 @router.post("/login", summary="Logs the user in with password A",
              response_description="JWT token for the current session.",
              status_code=status.HTTP_200_OK)
-def login(password_a: str):
-    if password_a == "123":
+def login(i: LoginInput):
+    if i.password_a == config("password_a", cast=str):
         return signJWT()
 
     raise HTTPException(status.HTTP_401_UNAUTHORIZED,
