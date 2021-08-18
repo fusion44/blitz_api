@@ -32,10 +32,6 @@ app.include_router(lightning.router)
 app.include_router(system.router)
 app.include_router(setup.router)
 
-app = VersionedFastAPI(app,
-                       version_format='{major}',
-                       prefix_format='/v{major}')
-
 
 @app.on_event('startup')
 async def on_startup() -> None:
@@ -49,12 +45,6 @@ async def on_shutdown() -> None:
     await redis_plugin.terminate()
 
 
-@app.get('/')
-def index():
-    # path operation function
-    return {'data': '123'}
-
-
 connections = []
 
 
@@ -62,6 +52,16 @@ connections = []
 async def stream(request: Request, channel: str = "default", redis: Redis = Depends(depends_redis)):
     connections.append(request)
     return EventSourceResponse(subscribe(request, channel, redis))
+
+app = VersionedFastAPI(app,
+                       version_format='{major}',
+                       prefix_format='/v{major}')
+
+
+@app.get('/')
+def index():
+    # path operation function
+    return {'data': '123'}
 
 
 async def subscribe(request: Request, channel: str, redis: Redis):
