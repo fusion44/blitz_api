@@ -5,6 +5,7 @@ from aioredis import Channel, Redis
 from fastapi import Depends, FastAPI, Request
 from fastapi_plugins import (RedisSettings, depends_redis, get_config,
                              redis_plugin, registered_configuration)
+from fastapi_versioning import VersionedFastAPI
 from starlette import status
 
 from app.repositories.bitcoin import (register_bitcoin_info_gatherer,
@@ -30,6 +31,10 @@ app.include_router(bitcoin.router)
 app.include_router(lightning.router)
 app.include_router(system.router)
 app.include_router(setup.router)
+
+app = VersionedFastAPI(app,
+                       version_format='{major}',
+                       prefix_format='/v{major}')
 
 
 @app.on_event('startup')
