@@ -4,10 +4,17 @@ from os import error
 import app.repositories.ln_impl.protos.router_pb2 as router
 import app.repositories.ln_impl.protos.rpc_pb2 as ln
 import grpc
-from app.models.lightning import (Invoice, InvoiceState, LnInfo, Payment,
-                                  WalletBalance, invoice_from_grpc,
-                                  ln_info_from_grpc, payment_from_grpc,
-                                  wallet_balance_from_grpc)
+from app.models.lightning import (
+    Invoice,
+    InvoiceState,
+    LnInfo,
+    Payment,
+    WalletBalance,
+    invoice_from_grpc,
+    ln_info_from_grpc,
+    payment_from_grpc,
+    wallet_balance_from_grpc,
+)
 from app.utils import SSE
 from app.utils import lightning_config as lncfg
 from app.utils import send_sse_message
@@ -15,8 +22,7 @@ from decouple import config
 from fastapi.exceptions import HTTPException
 from starlette import status
 
-GATHER_INFO_INTERVALL = config(
-    "gather_ln_info_interval", default=5, cast=float)
+GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=5, cast=float)
 
 _CACHE = {"wallet_balance": None}
 
@@ -30,7 +36,9 @@ async def get_wallet_balance_impl() -> WalletBalance:
     return wallet_balance_from_grpc(onchain, channel)
 
 
-async def add_invoice_impl(value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False) -> Invoice:
+async def add_invoice_impl(
+    value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
+) -> Invoice:
     i = ln.Invoice(
         memo=memo,
         value_msat=value_msat,
@@ -56,12 +64,14 @@ async def add_invoice_impl(value_msat: int, memo: str = "", expiry: int = 3600, 
     return invoice
 
 
-async def send_payment_impl(pay_req: str, timeout_seconds: int, fee_limit_msat: int) -> Payment:
+async def send_payment_impl(
+    pay_req: str, timeout_seconds: int, fee_limit_msat: int
+) -> Payment:
     try:
         r = router.SendPaymentRequest(
             payment_request=pay_req,
             timeout_seconds=timeout_seconds,
-            fee_limit_msat=fee_limit_msat
+            fee_limit_msat=fee_limit_msat,
         )
 
         p = None
@@ -71,12 +81,17 @@ async def send_payment_impl(pay_req: str, timeout_seconds: int, fee_limit_msat: 
         _update_wallet_balance()
         return p
     except grpc.aio._call.AioRpcError as error:
-        if error.details() != None and error.details().find("invalid bech32 string") > -1:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                detail="Invalid payment request string")
+        if (
+            error.details() != None
+            and error.details().find("invalid bech32 string") > -1
+        ):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+            )
         else:
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
-                                detail=error.details())
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
 
 
 async def get_ln_info_impl() -> LnInfo:

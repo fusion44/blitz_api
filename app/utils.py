@@ -17,7 +17,7 @@ class BitcoinConfig:
     def __init__(self) -> None:
         self.network = config("network")
 
-        if(self.network == "testnet"):
+        if self.network == "testnet":
             self.ip = config("bitcoind_ip_testnet")
             self.rpc_port = config("bitcoind_port_rpc_testnet")
             self.zmq_port = config("bitcoind_port_zmq_hashblock_testnet")
@@ -41,11 +41,11 @@ class LightningConfig:
         self.network = config("network")
         self.ln_node = config("ln_node")
 
-        if(self.ln_node == "lnd"):
+        if self.ln_node == "lnd":
             # Due to updated ECDSA generated tls.cert we need to let gprc know that
             # we need to use that cipher suite otherwise there will be a handshake
             # error when we communicate with the lnd rpc server.
-            os.environ["GRPC_SSL_CIPHER_SUITES"] = 'HIGH+ECDSA'
+            os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
 
             # Uncomment to see full gRPC logs
             # os.environ["GRPC_TRACE"] = 'all'
@@ -60,31 +60,30 @@ class LightningConfig:
 
             auth_creds = grpc.metadata_call_credentials(self.metadata_callback)
             ssl_creds = grpc.ssl_channel_credentials(self._lnd_cert)
-            combined_creds = grpc.composite_channel_credentials(
-                ssl_creds, auth_creds)
+            combined_creds = grpc.composite_channel_credentials(ssl_creds, auth_creds)
 
-            self._channel = grpc.aio.secure_channel(
-                self._lnd_grpc_url, combined_creds)
+            self._channel = grpc.aio.secure_channel(self._lnd_grpc_url, combined_creds)
             self.lnd_stub = lnrpc.LightningStub(self._channel)
             self.router_stub = routerrpc.RouterStub(self._channel)
 
-        elif(self.ln_node == "clightning"):
+        elif self.ln_node == "clightning":
             # TODO: implement c-lightning
             pass
         else:
             raise NameError(
-                f"Node type \"{self.ln_node}\" is unknown. Use \"lnd\" or \"clightning\"")
+                f'Node type "{self.ln_node}" is unknown. Use "lnd" or "clightning"'
+            )
 
     def metadata_callback(self, context, callback):
         # for more info see grpc docs
-        callback([('macaroon', self.lnd_macaroon)], None)
+        callback([("macaroon", self.lnd_macaroon)], None)
 
 
 lightning_config = LightningConfig()
 
 
 def bitcoin_rpc(method: str, params: list = []) -> requests.Response:
-    """Make an RPC request to the Bitcoin daemon 
+    """Make an RPC request to the Bitcoin daemon
 
     Connection parameters are read from the .env file.
 
@@ -97,16 +96,26 @@ def bitcoin_rpc(method: str, params: list = []) -> requests.Response:
     """
     auth = (bitcoin_config.username, bitcoin_config.pw)
     headers = {"Content-type": "text/plain"}
-    data = '{"jsonrpc": "2.0", "method": "' + \
-        method + '", "id":"0", "params":' + json.dumps(params) + '}'
+    data = (
+        '{"jsonrpc": "2.0", "method": "'
+        + method
+        + '", "id":"0", "params":'
+        + json.dumps(params)
+        + "}"
+    )
     return requests.post(bitcoin_config.rpc_url, auth=auth, headers=headers, data=data)
 
 
 async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
     auth = aiohttp.BasicAuth(bitcoin_config.username, bitcoin_config.pw)
     headers = {"Content-type": "text/plain"}
-    data = '{"jsonrpc": "2.0", "method": "' + \
-        method + '", "id":"0", "params":' + json.dumps(params) + '}'
+    data = (
+        '{"jsonrpc": "2.0", "method": "'
+        + method
+        + '", "id":"0", "params":'
+        + json.dumps(params)
+        + "}"
+    )
 
     async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
         async with session.post(bitcoin_config.rpc_url, data=data) as resp:
@@ -127,7 +136,7 @@ async def send_sse_message(id: str, json_data: Dict):
     await redis_plugin.redis.publish_json("default", {"id": id, "data": json_data})
 
 
-class SSE():
+class SSE:
     SYS_STATUS = "sys_status"
 
     BTC_NETWORK_STATUS = "btc_network_status"

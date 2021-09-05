@@ -4,13 +4,9 @@ from os import stat
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from aioredis import Redis
-from app.auth.auth_bearer import JWTBearer
 from fastapi_plugins import depends_redis, redis_plugin
 
-router = APIRouter(
-    prefix="/setup",
-    tags=["Setup"]
-)
+router = APIRouter(prefix="/setup", tags=["Setup"])
 
 
 class SetupErrors(Enum):
@@ -19,20 +15,34 @@ class SetupErrors(Enum):
 
 
 async def fake_system_activity(redis: Redis):
-    await redis.publish_json("default", {"type": "system_busy", "data": "Please hold on the line"})
+    await redis.publish_json(
+        "default", {"type": "system_busy", "data": "Please hold on the line"}
+    )
     await asyncio.sleep(1)
-    await redis.publish_json("default", {"type": "system_busy", "data": "Updating stuff"})
+    await redis.publish_json(
+        "default", {"type": "system_busy", "data": "Updating stuff"}
+    )
     await asyncio.sleep(2)
-    await redis.publish_json("default", {"type": "system_busy", "data": "Installing stuff"})
+    await redis.publish_json(
+        "default", {"type": "system_busy", "data": "Installing stuff"}
+    )
     await asyncio.sleep(1)
-    await redis.publish_json("default", {"type": "system_busy", "data": "Ensuring world peace"})
+    await redis.publish_json(
+        "default", {"type": "system_busy", "data": "Ensuring world peace"}
+    )
     await asyncio.sleep(1)
-    await redis.publish_json("default", {"type": "system_busy", "data": "Solving world hunger"})
+    await redis.publish_json(
+        "default", {"type": "system_busy", "data": "Solving world hunger"}
+    )
     await asyncio.sleep(1)
-    await redis.publish_json("default", {"type": "system_busy", "data": "Bitcoin fixes this"})
+    await redis.publish_json(
+        "default", {"type": "system_busy", "data": "Bitcoin fixes this"}
+    )
 
 
-def make_error(error_id: int, endpoint_url: str, err_description: str, description: str):
+def make_error(
+    error_id: int, endpoint_url: str, err_description: str, description: str
+):
     return {
         "error_id": error_id,
         "endpoint_url": endpoint_url,
@@ -50,28 +60,30 @@ def set_status(status: int, endpoint_url: str, description: str):
 
 
 def get_setup_type_options(error: str = ""):
-    return {"data": {
-        "error": error,
-        "type": "ask_setup_type",
-        "endpoint_url": "/setup/type/{id}",
-        "options": [
-            {
-                "id": 1,
-                "short_desc": "Bitcoin",
-                "long_desc": "Setup your RaspiBlitz as a Bitcoin Core node."
-            },
-            {
-                "id": 2,
-                "short_desc": "Litecoin",
-                "long_desc": "Setup your RaspiBlitz as a Litecoin Core node."
-            },
-            {
-                "id": 3,
-                "short_desc": "Migrate a RaspiBlitz",
-                "long_desc": "Setup your RaspiBlitz as a Litecoin Core node."
-            },
-        ]
-    }}
+    return {
+        "data": {
+            "error": error,
+            "type": "ask_setup_type",
+            "endpoint_url": "/setup/type/{id}",
+            "options": [
+                {
+                    "id": 1,
+                    "short_desc": "Bitcoin",
+                    "long_desc": "Setup your RaspiBlitz as a Bitcoin Core node.",
+                },
+                {
+                    "id": 2,
+                    "short_desc": "Litecoin",
+                    "long_desc": "Setup your RaspiBlitz as a Litecoin Core node.",
+                },
+                {
+                    "id": 3,
+                    "short_desc": "Migrate a RaspiBlitz",
+                    "long_desc": "Setup your RaspiBlitz as a Litecoin Core node.",
+                },
+            ],
+        }
+    }
 
 
 setup_status = set_status(2, "/setup/start_setup", "HDD needs setup (2)")
@@ -96,7 +108,9 @@ async def start_setup(redis: Redis = Depends(depends_redis)):
     await asyncio.sleep(1)
     await redis.publish_json("default", {"data": "Hardware test"})
     await asyncio.sleep(1)
-    await redis.publish_json("default", {"data": "Hardware looks good! Ready to proceed - have fun!"})
+    await redis.publish_json(
+        "default", {"data": "Hardware looks good! Ready to proceed - have fun!"}
+    )
     await asyncio.sleep(1)
     await redis.publish_json("default", get_setup_type_options())
 
@@ -112,11 +126,16 @@ async def start_setup(id: int, redis: Redis = Depends(depends_redis)):
         await redis.publish_json("default", {"data": "Starting migration ..."})
     else:
         setup_var_type = -1
-        await redis.publish_json("default", get_setup_type_options("Unknown setup type"))
+        await redis.publish_json(
+            "default", get_setup_type_options("Unknown setup type")
+        )
         return
 
     setup_status = set_status(
-        3, "setup/set_name/{name}", "Set name, one word, basic characters and not to long")
+        3,
+        "setup/set_name/{name}",
+        "Set name, one word, basic characters and not to long",
+    )
 
     await redis.publish_json("default", setup_status)
     await fake_system_activity(redis)
@@ -124,61 +143,66 @@ async def start_setup(id: int, redis: Redis = Depends(depends_redis)):
 
 @router.post("/set_name/{name}", status_code=status.HTTP_200_OK)
 async def set_name(name: str, redis: Redis = Depends(depends_redis)):
-    if(len(name) > 80):
-        await redis.publish_json("default", make_error(
-            SetupErrors.NAME_TO_LONG,
-            "setup/set_name/{name}",
-            "Name can be max. 80 characters",
-            "Set name, one word, basic characters and not to long",)
+    if len(name) > 80:
+        await redis.publish_json(
+            "default",
+            make_error(
+                SetupErrors.NAME_TO_LONG,
+                "setup/set_name/{name}",
+                "Name can be max. 80 characters",
+                "Set name, one word, basic characters and not to long",
+            ),
         )
-        raise HTTPException(status.HTTP_406_NOT_ACCEPTABLE,
-                            detail="Name can be max. 80 characters")
-    elif(setup_var_type == -1):
-        await redis.publish_json("default", get_setup_type_options("Setup type must be set first"))
-        raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                            detail="Setup type must be set first")
+        raise HTTPException(
+            status.HTTP_406_NOT_ACCEPTABLE, detail="Name can be max. 80 characters"
+        )
+    elif setup_var_type == -1:
+        await redis.publish_json(
+            "default", get_setup_type_options("Setup type must be set first")
+        )
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Setup type must be set first"
+        )
     else:
         setup_var_name = name
-        setup_status = set_status(
-            3,
-            "/set_password/a/{password}",
-            "Set password A")
+        setup_status = set_status(3, "/set_password/a/{password}", "Set password A")
         await redis.publish_json("default", setup_status)
     await fake_system_activity(redis)
 
 
 @router.post("/set_password/{type}/{password}", status_code=status.HTTP_200_OK)
 async def start_setup(type: str, password: str, redis: Redis = Depends(depends_redis)):
-    if(len(password) < 8):
-        await redis.publish_json("default", make_error(
-            SetupErrors.PASSWORD_TO_SHORT,
-            "setup/set_password/{type}/{password}",
-            "Password must be min. 8 characters",
-            "Set password, min 8 characters")
+    if len(password) < 8:
+        await redis.publish_json(
+            "default",
+            make_error(
+                SetupErrors.PASSWORD_TO_SHORT,
+                "setup/set_password/{type}/{password}",
+                "Password must be min. 8 characters",
+                "Set password, min 8 characters",
+            ),
         )
-        raise HTTPException(status.HTTP_406_NOT_ACCEPTABLE,
-                            detail="Password must be min. 8 characters")
+        raise HTTPException(
+            status.HTTP_406_NOT_ACCEPTABLE, detail="Password must be min. 8 characters"
+        )
     else:
         if type == "a":
             setup_var_password_a = password
             setup_status = set_status(
-                4,
-                "setup/set_password/b/{password}",
-                "Set password B")
+                4, "setup/set_password/b/{password}", "Set password B"
+            )
             await redis.publish_json("default", setup_status)
         elif type == "b":
             setup_var_password_b = password
             setup_status = set_status(
-                4,
-                "setup/set_tor/{enabled}",
-                "Set TOR true or false")
+                4, "setup/set_tor/{enabled}", "Set TOR true or false"
+            )
             await redis.publish_json("default", setup_status)
         elif type == "c":
             setup_var_password_c = password
             setup_status = set_status(
-                5,
-                "setup/set_password/c/{password}",
-                "Set password C")
+                5, "setup/set_password/c/{password}", "Set password C"
+            )
             await redis.publish_json("default", setup_status)
         await fake_system_activity()
 
@@ -187,10 +211,7 @@ async def start_setup(type: str, password: str, redis: Redis = Depends(depends_r
 async def set_tor(enabled: bool, redis: Redis = Depends(depends_redis)):
     setup_var_use_tor = enabled
     await fake_system_activity(redis)
-    setup_status = set_status(
-        5,
-        "setup/format_hdd",
-        "HDD needs to be formatted")
+    setup_status = set_status(5, "setup/format_hdd", "HDD needs to be formatted")
 
     await redis.publish_json("default", setup_status)
 
@@ -199,8 +220,5 @@ async def set_tor(enabled: bool, redis: Redis = Depends(depends_redis)):
 async def format_hdd(redis: Redis = Depends(depends_redis)):
     setup_var_hdd_formatted = True
     await fake_system_activity(redis)
-    setup_status = set_status(
-        7,
-        "setup/set_password/c/{password}",
-        "Set password C")
+    setup_status = set_status(7, "setup/set_password/c/{password}", "Set password C")
     await redis.publish_json("default", setup_status)

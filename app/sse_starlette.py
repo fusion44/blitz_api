@@ -9,8 +9,7 @@ from datetime import datetime
 from typing import Any, Optional, Union
 
 from starlette.background import BackgroundTask
-from starlette.concurrency import (iterate_in_threadpool,
-                                   run_until_first_complete)
+from starlette.concurrency import iterate_in_threadpool, run_until_first_complete
 from starlette.responses import Response
 from starlette.types import Receive, Scope, Send
 
@@ -199,8 +198,7 @@ class EventSourceResponse(Response):
             }
         )
 
-        self._ping_task = self._loop.create_task(
-            self._ping(send))  # type: ignore
+        self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
             if isinstance(data, dict):

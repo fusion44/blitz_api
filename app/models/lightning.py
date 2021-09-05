@@ -13,13 +13,13 @@ class InvoiceState(str, Enum):
 
 
 def invoice_settled_from_grpc(id):
-    if(id == 0):
+    if id == 0:
         return InvoiceState.open
-    elif(id == 1):
+    elif id == 1:
         return InvoiceState.settled
-    elif(id == 2):
+    elif id == 2:
         return InvoiceState.canceled
-    elif(id == 3):
+    elif id == 3:
         return InvoiceState.accepted
     else:
         raise NotImplementedError(f"InvoiceState {id} is not implemented")
@@ -32,11 +32,11 @@ class InvoiceHTLCState(str, Enum):
 
 
 def invoice_settled_from_grpc(id):
-    if(id == 0):
+    if id == 0:
         return InvoiceHTLCState.accepted
-    elif(id == 1):
+    elif id == 1:
         return InvoiceHTLCState.settled
-    elif(id == 2):
+    elif id == 2:
         return InvoiceHTLCState.canceled
     else:
         raise NotImplementedError(f"InvoiceHTLCState {id} is not implemented")
@@ -100,8 +100,8 @@ def amp_from_grpc(a) -> AMP:
 
 
 class CustomRecordsEntry(BaseModel):
-    key	: int
-    value:	str
+    key: int
+    value: str
 
 
 def custom_record_entry_from_grpc(e) -> CustomRecordsEntry:
@@ -116,10 +116,10 @@ class InvoiceHTLC(BaseModel):
     chan_id: int
 
     # Index identifying the htlc on the channel.
-    htlc_index:	int
+    htlc_index: int
 
     # The amount of the htlc in msat.
-    amt_msat:	int
+    amt_msat: int
 
     # Block height at which this htlc was accepted.
     accept_height: int
@@ -137,7 +137,7 @@ class InvoiceHTLC(BaseModel):
     state: InvoiceHTLCState
 
     # Custom tlv records.
-    custom_records:	List[CustomRecordsEntry]
+    custom_records: List[CustomRecordsEntry]
 
     # The total amount of the mpp payment in msat.
     mpp_total_amt_msat: int
@@ -166,7 +166,6 @@ def invoice_htlc_from_grpc(h) -> InvoiceHTLC:
         custom_records=_crecords(h.custom_records),
         mpp_total_amt_msat=h.mpp_total_amt_msat,
         amp=amp_from_grpc(h.amp),
-
     )
 
 
@@ -248,7 +247,7 @@ class Invoice(BaseModel):
     fallback_addr: Optional[str]
 
     # Delta to use for the time-lock of the CLTV extended to the final hop.
-    cltv_expiry	: Optional[int]
+    cltv_expiry: Optional[int]
 
     # Route hints that can each be individually used
     # to assist in reaching the invoice's destination.
@@ -304,7 +303,7 @@ class Invoice(BaseModel):
     payment_addr: Optional[str]
 
     # Signals whether or not this is an AMP invoice.
-    is_amp:	Optional[bool]
+    is_amp: Optional[bool]
 
 
 def invoice_from_grpc(i) -> Invoice:
@@ -390,7 +389,9 @@ class PaymentFailureReason(str, Enum):
     FAILURE_REASON_ERROR = "FAILURE_REASON_ERROR"
 
     # Payment details incorrect(unknown hash, invalid amt or invalid final cltv delta)
-    FAILURE_REASON_INCORRECT_PAYMENT_DETAILS = "FAILURE_REASON_INCORRECT_PAYMENT_DETAILS"
+    FAILURE_REASON_INCORRECT_PAYMENT_DETAILS = (
+        "FAILURE_REASON_INCORRECT_PAYMENT_DETAILS"
+    )
 
     # Insufficient local balance.
     FAILURE_REASON_INSUFFICIENT_BALANCE = "FAILURE_REASON_INSUFFICIENT_BALANCE"
@@ -410,8 +411,7 @@ def payment_failure_reason(f) -> PaymentFailureReason:
     elif f == 5:
         return PaymentFailureReason.FAILURE_REASON_INSUFFICIENT_BALANCE
     else:
-        raise NotImplementedError(
-            f"PaymentFailureReason {id} is not implemented")
+        raise NotImplementedError(f"PaymentFailureReason {id} is not implemented")
 
 
 class ChannelUpdate(BaseModel):
@@ -555,7 +555,7 @@ class Route(BaseModel):
     total_amt_msat: int
     mpp_record: Union[MPPRecord, None]
     amp_record: Union[AMPRecord, None]
-    custom_records:	List[CustomRecordsEntry]
+    custom_records: List[CustomRecordsEntry]
 
 
 def route_from_grpc(r):
@@ -592,7 +592,7 @@ def route_from_grpc(r):
         total_amt_msat=r.total_amt_msat,
         mpp_record=mpp,
         amp_record=amp,
-        custom_records=crecords
+        custom_records=crecords,
     )
 
 
@@ -712,7 +712,7 @@ class Payment(BaseModel):
     payment_request: Optional[str]
 
     # The status of the payment.
-    status:	PaymentStatus = PaymentStatus.UNKNOWN
+    status: PaymentStatus = PaymentStatus.UNKNOWN
 
     # The fee paid for this payment in milli-satoshis
     fee_msat: int
@@ -729,7 +729,7 @@ class Payment(BaseModel):
     payment_index: int
 
     # The failure reason
-    failure_reason:	PaymentFailureReason
+    failure_reason: PaymentFailureReason
 
 
 def payment_from_grpc(p) -> Payment:
@@ -885,12 +885,10 @@ def wallet_balance_from_grpc(onchain, channel) -> WalletBalance:
         onchain_unconfirmed_balance=onchain.unconfirmed_balance,
         local_balance=amount_from_grpc(channel.local_balance),
         remote_balance=amount_from_grpc(channel.remote_balance),
-        unsettled_local_balance=amount_from_grpc(
-            channel.unsettled_local_balance),
-        unsettled_remote_balance=amount_from_grpc(
-            channel.unsettled_remote_balance),
-        pending_open_local_balance=amount_from_grpc(
-            channel.pending_open_local_balance),
+        unsettled_local_balance=amount_from_grpc(channel.unsettled_local_balance),
+        unsettled_remote_balance=amount_from_grpc(channel.unsettled_remote_balance),
+        pending_open_local_balance=amount_from_grpc(channel.pending_open_local_balance),
         pending_open_remote_balance=amount_from_grpc(
-            channel.pending_open_remote_balance),
+            channel.pending_open_remote_balance
+        ),
     )

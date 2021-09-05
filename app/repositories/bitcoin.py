@@ -13,17 +13,21 @@ from starlette import status
 
 async def get_blockchain_info() -> BlockchainInfo:
     result = await bitcoin_rpc_async("getblockchaininfo")
-    if(result["error"] != None):
+    if result["error"] != None:
         raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"])
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"]
+        )
     return BlockchainInfo.from_rpc(result["result"])
+
 
 async def get_network_info() -> NetworkInfo:
     result = await bitcoin_rpc_async("getnetworkinfo")
-    if(result["error"] != None):
+    if result["error"] != None:
         raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"])
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"]
+        )
     return NetworkInfo.from_rpc(result["result"])
+
 
 async def get_btc_status() -> BtcStatus:
     binfo = await get_blockchain_info()
@@ -31,7 +35,7 @@ async def get_btc_status() -> BtcStatus:
     return BtcStatus.from_rpc(binfo, ninfo)
 
 
-async def handle_block_sub(request: Request,  verbosity: int = 1) -> str:
+async def handle_block_sub(request: Request, verbosity: int = 1) -> str:
     ctx = zmq.asyncio.Context()
     zmq_socket = ctx.socket(zmq.SUB)
     zmq_socket.setsockopt(zmq.RCVHWM, 0)
@@ -44,8 +48,8 @@ async def handle_block_sub(request: Request,  verbosity: int = 1) -> str:
             break
 
         _, body, _ = await zmq_socket.recv_multipart()
-        hash = binascii.hexlify(body).decode('utf-8')
-        r = await bitcoin_rpc_async('getblock', [hash, verbosity])
+        hash = binascii.hexlify(body).decode("utf-8")
+        r = await bitcoin_rpc_async("getblock", [hash, verbosity])
         yield json.dumps(r["result"])
 
 
