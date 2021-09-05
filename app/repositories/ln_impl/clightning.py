@@ -1,6 +1,10 @@
 from app.models.lightning import Invoice, LnInfo, Payment
 
 
+def get_implementation_name() -> str:
+    return "c-lightning"
+
+
 async def get_wallet_balance_impl():
     raise NotImplementedError("c-lightning not yet implemented")
 

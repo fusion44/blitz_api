@@ -1,8 +1,15 @@
 from app.auth.auth_bearer import JWTBearer
-from app.models.lightning import Invoice, LnInfo, Payment, WalletBalance
+from app.models.lightning import (
+    Invoice,
+    LightningStatus,
+    LnInfo,
+    Payment,
+    WalletBalance,
+)
 from app.repositories.lightning import (
     add_invoice,
     get_ln_info,
+    get_ln_status,
     get_wallet_balance,
     send_payment,
 )
@@ -11,6 +18,22 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 
 router = APIRouter(prefix="/lightning", tags=["Lightning"])
+
+
+@router.get(
+    "/get_ln_status",
+    summary="Get current lightning system status",
+    dependencies=[Depends(JWTBearer())],
+    status_code=status.HTTP_200_OK,
+    response_model=LightningStatus,
+)
+async def get_ln_status_path():
+    try:
+        return await get_ln_status()
+    except HTTPException as r:
+        raise HTTPException(r.status_code, detail=r.reason)
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.post(

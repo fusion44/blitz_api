@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Optional, Union
 
 from deepdiff import DeepDiff
+from fastapi.param_functions import Query
 from pydantic import BaseModel
 
 
@@ -857,38 +858,80 @@ def ln_info_from_grpc(i) -> LnInfo:
     )
 
 
-class Amount(BaseModel):
-    sat: int
-    msat: int
+class LightningStatus(BaseModel):
+    implementation: str = Query(
+        ..., description="Lightning software implementation (LND, c-lightning)"
+    )
+    version: str = Query(..., description="Version of the implementation")
+    num_pending_channels: int = Query(..., description="Number of pending channels")
+    num_active_channels: int = Query(..., description="Number of active channels")
+    num_inactive_channels: int = Query(..., description="Number of inactive channels")
+    block_height: int = Query(
+        ..., description="The node's current view of the height of the best block"
+    )
+    synced_to_chain: bool = Query(
+        ..., description="Whether the wallet's view is synced to the main chain"
+    )
+    synced_to_graph: bool = Query(
+        ...,
+        description="Whether we consider ourselves synced with the public channel graph.",
+    )
 
-
-def amount_from_grpc(amount) -> Amount:
-    return Amount(sat=amount.sat, msat=amount.msat)
+    @classmethod
+    def from_grpc(cls, name: str, info: LnInfo):
+        return cls(
+            implementation=name,
+            version=info.version,
+            num_pending_channels=info.num_pending_channels,
+            num_active_channels=info.num_active_channels,
+            num_inactive_channels=info.num_inactive_channels,
+            block_height=info.block_height,
+            synced_to_chain=info.synced_to_chain,
+            synced_to_graph=info.synced_to_graph,
+        )
 
 
 class WalletBalance(BaseModel):
-    onchain_confirmed_balance: int
-    onchain_total_balance: int
-    onchain_unconfirmed_balance: int
-    local_balance: Amount
-    remote_balance: Amount
-    unsettled_local_balance: Amount
-    unsettled_remote_balance: Amount
-    pending_open_local_balance: Amount
-    pending_open_remote_balance: Amount
-
-
-def wallet_balance_from_grpc(onchain, channel) -> WalletBalance:
-    return WalletBalance(
-        onchain_confirmed_balance=onchain.confirmed_balance,
-        onchain_total_balance=onchain.total_balance,
-        onchain_unconfirmed_balance=onchain.unconfirmed_balance,
-        local_balance=amount_from_grpc(channel.local_balance),
-        remote_balance=amount_from_grpc(channel.remote_balance),
-        unsettled_local_balance=amount_from_grpc(channel.unsettled_local_balance),
-        unsettled_remote_balance=amount_from_grpc(channel.unsettled_remote_balance),
-        pending_open_local_balance=amount_from_grpc(channel.pending_open_local_balance),
-        pending_open_remote_balance=amount_from_grpc(
-            channel.pending_open_remote_balance
-        ),
+    onchain_confirmed_balance: int = Query(
+        ...,
+        description="Confirmed onchain balance (more than three confirmations) in sat",
     )
+    onchain_total_balance: int = Query(
+        ..., description="Total combined onchain balance in sat"
+    )
+    onchain_unconfirmed_balance: int = Query(
+        ...,
+        description="Unconfirmed onchain balance (less than three confirmations) in sat",
+    )
+    channel_local_balance: int = Query(
+        ..., description="Sum of channels local balances in msat"
+    )
+    channel_remote_balance: int = Query(
+        ..., description="Sum of channels remote balances in msat."
+    )
+    channel_unsettled_local_balance: int = Query(
+        ..., description="Sum of channels local unsettled balances in msat."
+    )
+    channel_unsettled_remote_balance: int = Query(
+        ..., description="Sum of channels remote unsettled balances in msat."
+    )
+    channel_pending_open_local_balance: int = Query(
+        ..., description="Sum of channels pending local balances in msat."
+    )
+    channel_pending_open_remote_balance: int = Query(
+        ..., description="Sum of channels pending remote balances in msat."
+    )
+
+    @classmethod
+    def from_grpc(cls, onchain, channel) -> "WalletBalance":
+        return cls(
+            onchain_confirmed_balance=onchain.confirmed_balance,
+            onchain_total_balance=onchain.total_balance,
+            onchain_unconfirmed_balance=onchain.unconfirmed_balance,
+            channel_local_balance=channel.local_balance.msat,
+            channel_remote_balance=channel.remote_balance.msat,
+            channel_unsettled_local_balance=channel.unsettled_local_balance.msat,
+            channel_unsettled_remote_balance=channel.unsettled_remote_balance.msat,
+            channel_pending_open_local_balance=channel.pending_open_local_balance.msat,
+            channel_pending_open_remote_balance=channel.pending_open_remote_balance.msat,
+        )

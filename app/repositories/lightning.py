@@ -1,9 +1,10 @@
-from app.models.lightning import Invoice, LnInfo, Payment
+from app.models.lightning import Invoice, LightningStatus, LnInfo, Payment
 from app.utils import SSE, lightning_config, send_sse_message
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
         add_invoice_impl,
+        get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
         register_lightning_listener_impl,
@@ -12,11 +13,18 @@ if lightning_config.ln_node == "lnd":
 else:
     from app.repositories.ln_impl.clightning import (
         add_invoice_impl,
+        get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
         register_lightning_listener_impl,
         send_payment_impl,
     )
+
+
+async def get_ln_status() -> LightningStatus:
+    ln_info = await get_ln_info_impl()
+    name = get_implementation_name()
+    return LightningStatus.from_grpc(name, ln_info)
 
 
 async def get_wallet_balance():

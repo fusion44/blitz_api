@@ -13,7 +13,6 @@ from app.models.lightning import (
     invoice_from_grpc,
     ln_info_from_grpc,
     payment_from_grpc,
-    wallet_balance_from_grpc,
 )
 from app.utils import SSE
 from app.utils import lightning_config as lncfg
@@ -27,13 +26,17 @@ GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=5, cast=float)
 _CACHE = {"wallet_balance": None}
 
 
+def get_implementation_name() -> str:
+    return "LND"
+
+
 async def get_wallet_balance_impl() -> WalletBalance:
     req = ln.WalletBalanceRequest()
     req = ln.ChannelBalanceRequest()
     onchain = await lncfg.lnd_stub.WalletBalance(req)
     channel = await lncfg.lnd_stub.ChannelBalance(req)
 
-    return wallet_balance_from_grpc(onchain, channel)
+    return WalletBalance.from_grpc(onchain, channel)
 
 
 async def add_invoice_impl(
