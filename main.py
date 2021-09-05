@@ -17,7 +17,7 @@ from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
-from app.repositories.hardware_info import register_hardware_info_gatherer
+from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.lightning import register_lightning_listener
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse

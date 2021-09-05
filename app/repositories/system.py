@@ -1,6 +1,8 @@
 import asyncio
 
 import psutil
+from app.models.system import SystemInfo
+from app.repositories.lightning import get_ln_info
 from app.utils import SSE, send_sse_message
 from decouple import config
 from fastapi import Request
@@ -8,6 +10,11 @@ from fastapi import Request
 SLEEP_TIME = config("gather_hw_info_interval", default=2, cast=float)
 CPU_AVG_PERIOD = config("cpu_usage_averaging_period", default=0.5, cast=float)
 HW_INFO_YIELD_TIME = SLEEP_TIME + CPU_AVG_PERIOD
+
+
+async def get_system_info() -> SystemInfo:
+    lninfo = await get_ln_info()
+    return SystemInfo.from_rpc(lninfo)
 
 
 async def subscribe_hardware_info(request: Request):

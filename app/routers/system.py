@@ -1,9 +1,10 @@
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
-from app.models.system import LoginInput
-from app.repositories.hardware_info import (
+from app.models.system import LoginInput, SystemInfo
+from app.repositories.system import (
     HW_INFO_YIELD_TIME,
     get_hardware_info,
+    get_system_info,
     subscribe_hardware_info,
 )
 from app.routers.system_docs import get_hw_info_json
@@ -26,6 +27,16 @@ def login(i: LoginInput):
         return signJWT()
 
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
+
+
+@router.get(
+    "/get_system_info",
+    summary="Get system status information",
+    dependencies=[Depends(JWTBearer())],
+    response_model=SystemInfo,
+)
+async def get_system_info_path():
+    return await get_system_info()
 
 
 @router.get(
