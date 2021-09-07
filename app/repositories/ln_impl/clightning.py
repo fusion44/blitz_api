@@ -25,5 +25,5 @@ async def get_ln_info_impl() -> LnInfo:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
-async def register_lightning_listener_impl():
+async def listen_invoices() -> Invoice:
     raise NotImplementedError("c-lightning not yet implemented")
