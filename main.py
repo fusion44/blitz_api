@@ -17,8 +17,8 @@ from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
-from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.lightning import register_lightning_listener
+from app.repositories.system import register_hardware_info_gatherer
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse
 
@@ -40,8 +40,16 @@ app.include_router(system.router)
 app.include_router(setup.router)
 
 
+connections = []
+
+
+app = VersionedFastAPI(
+    app, version_format="{major}", prefix_format="/v{major}", enable_latest=True
+)
+
+
 @app.on_event("startup")
-async def on_startup() -> None:
+async def on_startup():
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
     await register_all_handlers()
@@ -52,7 +60,10 @@ async def on_shutdown() -> None:
     await redis_plugin.terminate()
 
 
-connections = []
+@app.get("/")
+def index():
+    # path operation function
+    return {"data": "123"}
 
 
 @app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
@@ -61,15 +72,6 @@ async def stream(
 ):
     connections.append(request)
     return EventSourceResponse(subscribe(request, channel, redis))
-
-
-app = VersionedFastAPI(app, version_format="{major}", prefix_format="/v{major}")
-
-
-@app.get("/")
-def index():
-    # path operation function
-    return {"data": "123"}
 
 
 async def subscribe(request: Request, channel: str, redis: Redis):
