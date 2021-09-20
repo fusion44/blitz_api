@@ -1,15 +1,30 @@
 import asyncio
+from os import path
 
 import psutil
-from app.models.system import SystemInfo
+from app.models.system import RawDebugLogData, SystemInfo
 from app.repositories.lightning import get_ln_info
 from app.utils import SSE, send_sse_message
 from decouple import config
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 
 SLEEP_TIME = config("gather_hw_info_interval", default=2, cast=float)
 CPU_AVG_PERIOD = config("cpu_usage_averaging_period", default=0.5, cast=float)
 HW_INFO_YIELD_TIME = SLEEP_TIME + CPU_AVG_PERIOD
+
+SHELL_SCRIPT_PATH = config("shell_script_path")
+GET_DEBUG_LOG_SCRIPT = path.join(SHELL_SCRIPT_PATH, "XXdebugLogs.sh")
+
+
+def _check_shell_scripts_status():
+    if not path.exists(SHELL_SCRIPT_PATH):
+        raise Exception(f"invalid shell script path: {SHELL_SCRIPT_PATH}")
+
+    if not path.isfile(GET_DEBUG_LOG_SCRIPT):
+        raise Exception(f"Required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
+
+
+_check_shell_scripts_status()
 
 
 async def get_system_info() -> SystemInfo:
@@ -91,6 +106,34 @@ def get_hardware_info() -> map:
     info["networks_bytes_received"] = net_io.bytes_recv
 
     return info
+
+
+async def get_debug_logs_raw() -> RawDebugLogData:
+    cmd = f"bash {GET_DEBUG_LOG_SCRIPT}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await proc.communicate()
+
+    if stderr:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"""
+f"[{cmd!r} exited with {proc.returncode}]"\n
+[stderr]\n{stderr.decode()}
+        """,
+        )
+
+    if stdout:
+        return RawDebugLogData(raw_data=f"[stdout]\n{stdout.decode()}")
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"{cmd} returned no error and no output.",
+    )
 
 
 async def _handle_gather_hardware_info():

@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from app.models.lightning import LnInfo
+from app.routers.system_docs import get_debug_data_sample_str
 from fastapi import Query
 from fastapi.param_functions import Query
 from pydantic import BaseModel
@@ -113,3 +114,13 @@ class SystemInfo(BaseModel):
                 0
             ].network,  # for now, assume we are only on bitcoin chain
         )
+
+
+class RawDebugLogData(BaseModel):
+    raw_data: str = Query(
+        ..., description="The raw debug log text", example=get_debug_data_sample_str
+    )
+    github_issues_url: str = Query(
+        "https://www.github.com/rootzoll/raspiblitz/issues",
+        description="Link to the Raspiblitz issue tracker",
+    )

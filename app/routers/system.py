@@ -1,13 +1,19 @@
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
-from app.models.system import LoginInput, SystemInfo
+from app.models.system import LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
+    get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
     subscribe_hardware_info,
 )
-from app.routers.system_docs import get_hw_info_json
+from app.routers.system_docs import (
+    get_debug_logs_raw_desc,
+    get_debug_logs_raw_resp_desc,
+    get_debug_logs_raw_summary,
+    get_hw_info_json,
+)
 from app.sse_starlette import EventSourceResponse
 from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
@@ -49,6 +55,19 @@ async def get_system_info_path():
 )
 def hw_info() -> map:
     return get_hardware_info()
+
+
+@router.get(
+    "/get_debug_logs_raw",
+    name="system.get_debug_logs_raw",
+    summary=get_debug_logs_raw_summary,
+    description=get_debug_logs_raw_desc,
+    response_description=get_debug_logs_raw_resp_desc,
+    response_model=RawDebugLogData,
+    dependencies=[Depends(JWTBearer())],
+)
+async def get_debug_logs_raw_route() -> RawDebugLogData:
+    return await get_debug_logs_raw()
 
 
 @router.get(
