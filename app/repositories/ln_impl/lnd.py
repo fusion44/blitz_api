@@ -9,6 +9,7 @@ from app.models.lightning import (
     InvoiceState,
     LnInfo,
     Payment,
+    PaymentRequest,
     WalletBalance,
     invoice_from_grpc,
     ln_info_from_grpc,
@@ -60,6 +61,25 @@ async def add_invoice_impl(
     )
 
     return invoice
+
+
+async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
+    try:
+        req = ln.PayReqString(pay_req=pay_req)
+        res = await lncfg.lnd_stub.DecodePayReq(req)
+        return PaymentRequest.from_grpc(res)
+    except grpc.aio._call.AioRpcError as error:
+        if (
+            error.details() != None
+            and error.details().find("checksum failed.") > -1
+        ):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+            )
+        else:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
 
 
 async def send_payment_impl(

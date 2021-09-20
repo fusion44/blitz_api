@@ -4,17 +4,19 @@ from app.models.lightning import (
     LightningStatus,
     LnInfo,
     Payment,
+    PaymentRequest,
     WalletBalance,
 )
 from app.repositories.lightning import (
     add_invoice,
+    decode_pay_request,
     get_ln_info,
     get_ln_status,
     get_wallet_balance,
     send_payment,
 )
 from app.routers.lightning_docs import send_payment_desc
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.params import Depends
 
 router = APIRouter(prefix="/lightning", tags=["Lightning"])
@@ -107,3 +109,17 @@ async def get_info():
         raise HTTPException(r.status_code, detail=r.detail)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/decode-pay-req",
+    name="lightning.decode-pay-req",
+    summary="DecodePayReq takes an encoded payment request string and attempts to decode it, returning a full description of the conditions encoded within the payment request.",
+    response_model=PaymentRequest,
+    response_description="A fully decoded payment request or a HTTP status 400 if the payment request cannot be decoded.",
+    dependencies=[Depends(JWTBearer())],
+)
+async def get_decode_pay_request(
+    pay_req: str = Query(..., description="The payment request string to be decoded")
+):
+    return await decode_pay_request(pay_req)

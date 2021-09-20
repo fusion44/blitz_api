@@ -1,12 +1,19 @@
 import asyncio
 
-from app.models.lightning import Invoice, LightningStatus, LnInfo, Payment
+from app.models.lightning import (
+    Invoice,
+    LightningStatus,
+    LnInfo,
+    Payment,
+    PaymentRequest,
+)
 from app.utils import SSE, lightning_config, send_sse_message
 from decouple import config
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
         add_invoice_impl,
+        decode_pay_request_impl,
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
@@ -16,6 +23,7 @@ if lightning_config.ln_node == "lnd":
 else:
     from app.repositories.ln_impl.clightning import (
         add_invoice_impl,
+        decode_pay_request_impl,
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
@@ -42,6 +50,10 @@ async def add_invoice(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
     return await add_invoice_impl(memo, value_msat, expiry, is_keysend)
+
+
+async def decode_pay_request(pay_req: str) -> PaymentRequest:
+    return await decode_pay_request_impl(pay_req)
 
 
 async def send_payment(

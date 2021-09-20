@@ -48,25 +48,25 @@ class Feature(BaseModel):
     is_required: bool
     is_known: bool
 
-
-def feature_from_grpc(f):
-    return Feature(
-        name=f.name,
-        is_required=f.is_required,
-        is_known=f.is_known,
-    )
+    @classmethod
+    def from_grpc(cls, f):
+        return cls(
+            name=f.name,
+            is_required=f.is_required,
+            is_known=f.is_known,
+        )
 
 
 class FeaturesEntry(BaseModel):
     key: int
     value: Feature
 
-
-def features_entry_from_grpc(entry_key, feature):
-    return FeaturesEntry(
-        key=entry_key,
-        value=feature_from_grpc(feature),
-    )
+    @classmethod
+    def from_grpc(cls, entry_key, feature):
+        return cls(
+            key=entry_key,
+            value=Feature.from_grpc(feature),
+        )
 
 
 class AMP(BaseModel):
@@ -187,15 +187,15 @@ class RouteHint(BaseModel):
     # The time-lock delta of the channel.
     cltv_expiry_delta: int
 
-
-def route_hint_from_grpc(h) -> RouteHint:
-    return RouteHint(
-        node_id=h.node_id,
-        chan_id=h.chan_id,
-        fee_base_msat=h.fee_base_msat,
-        fee_proportional_millionths=h.fee_proportional_millionths,
-        cltv_expiry_delta=h.cltv_expiry_delta,
-    )
+    @classmethod
+    def from_grpc(cls, h) -> "RouteHint":
+        return cls(
+            node_id=h.node_id,
+            chan_id=h.chan_id,
+            fee_base_msat=h.fee_base_msat,
+            fee_proportional_millionths=h.fee_proportional_millionths,
+            cltv_expiry_delta=h.cltv_expiry_delta,
+        )
 
 
 class Invoice(BaseModel):
@@ -311,7 +311,7 @@ def invoice_from_grpc(i) -> Invoice:
     def _route_hints(hints):
         l = []
         for h in hints:
-            l.append(route_hint_from_grpc(h))
+            l.append(RouteHint.from_grpc((h)))
         return l
 
     def _htlcs(htlcs):
@@ -323,7 +323,7 @@ def invoice_from_grpc(i) -> Invoice:
     def _features(features):
         l = []
         for k in features:
-            l.append(features_entry_from_grpc(k, features[k]))
+            l.append(FeaturesEntry.from_grpc(k, features[k]))
         return l
 
     return Invoice(
@@ -833,7 +833,7 @@ def ln_info_from_grpc(i) -> LnInfo:
 
     _features = []
     for f in i.features:
-        _features.append(features_entry_from_grpc(f, i.features[f]))
+        _features.append(FeaturesEntry.from_grpc(f, i.features[f]))
 
     _uris = [u for u in i.uris]
 
@@ -934,4 +934,38 @@ class WalletBalance(BaseModel):
             channel_unsettled_remote_balance=channel.unsettled_remote_balance.msat,
             channel_pending_open_local_balance=channel.pending_open_local_balance.msat,
             channel_pending_open_remote_balance=channel.pending_open_remote_balance.msat,
+        )
+
+
+class PaymentRequest(BaseModel):
+    destination: str
+    payment_hash: str
+    num_satoshis: int
+    timestamp: int
+    expiry: int
+    description: str
+    description_hash: str
+    fallback_addr: Optional[str]
+    cltv_expiry: int
+    route_hints: List[RouteHint] = Query([])
+    payment_addr: str = Query(..., description="The payment address in hex format")
+    num_msat: int
+    features: List[FeaturesEntry] = Query([])
+
+    @classmethod
+    def from_grpc(cls, r):
+        return cls(
+            destination=r.destination,
+            payment_hash=r.payment_hash,
+            num_satoshis=r.num_satoshis,
+            timestamp=r.timestamp,
+            expiry=r.expiry,
+            description=r.description,
+            description_hash=r.description_hash,
+            fallback_addr=r.fallback_addr,
+            cltv_expiry=r.cltv_expiry,
+            route_hints=[RouteHint.from_grpc(rh) for rh in r.route_hints],
+            payment_addr=r.payment_addr.hex(),
+            num_msat=r.num_msat,
+            features=[FeaturesEntry.from_grpc(k, r.features[k]) for k in r.features],
         )
