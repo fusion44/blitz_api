@@ -13,7 +13,7 @@ If you need a easy option to run a simple bitcoind & lnd client, [Polar](https:/
 You will need to have [Python in version 3.7](https://www.python.org/downloads/) installed and have the `.env` see [Configuration](#Configuration) configured correctly first.
 
 
->**NOTE:** To setup a development environment for BlitzAPI skip to the [Development](#Development) section.
+>:warning: To setup a development environment for BlitzAPI skip to the [Development](#Development) section.
 
 
 To install the dependencies, run
@@ -31,15 +31,15 @@ After that, you can run the application with
 ## Development
 For development it is recommended to have python-poetry installed. Install instructions can be found [here](https://python-poetry.org/docs/master/#installation)
 
-Install dependencies with all dev dependencies:
+From within the blitz_api folder open a shell via `poetry shell`.
 
-`poetry install`
+Install dependencies with all dev dependencies: `poetry install`
 
 If any dependencies have changed it becomes necessary to freeze all requirements to requirements.txt:
 
 `poetry export -f requirements.txt --output requirements.txt`
 
-> **Note**: This will skip all dev dependencies by default.<br> 
+> :information_source: This will skip all dev dependencies by default.<br> 
 > This step is required to avoid having to install poetry for final deployment.
 
 
