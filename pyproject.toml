@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "blitz_api"
+version = "1.8.0"
+description = "A backend for the Raspiblitz project"
+authors = ["fusion44 <some.fusion@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+fastapi = "^0.68.1"
+fastapi-plugins = "^0.8.1"
+fastapi-versioning = "^0.10.0"
+redis = "^3.5.3"
+aioredis = "==1.3.1"
+pydantic = "^1.8.2"
+uvicorn = "^0.15.0"
+PyJWT = "^0.1.5"
+python-decouple = "^3.4"
+psutil = "^5.8.0"
+requests = "^2.26.0"
+pyzmq = "^22.3.0"
+cchardet = "^2.1.7"
+aiohttp = "^3.7.4.post0"
+grpcio = "^1.40.0"
+grpcio-tools = "^1.40.0"
+googleapis-common-protos = "^1.53.0"
+protobuf = "^3.18.0"
+deepdiff = "^5.5.0"
+
+[tool.poetry.dev-dependencies]
+black = "^21.9b0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
