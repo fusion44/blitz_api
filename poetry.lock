@@ -411,11 +411,17 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pyjwt"
-version = "0.1.9"
+version = "2.1.0"
 description = "JSON Web Token implementation in Python"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.6"
+
+[package.extras]
+crypto = ["cryptography (>=3.3.1,<4.0.0)"]
+dev = ["sphinx", "sphinx-rtd-theme", "zope.interface", "cryptography (>=3.3.1,<4.0.0)", "pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)", "mypy", "pre-commit"]
+docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
+tests = ["pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)"]
 
 [[package]]
 name = "python-decouple"
@@ -586,7 +592,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "4fa607c83a82ee95650dd16ce783ebc0260461f2e0aeabf154fd3021a5119a69"
+content-hash = "b4e21930ade7bcbe8dbcbdcea32967d9f1e91ac09dfbf412e77093ebe9885e2f"
 
 [metadata.files]
 aiohttp = [
@@ -1057,10 +1063,8 @@ pydantic = [
     {file = "pydantic-1.8.2.tar.gz", hash = "sha256:26464e57ccaafe72b7ad156fdaa4e9b9ef051f69e175dbbb463283000c05ab7b"},
 ]
 pyjwt = [
-    {file = "PyJWT-0.1.9-py2.6.egg", hash = "sha256:f3805a255fc4eefa09066bb3d97d552db5eea18ee8a34d2823987f1e051a0bca"},
-    {file = "PyJWT-0.1.9-py2.7.egg", hash = "sha256:ae72c56f8f660958d32c3f93186df8c6b52fb617dc687ff67d255303a577e609"},
-    {file = "PyJWT-0.1.9-py3.3.egg", hash = "sha256:d335622bb6febe010b4989d2b74d7797745f70f4a6093ccc4584913bc5d77d5b"},
-    {file = "PyJWT-0.1.9.tar.gz", hash = "sha256:608605a08d267a7de26a4f4c588c7e663ee07db386fc40acded20a6fcfc110ed"},
+    {file = "PyJWT-2.1.0-py3-none-any.whl", hash = "sha256:934d73fbba91b0483d3857d1aff50e96b2a892384ee2c17417ed3203f173fca1"},
+    {file = "PyJWT-2.1.0.tar.gz", hash = "sha256:fba44e7898bbca160a2b2b501f492824fc8382485d3a6f11ba5d0c1937ce6130"},
 ]
 python-decouple = [
     {file = "python-decouple-3.4.tar.gz", hash = "sha256:2e5adb0263a4f963b58d7407c4760a2465d464ee212d733e2a2c179e54c08d8f"},
