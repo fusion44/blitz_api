@@ -12,6 +12,7 @@ from fastapi_plugins import (
 )
 from fastapi_versioning import VersionedFastAPI
 from starlette import status
+from starlette.responses import RedirectResponse
 
 from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
@@ -61,9 +62,10 @@ async def on_shutdown() -> None:
 
 
 @app.get("/")
-def index():
-    # path operation function
-    return {"data": "123"}
+def index(req: Request):
+    return RedirectResponse(
+        req.url_for("latest"), status_code=status.HTTP_308_PERMANENT_REDIRECT
+    )
 
 
 @app.get("/sse/subscribe", status_code=status.HTTP_200_OK)

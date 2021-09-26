@@ -148,9 +148,7 @@ deepdiff==5.5.0; python_version >= "3.6" \
 fastapi-plugins==0.8.1; python_full_version >= "3.6.0" \
     --hash=sha256:c068010fb8c8d8c5bcad4eabcb4c412a186fb0f8421478b29d5a3a1ba79bafc3 \
     --hash=sha256:c57b7328068f615ec6e964aefacd9935c53ad9406b4a5a0fc8068a60c83c430d
-fastapi-versioning==0.10.0; python_version >= "3.6" \
-    --hash=sha256:afe0ad7a56383b884c399341260bd3301b40e5a1cf9f6dc4211a349489087e1b \
-    --hash=sha256:5c18ea4e9ae1afd39c9e5bed1c240bf1cabdc75217579af78249ccb651c7b5b5
+fastapi-versioning @ git+https://github.com/fusion44/fastapi-versioning@master ; python_version >= "3.6"
 fastapi==0.68.1; python_version >= "3.6" \
     --hash=sha256:94d2820906c36b9b8303796fb7271337ec89c74223229e3cfcf056b5a7d59e23 \
     --hash=sha256:644bb815bae326575c4b2842469fb83053a4b974b82fa792ff9283d17fbbd99d

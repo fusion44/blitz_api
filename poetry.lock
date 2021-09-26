@@ -223,16 +223,23 @@ memcached = ["aiojobs (>=0.3)", "aiomcache (>=0.6)", "aioredis (>=1.3)", "fastap
 test = ["aiojobs (>=0.3)", "aioredis (>=1.3)", "bandit", "docker-compose", "fastapi (>=0.41)", "flake8", "m2r", "pydantic (>=0.32)", "pytest", "pytest-cov", "tenacity (>=6.2)", "tox", "uvicorn"]
 
 [[package]]
-name = "fastapi-versioning"
+name = "fastapi_versioning"
 version = "0.10.0"
-description = "api versioning for fastapi web applications"
+description = ""
 category = "main"
 optional = false
 python-versions = ">=3.6"
+develop = false
 
 [package.dependencies]
 fastapi = ">=0.56.0"
 starlette = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/fusion44/fastapi-versioning"
+reference = "master"
+resolved_reference = "c1832936726d9ffce364ac63a9aac2ff3712b37d"
 
 [[package]]
 name = "googleapis-common-protos"
@@ -592,7 +599,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "b4e21930ade7bcbe8dbcbdcea32967d9f1e91ac09dfbf412e77093ebe9885e2f"
+content-hash = "3604a49ab64c940a5d9ccb554768248458a9c8046c82c64b89d042e02e1b1b9d"
 
 [metadata.files]
 aiohttp = [
@@ -768,10 +775,7 @@ fastapi-plugins = [
     {file = "fastapi-plugins-0.8.1.tar.gz", hash = "sha256:c068010fb8c8d8c5bcad4eabcb4c412a186fb0f8421478b29d5a3a1ba79bafc3"},
     {file = "fastapi_plugins-0.8.1-py3-none-any.whl", hash = "sha256:c57b7328068f615ec6e964aefacd9935c53ad9406b4a5a0fc8068a60c83c430d"},
 ]
-fastapi-versioning = [
-    {file = "fastapi_versioning-0.10.0-py3-none-any.whl", hash = "sha256:afe0ad7a56383b884c399341260bd3301b40e5a1cf9f6dc4211a349489087e1b"},
-    {file = "fastapi_versioning-0.10.0.tar.gz", hash = "sha256:5c18ea4e9ae1afd39c9e5bed1c240bf1cabdc75217579af78249ccb651c7b5b5"},
-]
+fastapi_versioning = []
 googleapis-common-protos = [
     {file = "googleapis-common-protos-1.53.0.tar.gz", hash = "sha256:a88ee8903aa0a81f6c3cec2d5cf62d3c8aa67c06439b0496b49048fb1854ebf4"},
     {file = "googleapis_common_protos-1.53.0-py2.py3-none-any.whl", hash = "sha256:f6d561ab8fb16b30020b940e2dd01cd80082f4762fa9f3ee670f4419b4b8dbd0"},
