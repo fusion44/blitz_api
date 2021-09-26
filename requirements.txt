@@ -145,9 +145,9 @@ colorama==0.4.4; python_version >= "3.6" and python_full_version < "3.0.0" and p
 deepdiff==5.5.0; python_version >= "3.6" \
     --hash=sha256:e054fed9dfe0d83d622921cbb3a3d0b3a6dd76acd2b6955433a0a2d35147774a \
     --hash=sha256:dd79b81c2d84bfa33aa9d94d456b037b68daff6bb87b80dfaa1eca04da68b349
-fastapi-plugins==0.8.1; python_full_version >= "3.6.0" \
-    --hash=sha256:c068010fb8c8d8c5bcad4eabcb4c412a186fb0f8421478b29d5a3a1ba79bafc3 \
-    --hash=sha256:c57b7328068f615ec6e964aefacd9935c53ad9406b4a5a0fc8068a60c83c430d
+fastapi-plugins==0.8.2; python_full_version >= "3.6.0" \
+    --hash=sha256:3b331bb56904114d6f6507382ad35b822f6417574aa0d59728859195d9910788 \
+    --hash=sha256:ec5a1137b6db6d750588997e708597f7d4f99af826979e92ce75bfba3b7dc59f
 fastapi-versioning @ git+https://github.com/fusion44/fastapi-versioning@master ; python_version >= "3.6"
 fastapi==0.68.1; python_version >= "3.6" \
     --hash=sha256:94d2820906c36b9b8303796fb7271337ec89c74223229e3cfcf056b5a7d59e23 \
@@ -479,9 +479,9 @@ typing-extensions==3.10.0.2; python_full_version >= "3.6.1" and python_version >
     --hash=sha256:d8226d10bc02a29bcc81df19a26e56a9647f8b0a6d4a83924139f4a8b01f17b7 \
     --hash=sha256:f1d25edafde516b146ecd0613dabcc61409817af4766fbbcfb8d1ad4ec441a34 \
     --hash=sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e
-urllib3==1.26.6; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "4" \
-    --hash=sha256:39fb8672126159acb139a7718dd10806104dec1e2f0f6c88aab05d17df10c8d4 \
-    --hash=sha256:f57b4c16c62fa2760b7e3d97c35b255512fb6b59a259730f36ba32ce9f8e342f
+urllib3==1.26.7; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version < "4" \
+    --hash=sha256:c4fdf4019605b6e5423637e01bc9fe4daef873709a7973e195ceba0a62bbc844 \
+    --hash=sha256:4987c65554f7a2dbf30c18fd48778ef124af6fab771a377103da0585e2336ece
 uvicorn==0.15.0 \
     --hash=sha256:17f898c64c71a2640514d4089da2689e5db1ce5d4086c2d53699bf99513421c1 \
     --hash=sha256:d9a3c0dd1ca86728d3e235182683b4cf94cd53a867c288eaeca80ee781b2caff
