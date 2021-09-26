@@ -13,7 +13,7 @@ CPU_AVG_PERIOD = config("cpu_usage_averaging_period", default=0.5, cast=float)
 HW_INFO_YIELD_TIME = SLEEP_TIME + CPU_AVG_PERIOD
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
-GET_DEBUG_LOG_SCRIPT = path.join(SHELL_SCRIPT_PATH, "XXdebugLogs.sh")
+GET_DEBUG_LOG_SCRIPT = path.join(SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh")
 
 
 def _check_shell_scripts_status():
