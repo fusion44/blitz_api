@@ -5,15 +5,17 @@ from app.sse_starlette import EventSourceResponse
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 
-router = APIRouter(prefix="/apps", tags=["Apps"])
+_PREFIX = "apps"
+
+router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
 
 
 @router.get(
     "/status",
+    name=f"{_PREFIX}/status",
     summary="Get the status of currently installed apps.",
     response_description=docs.get_app_status_response_docs,
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 def get_status():
     try:
@@ -25,11 +27,11 @@ def get_status():
 
 
 @router.get(
-    "/status_sub",
+    "/status-sub",
+    name=f"{_PREFIX}/status-sub",
     summary="Subscribe to status changes of currently installed apps.",
     response_description=docs.get_app_status_sub_response_docs,
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 async def get_status():
     try:

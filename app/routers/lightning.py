@@ -1,3 +1,4 @@
+from app.routers.system import _PREFIX
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
     Invoice,
@@ -19,11 +20,14 @@ from app.routers.lightning_docs import send_payment_desc
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.params import Depends
 
-router = APIRouter(prefix="/lightning", tags=["Lightning"])
+_PREFIX = "lightning"
+
+router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
 
 
 @router.get(
-    "/get_ln_status",
+    "/get-ln-status",
+    name=f"{_PREFIX}.get-ln-status",
     summary="Get current lightning system status",
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
@@ -39,11 +43,11 @@ async def get_ln_status_path():
 
 
 @router.post(
-    "/addinvoice",
+    "/add-invoice",
+    name=f"{_PREFIX}.add-invoice",
     summary="Addinvoice adds a new Invoice to the database.",
     description="For additional information see [LND docs](https://api.lightning.community/#addinvoice)",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
     response_model=Invoice,
 )
 async def addinvoice(
@@ -58,11 +62,11 @@ async def addinvoice(
 
 
 @router.get(
-    "/getbalance",
+    "/get-balance",
+    name=f"{_PREFIX}.get-balance",
     summary="Get the current on chain and channel balances of the lighting wallet.",
     response_description="A JSON String with on chain wallet balances.",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
     response_model=WalletBalance,
 )
 async def getwalletbalance():
@@ -75,12 +79,12 @@ async def getwalletbalance():
 
 
 @router.post(
-    "/sendpayment",
+    "/send-payment",
+    name=f"{_PREFIX}.send-payment",
     summary="Attempt to pay a payment request.",
     description=send_payment_desc,
     response_description="Either an error or a Payment object on success",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
     response_model=Payment,
 )
 async def sendpayment(
@@ -95,11 +99,11 @@ async def sendpayment(
 
 
 @router.get(
-    "/getinfo",
+    "/get-info",
+    name=f"{_PREFIX}.get-info",
     summary="Request information about the currently running lightning node.",
     response_description="Either an error or a LnInfo object on success",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
     response_model=LnInfo,
 )
 async def get_info():
@@ -113,7 +117,7 @@ async def get_info():
 
 @router.get(
     "/decode-pay-req",
-    name="lightning.decode-pay-req",
+    name=f"{_PREFIX}.decode-pay-req",
     summary="DecodePayReq takes an encoded payment request string and attempts to decode it, returning a full description of the conditions encoded within the payment request.",
     response_model=PaymentRequest,
     response_description="A fully decoded payment request or a HTTP status 400 if the payment request cannot be decoded.",

@@ -19,11 +19,14 @@ from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
 
-router = APIRouter(prefix="/system", tags=["System"])
+_PREFIX = "system"
+
+router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
 
 
 @router.post(
     "/login",
+    name=f"{_PREFIX}.login",
     summary="Logs the user in with the current password",
     response_description="JWT token for the current session.",
     status_code=status.HTTP_200_OK,
@@ -36,7 +39,8 @@ def login(i: LoginInput):
 
 
 @router.get(
-    "/get_system_info",
+    "/get-system-info",
+    name=f"{_PREFIX}.get-system-info",
     summary="Get system status information",
     dependencies=[Depends(JWTBearer())],
     response_model=SystemInfo,
@@ -46,7 +50,8 @@ async def get_system_info_path():
 
 
 @router.get(
-    "/hardware_info",
+    "/hardware-info",
+    name=f"{_PREFIX}.hardware-info",
     summary="Get hardware status information.",
     response_description="Returns a JSON string with hardware information:\n"
     + get_hw_info_json,
@@ -58,8 +63,8 @@ def hw_info() -> map:
 
 
 @router.get(
-    "/get_debug_logs_raw",
-    name="system.get_debug_logs_raw",
+    "/get-debug-logs-raw",
+    name=f"{_PREFIX}.get-debug-logs-raw",
     summary=get_debug_logs_raw_summary,
     description=get_debug_logs_raw_desc,
     response_description=get_debug_logs_raw_resp_desc,
@@ -71,12 +76,12 @@ async def get_debug_logs_raw_route() -> RawDebugLogData:
 
 
 @router.get(
-    "/hardware_info_sub",
+    "/hardware-info-sub",
+    name=f"{_PREFIX}.hardware-info-sub",
     summary="Subscribe to hardware status information.",
     response_description=f"Yields a JSON string with hardware information every {HW_INFO_YIELD_TIME} seconds:\n"
     + get_hw_info_json,
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 async def hw_info_sub(request: Request):
     return EventSourceResponse(subscribe_hardware_info(request))
@@ -84,9 +89,9 @@ async def hw_info_sub(request: Request):
 
 @router.post(
     "/reboot",
+    name=f"{_PREFIX}.reboot",
     summary="Reboots the system",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 def reboot_system():
     return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
@@ -94,9 +99,9 @@ def reboot_system():
 
 @router.post(
     "/shutdown",
+    name=f"{_PREFIX}.shutdown",
     summary="Shuts the system down",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 def reboot_system():
     return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)

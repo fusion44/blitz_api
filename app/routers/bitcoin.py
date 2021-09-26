@@ -12,11 +12,14 @@ from app.utils import bitcoin_rpc
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
 
-router = APIRouter(prefix="/bitcoin", tags=["Bitcoin Core"])
+_PREFIX = "bitcoin"
+
+router = APIRouter(prefix=f"/{_PREFIX}", tags=["Bitcoin Core"])
 
 
 @router.get(
-    "/btc_status",
+    "/btc-status",
+    name=f"{_PREFIX}.btc-status",
     description="Get general information about bitcoin core. Combines most important information from `getblockchaininfo` and `getnetworkinfo`",
     dependencies=[Depends(JWTBearer())],
     response_model=BtcStatus,
@@ -26,7 +29,8 @@ async def btc_status():
 
 
 @router.get(
-    "/getblockcount",
+    "/get-block-count",
+    name=f"{_PREFIX}.get-block-count",
     summary="Get the current block count",
     description="See documentation on [bitcoincore.org](https://bitcoincore.org/en/doc/0.21.0/rpc/blockchain/getblockcount/)",
     response_description="""A JSON String with relevant information.\n
@@ -38,7 +42,6 @@ async def btc_status():
 }
 """,
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 def getblockcount():
     r = bitcoin_rpc("getblockcount")
@@ -50,12 +53,12 @@ def getblockcount():
 
 
 @router.get(
-    "/getblockchaininfo",
+    "/get-blockchain-info",
+    name=f"{_PREFIX}.get-blockchain-info",
     summary="Get the current blockchain status",
     description="See documentation on [bitcoincore.org](https://bitcoincore.org/en/doc/0.21.0/rpc/blockchain/getblockchaininfo/)",
     response_description="A JSON String with relevant information.",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
     response_model=BlockchainInfo,
 )
 async def getblockchaininfo():
@@ -64,7 +67,8 @@ async def getblockchaininfo():
 
 
 @router.get(
-    "/getnetworkinfo",
+    "/get-network-info",
+    name=f"{_PREFIX}.get-network-info",
     summary="Get information about the network",
     description="See documentation on [bitcoincore.org](https://bitcoincore.org/en/doc/0.21.0/rpc/network/getnetworkinfo/)",
     response_description="A JSON String with relevant information.",
@@ -78,12 +82,12 @@ async def getnetworkinfo():
 
 
 @router.get(
-    "/block_sub",
+    "/block-sub",
+    name=f"{_PREFIX}.block-sub",
     summary="Subscribe to incoming blocks.",
     description=blocks_sub_doc,
     response_description="A JSON object with information about the new block.",
     dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
 )
 async def zmq_sub(request: Request, verbosity: int = 1):
     return EventSourceResponse(handle_block_sub(request, verbosity))
