@@ -1,6 +1,5 @@
 import asyncio
 
-import aioredis
 from aioredis import Channel, Redis
 from fastapi import Depends, FastAPI, Request
 from fastapi_plugins import (
@@ -41,9 +40,6 @@ app.include_router(system.router)
 app.include_router(setup.router)
 
 
-connections = []
-
-
 app = VersionedFastAPI(
     app, version_format="{major}", prefix_format="/v{major}", enable_latest=True
 )
@@ -53,7 +49,7 @@ app = VersionedFastAPI(
 async def on_startup():
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
-    await register_all_handlers()
+    await register_all_handlers(redis_plugin.redis)
 
 
 @app.on_event("shutdown")
@@ -68,36 +64,48 @@ def index(req: Request):
     )
 
 
+num_connections = 0
+connections = {}
+
+
 @app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
-async def stream(
-    request: Request, channel: str = "default", redis: Redis = Depends(depends_redis)
-):
-    connections.append(request)
-    return EventSourceResponse(subscribe(request, channel, redis))
+async def stream(request: Request):
+    global num_connections
+    q = asyncio.Queue()
+    connections[num_connections] = q
+    num_connections += 1
+    return EventSourceResponse(subscribe(request, num_connections - 1, q))
 
 
-async def subscribe(request: Request, channel: str, redis: Redis):
-    (sub,) = await redis.subscribe(channel=Channel(channel, False))
+async def subscribe(request: Request, id: int, q: asyncio.Queue):
     try:
-        while await sub.wait_message():
+        while True:
             if await request.is_disconnected():
-                connections.remove(request)
+                connections.pop(id)
                 await request.close()
                 break
             else:
-                if len(connections) > 0:
-                    data = await sub.get(encoding="utf-8")
-                    yield data
+                data = await q.get()
+                yield data
     except asyncio.CancelledError as e:
-        connections.remove(request)
-        await request.close()
-    except aioredis.errors.ChannelClosedError as cle:
-        connections.remove(request)
+        connections.pop(id)
         await request.close()
 
 
-async def register_all_handlers():
+async def register_all_handlers(redis: Redis):
     await register_bitcoin_zmq_sub()
     await register_bitcoin_status_gatherer()
     await register_hardware_info_gatherer()
     await register_lightning_listener()
+
+    (sub,) = await redis.subscribe(channel=Channel("default", False))
+    loop = asyncio.get_event_loop()
+    loop.create_task(broadcast_data_sse(sub))
+
+
+async def broadcast_data_sse(sub):
+    while await sub.wait_message():
+        data = await sub.get(encoding="utf-8")
+        for k in connections.keys():
+            if connections.get(k):
+                await connections.get(k).put(data)
