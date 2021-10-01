@@ -60,7 +60,7 @@ async def on_shutdown() -> None:
 @app.get("/")
 def index(req: Request):
     return RedirectResponse(
-        req.url_for("latest"), status_code=status.HTTP_308_PERMANENT_REDIRECT
+        req.url_for("latest", path="docs"), status_code=status.HTTP_307_TEMPORARY_REDIRECT
     )
 
 
