@@ -33,8 +33,10 @@ class BtcLocalAddress(BaseModel):
 
     @classmethod
     def from_rpc(cls, local_address):
-        return BtcNetwork(
-            local_address["address"], local_address["port"], local_address["score"]
+        return BtcLocalAddress(
+            address=local_address["address"],
+            port=local_address["port"],
+            score=local_address["score"],
         )
 
 
