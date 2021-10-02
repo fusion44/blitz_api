@@ -122,11 +122,11 @@ class Bip9Statistics(BaseModel):
     @classmethod
     def from_rpc(cls, r):
         return cls(
-            r["period"],
-            r["threshold"],
-            r["elapsed"],
-            r["count"],
-            r["possible"],
+            period=r["period"],
+            threshold=r["threshold"],
+            elapsed=r["elapsed"],
+            count=r["count"],
+            possible=r["possible"],
         )
 
 
