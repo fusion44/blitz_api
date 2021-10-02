@@ -18,13 +18,13 @@ You will need to have [Python in version 3.7](https://www.python.org/downloads/)
 
 To install the dependencies, run
 
-`python -m pip install -r requirements.txt` on Linux / macOS or
+`make install` or `python -m pip install -r requirements.txt` on Linux / macOS or
 
 `py -m pip install -r requirements.txt` on Windows.
 
 After that, you can run the application with
 
-`python -m uvicorn app.main:app --reload` on Linux / macOS or
+`make run` or `python -m uvicorn app.main:app --reload` on Linux / macOS or
 
 `py -m uvicorn app.main:app --reload` on Windows.
 
@@ -33,7 +33,7 @@ For development it is recommended to have python-poetry installed. Install instr
 
 From within the blitz_api folder open a shell via `poetry shell`.
 
-Install dependencies with all dev dependencies: `poetry install`
+Install dependencies with all dev dependencies: `make install_dev` or `poetry install`
 
 If any dependencies have changed it becomes necessary to freeze all requirements to requirements.txt:
 
@@ -46,4 +46,20 @@ If any dependencies have changed it becomes necessary to freeze all requirements
 Make sure to include test for important pieces of code submitted. 
 To run the tests run `make tests` to test with pytest or run `make coverage` to test and generate a coverage html file in a folder called `htmlcov`
 
+## Useful cURL commands to test the API
+`curl -N http://127.0.0.1:8000/v1/sse/subscribe`
 
+`curl -N http://127.0.0.1:8000/v1/bitcoin/getblockchaininfo`
+
+`curl -X POST -N http://127.0.0.1:8000/v1/setup/type/1`
+
+```sh
+curl --header "Content-Type: application/json" \
+  --request POST \
+  --data '{"password":"12345678"}' \
+  http://127.0.0.1:8000/system/login
+```
+
+### Acknowledgements
+Integrated Libraries:
+* [sse-starlette](https://github.com/sysid/sse-starlette)
