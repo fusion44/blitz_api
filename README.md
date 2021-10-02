@@ -42,4 +42,8 @@ If any dependencies have changed it becomes necessary to freeze all requirements
 > :information_source: This will skip all dev dependencies by default.<br> 
 > This step is required to avoid having to install poetry for final deployment.
 
+### Testing
+Make sure to include test for important pieces of code submitted. 
+To run the tests run `make tests` to test with pytest or run `make coverage` to test and generate a coverage html file in a folder called `htmlcov`
+
 

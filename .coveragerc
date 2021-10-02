@@ -1,0 +1,3 @@
+[run]
+source = .
+omit = *app/repositories/ln_impl/protos/*, *_docs.py
