@@ -1,10 +1,9 @@
 import asyncio
 
 from aioredis import Channel, Redis
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi_plugins import (
     RedisSettings,
-    depends_redis,
     get_config,
     redis_plugin,
     registered_configuration,
@@ -22,26 +21,27 @@ from app.repositories.system import register_hardware_info_gatherer
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse
 
-# start server with "uvicorn main:app --reload"
-
 
 @registered_configuration
 class AppSettings(RedisSettings):
     api_name: str = str(__name__)
 
 
-app = FastAPI()
+unversioned_app = FastAPI()
 config = get_config()
 
-app.include_router(apps.router)
-app.include_router(bitcoin.router)
-app.include_router(lightning.router)
-app.include_router(system.router)
-app.include_router(setup.router)
+unversioned_app.include_router(apps.router)
+unversioned_app.include_router(bitcoin.router)
+unversioned_app.include_router(lightning.router)
+unversioned_app.include_router(system.router)
+unversioned_app.include_router(setup.router)
 
 
 app = VersionedFastAPI(
-    app, version_format="{major}", prefix_format="/v{major}", enable_latest=True
+    unversioned_app,
+    version_format="{major}",
+    prefix_format="/v{major}",
+    enable_latest=True,
 )
 
 
@@ -60,7 +60,8 @@ async def on_shutdown() -> None:
 @app.get("/")
 def index(req: Request):
     return RedirectResponse(
-        req.url_for("latest", path="docs"), status_code=status.HTTP_307_TEMPORARY_REDIRECT
+        req.url_for("latest", path="docs"),
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
 

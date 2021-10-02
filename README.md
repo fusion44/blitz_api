@@ -24,9 +24,9 @@ To install the dependencies, run
 
 After that, you can run the application with
 
-`python -m uvicorn main:app --reload` on Linux / macOS or
+`python -m uvicorn app.main:app --reload` on Linux / macOS or
 
-`py -m uvicorn main:app --reload` on Windows.
+`py -m uvicorn app.main:app --reload` on Windows.
 
 ## Development
 For development it is recommended to have python-poetry installed. Install instructions can be found [here](https://python-poetry.org/docs/master/#installation)
