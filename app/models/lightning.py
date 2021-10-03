@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
 from pydantic import BaseModel
+from pydantic.types import conint
 
 
 class InvoiceState(str, Enum):
@@ -752,6 +753,52 @@ def payment_from_grpc(p) -> Payment:
         payment_index=p.payment_index,
         failure_reason=payment_failure_reason(p.failure_reason),
     )
+
+
+class SendCoinsInput(BaseModel):
+    address: str = Query(
+        ...,
+        description="The base58 or bech32 encoded bitcoin address to send coins to on-chain",
+    )
+    amount: conint(gt=0) = Query(
+        ...,
+        description="The number of bitcoin denominated in satoshis to send",
+    )
+    target_conf: int = Query(
+        0,
+        description="The number of blocks that the transaction *should* confirm in, will be used for fee estimation",
+    )
+    sat_per_vbyte: int = Query(
+        0,
+        description="A manual fee expressed in sat/vbyte that should be used when crafting the transaction (default: 0)",
+    )
+    min_confs: int = Query(
+        1,
+        description="The minimum number of confirmations each one of your outputs used for the transaction must satisfy",
+    )
+    label: str = Query("", description="A label for the transaction")
+
+
+class SendCoinsResponse(BaseModel):
+    txid: str = Query(..., description="The transaction ID for this onchain payment")
+    address: str = Query(
+        ...,
+        description="The base58 or bech32 encoded bitcoin address where the onchain funds where sent to",
+    )
+    amount: conint(gt=0) = Query(
+        ...,
+        description="The number of bitcoin denominated in satoshis which where sent",
+    )
+    label: str = Query("", description="The label used for the transaction")
+
+    @classmethod
+    def from_grpc(cls, r, input: SendCoinsInput):
+        return cls(
+            txid=r.txid,
+            address=input.address,
+            amount=input.amount,
+            label=input.label,
+        )
 
 
 class Chain(BaseModel):

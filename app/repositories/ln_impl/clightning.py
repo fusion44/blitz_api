@@ -1,4 +1,11 @@
-from app.models.lightning import Invoice, LnInfo, Payment, PaymentRequest
+from app.models.lightning import (
+    Invoice,
+    LnInfo,
+    Payment,
+    PaymentRequest,
+    SendCoinsInput,
+    SendCoinsResponse,
+)
 
 
 def get_implementation_name() -> str:
@@ -16,6 +23,10 @@ async def add_invoice_impl(
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
     raise NotImplementedError("c-lightning not yet implemented")
 
 

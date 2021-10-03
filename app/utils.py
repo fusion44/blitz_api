@@ -148,5 +148,6 @@ class SSE:
     LN_STATUS = "ln_status"
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"
+    LN_ONCHAIN_PAYMENT_STATUS = "ln_onchain_payment_status"
 
     WALLET_BALANCE = "wallet_balance"

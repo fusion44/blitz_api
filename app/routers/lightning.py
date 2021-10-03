@@ -5,6 +5,8 @@ from app.models.lightning import (
     LnInfo,
     Payment,
     PaymentRequest,
+    SendCoinsInput,
+    SendCoinsResponse,
     WalletBalance,
 )
 from app.repositories.lightning import (
@@ -13,9 +15,10 @@ from app.repositories.lightning import (
     get_ln_info,
     get_ln_status,
     get_wallet_balance,
+    send_coins,
     send_payment,
 )
-from app.routers.lightning_docs import send_payment_desc
+from app.routers.lightning_docs import send_coins_desc, send_payment_desc
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.params import Depends
 
@@ -73,6 +76,24 @@ async def getwalletbalance():
         return await get_wallet_balance()
     except HTTPException as r:
         raise HTTPException(r.status_code, detail=r.reason)
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.post(
+    "/send-coins",
+    name=f"{_PREFIX}.send-coins",
+    summary="Attempt to send on-chain funds.",
+    description=send_coins_desc,
+    response_description="Either an error or a SendCoinsResponse object on success",
+    dependencies=[Depends(JWTBearer())],
+    response_model=SendCoinsResponse,
+)
+async def send_coins_path(input: SendCoinsInput):
+    try:
+        return await send_coins(input=input)
+    except HTTPException as r:
+        raise HTTPException(r.status_code, detail=r.detail)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 

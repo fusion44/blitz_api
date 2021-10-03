@@ -1,4 +1,3 @@
-import asyncio
 from os import error
 
 import app.repositories.ln_impl.protos.router_pb2 as router
@@ -10,6 +9,8 @@ from app.models.lightning import (
     LnInfo,
     Payment,
     PaymentRequest,
+    SendCoinsInput,
+    SendCoinsResponse,
     WalletBalance,
     invoice_from_grpc,
     ln_info_from_grpc,
@@ -69,12 +70,40 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
         res = await lncfg.lnd_stub.DecodePayReq(req)
         return PaymentRequest.from_grpc(res)
     except grpc.aio._call.AioRpcError as error:
-        if (
-            error.details() != None
-            and error.details().find("checksum failed.") > -1
-        ):
+        if error.details() != None and error.details().find("checksum failed.") > -1:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+            )
+        else:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
+
+
+async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
+    try:
+        r = ln.SendCoinsRequest(
+            addr=input.address,
+            amount=input.amount,
+            target_conf=input.target_conf,
+            sat_per_vbyte=input.sat_per_vbyte,
+            min_confs=input.min_confs,
+            label=input.label,
+        )
+
+        response = await lncfg.lnd_stub.SendCoins(r)
+        r = SendCoinsResponse.from_grpc(response, input)
+        await send_sse_message(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
+        return r
+    except grpc.aio._call.AioRpcError as error:
+        details = error.details()
+        if details and details.find("invalid bech32 string") > -1:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+            )
+        elif details and details.find("insufficient funds available") > -1:
+            raise HTTPException(
+                status.HTTP_412_PRECONDITION_FAILED, detail=error.details()
             )
         else:
             raise HTTPException(

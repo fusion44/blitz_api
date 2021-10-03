@@ -6,6 +6,8 @@ from app.models.lightning import (
     LnInfo,
     Payment,
     PaymentRequest,
+    SendCoinsInput,
+    SendCoinsResponse,
 )
 from app.utils import SSE, lightning_config, send_sse_message
 from decouple import config
@@ -18,6 +20,7 @@ if lightning_config.ln_node == "lnd":
         get_ln_info_impl,
         get_wallet_balance_impl,
         listen_invoices,
+        send_coins_impl,
         send_payment_impl,
     )
 else:
@@ -28,6 +31,7 @@ else:
         get_ln_info_impl,
         get_wallet_balance_impl,
         listen_invoices,
+        send_coins_impl,
         send_payment_impl,
     )
 
@@ -54,6 +58,12 @@ async def add_invoice(
 
 async def decode_pay_request(pay_req: str) -> PaymentRequest:
     return await decode_pay_request_impl(pay_req)
+
+
+async def send_coins(input: SendCoinsInput) -> SendCoinsResponse:
+    res = await send_coins_impl(input)
+    _update_wallet_balance()
+    return res
 
 
 async def send_payment(
