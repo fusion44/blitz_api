@@ -1,4 +1,3 @@
-from app.routers.system import _PREFIX
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
     Invoice,
