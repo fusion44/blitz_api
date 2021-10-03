@@ -1,3 +1,5 @@
+import secrets
+
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
 from app.models.system import LoginInput, RawDebugLogData, SystemInfo
@@ -32,7 +34,8 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     status_code=status.HTTP_200_OK,
 )
 def login(i: LoginInput):
-    if i.password == config("login_password", cast=str):
+    match = secrets.compare_digest(i.password, config("login_password", cast=str))
+    if match:
         return signJWT()
 
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
