@@ -20,6 +20,7 @@ from app.repositories.lightning import register_lightning_listener
 from app.repositories.system import register_hardware_info_gatherer
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse
+from starlette.middleware.cors import CORSMiddleware
 
 
 @registered_configuration
@@ -42,6 +43,19 @@ app = VersionedFastAPI(
     version_format="{major}",
     prefix_format="/v{major}",
     enable_latest=True,
+)
+
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
