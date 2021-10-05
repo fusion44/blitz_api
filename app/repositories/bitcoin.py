@@ -4,7 +4,7 @@ import json
 
 import zmq
 import zmq.asyncio
-from app.models.bitcoind import BlockchainInfo, BtcStatus, NetworkInfo
+from app.models.bitcoind import BlockchainInfo, BtcInfo, NetworkInfo
 from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
 from fastapi import Request
 from fastapi.exceptions import HTTPException
@@ -29,10 +29,10 @@ async def get_network_info() -> NetworkInfo:
     return NetworkInfo.from_rpc(result["result"])
 
 
-async def get_btc_status() -> BtcStatus:
+async def get_btc_info() -> BtcInfo:
     binfo = await get_blockchain_info()
     ninfo = await get_network_info()
-    return BtcStatus.from_rpc(binfo, ninfo)
+    return BtcInfo.from_rpc(binfo, ninfo)
 
 
 async def handle_block_sub(request: Request, verbosity: int = 1) -> str:
@@ -76,7 +76,7 @@ async def _handle_gather_bitcoin_status():
     last_info = {}
     while True:
         try:
-            info = await get_btc_status()
+            info = await get_btc_info()
         except HTTPException as e:
             print(e)
             await asyncio.sleep(2)

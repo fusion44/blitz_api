@@ -1,8 +1,8 @@
-from app.models.lightning import LightningStatus
+from app.models.lightning import LightningInfoLite
 
 
-def get_valid_lightning_status() -> LightningStatus:
-    return LightningStatus(
+def get_valid_lightning_info_lite() -> LightningInfoLite:
+    return LightningInfoLite(
         implementation="LND",
         version="0.13.1",
         num_pending_channels=1,

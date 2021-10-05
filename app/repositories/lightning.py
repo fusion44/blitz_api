@@ -2,7 +2,7 @@ import asyncio
 
 from app.models.lightning import (
     Invoice,
-    LightningStatus,
+    LightningInfoLite,
     LnInfo,
     Payment,
     PaymentRequest,
@@ -40,10 +40,10 @@ GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=5, cast=float)
 _CACHE = {"wallet_balance": None}
 
 
-async def get_ln_status() -> LightningStatus:
+async def get_ln_info_lite() -> LightningInfoLite:
     ln_info = await get_ln_info_impl()
     name = get_implementation_name()
-    return LightningStatus.from_grpc(name, ln_info)
+    return LightningInfoLite.from_grpc(name, ln_info)
 
 
 async def get_wallet_balance():
@@ -90,8 +90,8 @@ async def _handle_info_listener():
         info = await get_ln_info_impl()
 
         if last_info != info:
-            status = LightningStatus.from_grpc(get_implementation_name(), info)
-            await send_sse_message(SSE.LN_STATUS, status.dict())
+            info_lite = LightningInfoLite.from_grpc(get_implementation_name(), info)
+            await send_sse_message(SSE.LN_INFO_LITE, info_lite.dict())
             last_info = info
 
         await asyncio.sleep(GATHER_INFO_INTERVALL)

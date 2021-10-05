@@ -1,7 +1,7 @@
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
     Invoice,
-    LightningStatus,
+    LightningInfoLite,
     LnInfo,
     Payment,
     PaymentRequest,
@@ -13,7 +13,7 @@ from app.repositories.lightning import (
     add_invoice,
     decode_pay_request,
     get_ln_info,
-    get_ln_status,
+    get_ln_info_lite,
     get_wallet_balance,
     send_coins,
     send_payment,
@@ -28,16 +28,16 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
 
 
 @router.get(
-    "/get-ln-status",
-    name=f"{_PREFIX}.get-ln-status",
+    "/get-ln-info-lite",
+    name=f"{_PREFIX}.get-ln-info-lite",
     summary="Get current lightning system status",
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
-    response_model=LightningStatus,
+    response_model=LightningInfoLite,
 )
-async def get_ln_status_path():
+async def get_ln_info_lite_path():
     try:
-        return await get_ln_status()
+        return await get_ln_info_lite()
     except HTTPException as r:
         raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:

@@ -141,7 +141,7 @@ async def _handle_gather_hardware_info():
     while True:
         info = get_hardware_info()
         if last_info != info:
-            await send_sse_message(SSE.SYS_STATUS, info)
+            await send_sse_message(SSE.HARDWARE_INFO, info)
             last_info = info
 
         await asyncio.sleep(HW_INFO_YIELD_TIME)

@@ -1,8 +1,8 @@
 from app.auth.auth_bearer import JWTBearer
-from app.models.bitcoind import BlockchainInfo, BtcStatus, NetworkInfo
+from app.models.bitcoind import BlockchainInfo, BtcInfo, NetworkInfo
 from app.repositories.bitcoin import (
     get_blockchain_info,
-    get_btc_status,
+    get_btc_info,
     get_network_info,
     handle_block_sub,
 )
@@ -18,14 +18,14 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Bitcoin Core"])
 
 
 @router.get(
-    "/btc-status",
-    name=f"{_PREFIX}.btc-status",
+    "/btc-info",
+    name=f"{_PREFIX}.btc-info",
     description="Get general information about bitcoin core. Combines most important information from `getblockchaininfo` and `getnetworkinfo`",
     dependencies=[Depends(JWTBearer())],
-    response_model=BtcStatus,
+    response_model=BtcInfo,
 )
-async def btc_status():
-    return await get_btc_status()
+async def btc_info_path():
+    return await get_btc_info()
 
 
 @router.get(

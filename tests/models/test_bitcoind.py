@@ -157,8 +157,8 @@ def test_BlockchainInfo():
     assert len(i.softforks) == 6
 
 
-def test_BtcStatus():
-    s = BtcStatus.from_rpc(
+def test_BtcInfo():
+    s = BtcInfo.from_rpc(
         binfo=BlockchainInfo.from_rpc(blockhain_info),
         ninfo=NetworkInfo.from_rpc(network_info),
     )

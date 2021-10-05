@@ -137,7 +137,10 @@ async def send_sse_message(id: str, json_data: Dict):
 
 
 class SSE:
-    SYS_STATUS = "sys_status"
+    SYSTEM_INFO = "system_info"
+    HARDWARE_INFO = "hardware_info"
+
+    INSTALLED_APP_STATUS = "installed_app_status"
 
     BTC_NETWORK_STATUS = "btc_network_status"
     BTC_MEMPOOL_STATUS = "btc_mempool_status"
@@ -145,7 +148,7 @@ class SSE:
     BTC_INFO = "btc_info"
 
     LN_INFO = "ln_info"
-    LN_STATUS = "ln_status"
+    LN_INFO_LITE = "ln_info_lite"
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"
     LN_ONCHAIN_PAYMENT_STATUS = "ln_onchain_payment_status"

@@ -905,7 +905,7 @@ def ln_info_from_grpc(i) -> LnInfo:
     )
 
 
-class LightningStatus(BaseModel):
+class LightningInfoLite(BaseModel):
     implementation: str = Query(
         ..., description="Lightning software implementation (LND, c-lightning)"
     )

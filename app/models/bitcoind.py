@@ -282,7 +282,7 @@ class BlockchainInfo(BaseModel):
         )
 
 
-class BtcStatus(BaseModel):
+class BtcInfo(BaseModel):
     # Info regarding bitcoind
     blocks: int = Query(
         ...,
