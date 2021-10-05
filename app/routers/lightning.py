@@ -27,23 +27,6 @@ _PREFIX = "lightning"
 router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
 
 
-@router.get(
-    "/get-ln-info-lite",
-    name=f"{_PREFIX}.get-ln-info-lite",
-    summary="Get current lightning system status",
-    dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
-    response_model=LightningInfoLite,
-)
-async def get_ln_info_lite_path():
-    try:
-        return await get_ln_info_lite()
-    except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.reason)
-    except NotImplementedError as r:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
-
-
 @router.post(
     "/add-invoice",
     name=f"{_PREFIX}.add-invoice",
@@ -131,6 +114,23 @@ async def get_info():
         return await get_ln_info()
     except HTTPException as r:
         raise HTTPException(r.status_code, detail=r.detail)
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/get-info-lite",
+    name=f"{_PREFIX}.get-info-lite",
+    summary="Get lightweight current lightning info. Less verbose version of /lightning/get-info",
+    dependencies=[Depends(JWTBearer())],
+    status_code=status.HTTP_200_OK,
+    response_model=LightningInfoLite,
+)
+async def get_ln_info_lite_path():
+    try:
+        return await get_ln_info_lite()
+    except HTTPException as r:
+        raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
