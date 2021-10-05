@@ -10,6 +10,7 @@ from fastapi_plugins import (
 )
 from fastapi_versioning import VersionedFastAPI
 from starlette import status
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
 from app.repositories.bitcoin import (
@@ -18,9 +19,10 @@ from app.repositories.bitcoin import (
 )
 from app.repositories.lightning import register_lightning_listener
 from app.repositories.system import register_hardware_info_gatherer
+from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse
-from starlette.middleware.cors import CORSMiddleware
+from app.utils import SSE
 
 
 @registered_configuration
@@ -81,6 +83,7 @@ def index(req: Request):
 
 num_connections = 0
 connections = {}
+new_connections = []
 
 
 @app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
@@ -89,7 +92,32 @@ async def stream(request: Request):
     q = asyncio.Queue()
     connections[num_connections] = q
     num_connections += 1
+    new_connections.append(q)
+
+    if len(new_connections) == 1:
+        loop = asyncio.get_event_loop()
+        loop.create_task(warmup_new_connections())
+
     return EventSourceResponse(subscribe(request, num_connections - 1, q))
+
+
+async def warmup_new_connections():
+    global new_connections
+
+    res = await get_client_warmup_data()
+
+    for c in new_connections:
+        await asyncio.gather(
+            *[
+                c.put({"id": SSE.SYSTEM_INFO, "data": res[0].dict()}),
+                c.put({"id": SSE.BTC_INFO, "data": res[1].dict()}),
+                c.put({"id": SSE.LN_INFO_LITE, "data": res[2].dict()}),
+                c.put({"id": SSE.WALLET_BALANCE, "data": res[3].dict()}),
+                c.put({"id": SSE.INSTALLED_APP_STATUS, "data": res[4]}),
+            ]
+        )
+
+    new_connections.clear()
 
 
 async def subscribe(request: Request, id: int, q: asyncio.Queue):
