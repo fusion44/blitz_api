@@ -7,6 +7,7 @@ import aiohttp
 import grpc
 import requests
 from decouple import config
+from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 
 import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
@@ -122,6 +123,10 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
             return await resp.json()
 
 
+def convert_json(dict):
+    return json.dumps(jsonable_encoder(dict))
+
+
 async def send_sse_message(id: str, json_data: Dict):
     """Send a message to any SSE connections
 
@@ -133,7 +138,9 @@ async def send_sse_message(id: str, json_data: Dict):
         The data to include
     """
 
-    await redis_plugin.redis.publish_json("default", {"id": id, "data": json_data})
+    await redis_plugin.redis.publish_json(
+        "default", {"id": id, "data": jsonable_encoder(json_data)}
+    )
 
 
 class SSE:
