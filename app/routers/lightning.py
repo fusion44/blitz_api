@@ -18,7 +18,11 @@ from app.repositories.lightning import (
     send_coins,
     send_payment,
 )
-from app.routers.lightning_docs import send_coins_desc, send_payment_desc
+from app.routers.lightning_docs import (
+    get_balance_response_desc,
+    send_coins_desc,
+    send_payment_desc,
+)
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.params import Depends
 
@@ -50,7 +54,7 @@ async def addinvoice(
     "/get-balance",
     name=f"{_PREFIX}.get-balance",
     summary="Get the current on chain and channel balances of the lighting wallet.",
-    response_description="A JSON String with on chain wallet balances.",
+    response_description=get_balance_response_desc,
     dependencies=[Depends(JWTBearer())],
     response_model=WalletBalance,
 )

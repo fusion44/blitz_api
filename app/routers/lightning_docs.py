@@ -1,3 +1,8 @@
+get_balance_response_desc = """
+A JSON String with on chain wallet balances with on-chain balances in 
+**sat** and channel balances in **msat**. Detailed description is in 
+the schema"""
+
 send_coins_desc = """
 __send-coins__ executes a request to send coins to a particular address. 
 
