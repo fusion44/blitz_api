@@ -4,6 +4,7 @@ import enum
 import inspect
 import io
 import logging
+import json
 import re
 from datetime import datetime
 from typing import Any, Optional, Union
@@ -198,13 +199,16 @@ class EventSourceResponse(Response):
             }
         )
 
-        self._ping_task = self._loop.create_task(self._ping(send))  # type: ignore
+        self._ping_task = self._loop.create_task(
+            self._ping(send))  # type: ignore
 
         async for data in self.body_iterator:
             if isinstance(data, dict):
                 chunk = ServerSentEvent(**data).encode()
             else:
-                chunk = ServerSentEvent(str(data), sep=self.sep).encode()
+                parsedData = json.loads(data)
+                chunk = ServerSentEvent(
+                    str(data), sep=self.sep, event=parsedData["id"]).encode()
             _log.debug(f"chunk: {chunk.decode()}")
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
         await send({"type": "http.response.body", "body": b"", "more_body": False})

@@ -109,11 +109,11 @@ async def warmup_new_connections():
     for c in new_connections:
         await asyncio.gather(
             *[
-                c.put({"id": SSE.SYSTEM_INFO, "data": convert_json(res[0].dict())}),
-                c.put({"id": SSE.BTC_INFO, "data": convert_json(res[1].dict())}),
-                c.put({"id": SSE.LN_INFO_LITE, "data": convert_json(res[2].dict())}),
-                c.put({"id": SSE.WALLET_BALANCE, "data": convert_json(res[3].dict())}),
-                c.put({"id": SSE.INSTALLED_APP_STATUS, "data": convert_json(res[4])}),
+                c.put({"event": SSE.SYSTEM_INFO, "data": convert_json(res[0].dict())}),
+                c.put({"event": SSE.BTC_INFO, "data": convert_json(res[1].dict())}),
+                c.put({"event": SSE.LN_INFO_LITE, "data": convert_json(res[2].dict())}),
+                c.put({"event": SSE.WALLET_BALANCE, "data": convert_json(res[3].dict())}),
+                c.put({"event": SSE.INSTALLED_APP_STATUS, "data": convert_json(res[4])}),
             ]
         )
 
