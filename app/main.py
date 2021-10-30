@@ -1,7 +1,9 @@
 import asyncio
+import json
 
 from aioredis import Channel, Redis
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import (
     RedisSettings,
     get_config,
@@ -22,7 +24,7 @@ from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.sse_starlette import EventSourceResponse
-from app.utils import SSE, convert_json
+from app.utils import SSE
 
 
 @registered_configuration
@@ -109,15 +111,21 @@ async def warmup_new_connections():
     for c in new_connections:
         await asyncio.gather(
             *[
-                c.put({"id": SSE.SYSTEM_INFO, "data": convert_json(res[0].dict())}),
-                c.put({"id": SSE.BTC_INFO, "data": convert_json(res[1].dict())}),
-                c.put({"id": SSE.LN_INFO_LITE, "data": convert_json(res[2].dict())}),
-                c.put({"id": SSE.WALLET_BALANCE, "data": convert_json(res[3].dict())}),
-                c.put({"id": SSE.INSTALLED_APP_STATUS, "data": convert_json(res[4])}),
+                c.put(_make_evt_data(SSE.SYSTEM_INFO, res[0].dict())),
+                c.put(_make_evt_data(SSE.BTC_INFO, res[1].dict())),
+                c.put(_make_evt_data(SSE.LN_INFO_LITE, res[2].dict())),
+                c.put(_make_evt_data(SSE.WALLET_BALANCE, res[3].dict())),
+                c.put(_make_evt_data(SSE.INSTALLED_APP_STATUS, res[4])),
             ]
         )
 
     new_connections.clear()
+
+
+def _make_evt_data(evt: SSE, data):
+    d1 = {"event": evt, "data": json.dumps(jsonable_encoder(data))}
+    # d2 = {"event": evt, "data": jsonable_encoder(data)}
+    return d1
 
 
 async def subscribe(request: Request, id: int, q: asyncio.Queue):
@@ -128,7 +136,7 @@ async def subscribe(request: Request, id: int, q: asyncio.Queue):
                 await request.close()
                 break
             else:
-                data = await q.get()
+                data = jsonable_encoder(await q.get())
                 yield data
     except asyncio.CancelledError as e:
         connections.pop(id)
@@ -148,7 +156,7 @@ async def register_all_handlers(redis: Redis):
 
 async def broadcast_data_sse(sub):
     while await sub.wait_message():
-        data = await sub.get(encoding="utf-8")
+        data = json.loads(await sub.get(encoding="utf-8"))
         for k in connections.keys():
             if connections.get(k):
                 await connections.get(k).put(data)
