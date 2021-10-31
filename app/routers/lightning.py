@@ -73,7 +73,7 @@ async def getwalletbalance():
 
 @router.get(
     "/list-onchain-tx",
-    name=f"{_PREFIX}.decode-pay-req",
+    name=f"{_PREFIX}.list-onchain-tx",
     summary="Lists all onchain transactions from the wallet",
     response_model=List[OnChainTransaction],
     response_description="A list of all on-chain transactions made.",
