@@ -1,8 +1,11 @@
+from typing import List
+
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
     Invoice,
     LightningInfoLite,
     LnInfo,
+    OnChainTransaction,
     Payment,
     PaymentRequest,
     SendCoinsInput,
@@ -15,6 +18,7 @@ from app.repositories.lightning import (
     get_ln_info,
     get_ln_info_lite,
     get_wallet_balance,
+    list_on_chain_tx,
     send_coins,
     send_payment,
 )
@@ -65,6 +69,18 @@ async def getwalletbalance():
         raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/list-onchain-tx",
+    name=f"{_PREFIX}.decode-pay-req",
+    summary="Lists all onchain transactions from the wallet",
+    response_model=List[OnChainTransaction],
+    response_description="A list of all on-chain transactions made.",
+    dependencies=[Depends(JWTBearer())],
+)
+async def list_on_chain_tx_path():
+    return await list_on_chain_tx()
 
 
 @router.post(

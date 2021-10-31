@@ -1016,3 +1016,36 @@ class PaymentRequest(BaseModel):
             num_msat=r.num_msat,
             features=[FeaturesEntry.from_grpc(k, r.features[k]) for k in r.features],
         )
+
+
+class OnChainTransaction(BaseModel):
+    tx_hash: str = Query(..., description="The transaction hash")
+    amount: int = Query(
+        ..., description="The transaction amount, denominated in satoshis"
+    )
+    num_confirmations: int = Query(..., description="The number of confirmations")
+    block_height: int = Query(
+        ..., description="The height of the block this transaction was included in"
+    )
+    time_stamp: int = Query(..., description="Timestamp of this transaction")
+    total_fees: int = Query(..., description="Fees paid for this transaction")
+    dest_addresses: List[str] = Query(
+        [], description="Addresses that received funds for this transaction"
+    )
+    label: str = Query(
+        "", description="An optional label that was set on transaction broadcast."
+    )
+
+    @classmethod
+    def from_grpc(cls, t):
+        addrs = [a for a in t.dest_addresses]
+        return cls(
+            tx_hash=t.tx_hash,
+            amount=t.amount,
+            num_confirmations=t.num_confirmations,
+            block_height=t.block_height,
+            time_stamp=t.time_stamp,
+            total_fees=t.total_fees,
+            dest_addresses=addrs,
+            label=t.label,
+        )

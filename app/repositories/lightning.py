@@ -1,9 +1,11 @@
 import asyncio
+from typing import List
 
 from app.models.lightning import (
     Invoice,
     LightningInfoLite,
     LnInfo,
+    OnChainTransaction,
     Payment,
     PaymentRequest,
     SendCoinsInput,
@@ -19,6 +21,7 @@ if lightning_config.ln_node == "lnd":
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
+        list_on_chain_tx_impl,
         listen_invoices,
         send_coins_impl,
         send_payment_impl,
@@ -30,6 +33,7 @@ else:
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
+        list_on_chain_tx_impl,
         listen_invoices,
         send_coins_impl,
         send_payment_impl,
@@ -48,6 +52,10 @@ async def get_ln_info_lite() -> LightningInfoLite:
 
 async def get_wallet_balance():
     return await get_wallet_balance_impl()
+
+
+async def list_on_chain_tx() -> List[OnChainTransaction]:
+    return await list_on_chain_tx_impl()
 
 
 async def add_invoice(

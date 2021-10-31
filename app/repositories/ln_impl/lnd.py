@@ -1,4 +1,5 @@
 from os import error
+from typing import List
 
 import app.repositories.ln_impl.protos.router_pb2 as router
 import app.repositories.ln_impl.protos.rpc_pb2 as ln
@@ -7,6 +8,7 @@ from app.models.lightning import (
     Invoice,
     InvoiceState,
     LnInfo,
+    OnChainTransaction,
     Payment,
     PaymentRequest,
     SendCoinsInput,
@@ -34,6 +36,12 @@ async def get_wallet_balance_impl() -> WalletBalance:
     channel = await lncfg.lnd_stub.ChannelBalance(req)
 
     return WalletBalance.from_grpc(onchain, channel)
+
+
+async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
+    req = ln.GetInfoRequest()
+    response = await lncfg.lnd_stub.GetTransactions(req)
+    return [OnChainTransaction.from_grpc(t) for t in response.transactions]
 
 
 async def add_invoice_impl(

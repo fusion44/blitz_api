@@ -1,6 +1,9 @@
+from typing import List
+
 from app.models.lightning import (
     Invoice,
     LnInfo,
+    OnChainTransaction,
     Payment,
     PaymentRequest,
     SendCoinsInput,
@@ -13,6 +16,10 @@ def get_implementation_name() -> str:
 
 
 async def get_wallet_balance_impl():
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
