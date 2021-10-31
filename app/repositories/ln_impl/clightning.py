@@ -19,6 +19,12 @@ async def get_wallet_balance_impl():
     raise NotImplementedError("c-lightning not yet implemented")
 
 
+async def list_invoices_impl(
+    pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
+):
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     raise NotImplementedError("c-lightning not yet implemented")
 

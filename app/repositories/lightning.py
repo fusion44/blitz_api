@@ -21,6 +21,7 @@ if lightning_config.ln_node == "lnd":
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
+        list_invoices_impl,
         list_on_chain_tx_impl,
         listen_invoices,
         send_coins_impl,
@@ -33,6 +34,7 @@ else:
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
+        list_invoices_impl,
         list_on_chain_tx_impl,
         listen_invoices,
         send_coins_impl,
@@ -52,6 +54,17 @@ async def get_ln_info_lite() -> LightningInfoLite:
 
 async def get_wallet_balance():
     return await get_wallet_balance_impl()
+
+
+async def list_invoices(
+    pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
+) -> List[Invoice]:
+    return await list_invoices_impl(
+        pending_only,
+        index_offset,
+        num_max_invoices,
+        reversed,
+    )
 
 
 async def list_on_chain_tx() -> List[OnChainTransaction]:

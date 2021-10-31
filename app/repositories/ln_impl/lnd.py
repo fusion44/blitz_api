@@ -35,6 +35,19 @@ async def get_wallet_balance_impl() -> WalletBalance:
     return WalletBalance.from_grpc(onchain, channel)
 
 
+async def list_invoices_impl(
+    pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
+):
+    req = ln.ListInvoiceRequest(
+        pending_only=pending_only,
+        index_offset=index_offset,
+        num_max_invoices=num_max_invoices,
+        reversed=reversed,
+    )
+    response = await lncfg.lnd_stub.ListInvoices(req)
+    return [Invoice.from_grpc(i) for i in response.invoices]
+
+
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     req = ln.GetInfoRequest()
     response = await lncfg.lnd_stub.GetTransactions(req)

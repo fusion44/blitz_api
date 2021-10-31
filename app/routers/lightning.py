@@ -18,6 +18,7 @@ from app.repositories.lightning import (
     get_ln_info,
     get_ln_info_lite,
     get_wallet_balance,
+    list_invoices,
     list_on_chain_tx,
     send_coins,
     send_payment,
@@ -69,6 +70,35 @@ async def getwalletbalance():
         raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/list-invoices",
+    name=f"{_PREFIX}.list-invoices",
+    summary="Lists all invoices from the wallet. Modeled after LND implementation.",
+    response_model=List[Invoice],
+    response_description="A list of all invoices created.",
+    dependencies=[Depends(JWTBearer())],
+)
+async def list_invoices_path(
+    pending_only: bool = Query(
+        False,
+        description="If set, only invoices that are not settled and not canceled will be returned in the response.",
+    ),
+    index_offset: int = Query(
+        0,
+        description="The index of an invoice that will be used as either the start or end of a query to determine which invoices should be returned in the response.",
+    ),
+    num_max_invoices: int = Query(
+        0,
+        description="The max number of invoices to return in the response to this query. Will return all invoices when set to 0 or null.",
+    ),
+    reversed: bool = Query(
+        False,
+        description="If set, the invoices returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards.",
+    ),
+):
+    return await list_invoices(pending_only, index_offset, num_max_invoices, reversed)
 
 
 @router.get(

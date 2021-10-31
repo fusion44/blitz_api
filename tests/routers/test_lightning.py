@@ -18,6 +18,9 @@ def test_route_authentications_latest(test_client: TestClient):
     response = test_client.get(f"{prefix}/get-balance")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    response = test_client.get(f"{prefix}/list-invoices")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
     response = test_client.get(f"{prefix}/list-onchain-tx")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -46,6 +49,9 @@ def test_route_authentications_v1(test_client: TestClient):
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
     response = test_client.get(f"{prefix}/get-balance")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    response = test_client.get(f"{prefix}/list-invoices")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
     response = test_client.get(f"{prefix}/list-onchain-tx")
