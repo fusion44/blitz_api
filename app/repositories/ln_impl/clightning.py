@@ -29,6 +29,12 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
+async def list_payments_impl(
+    include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
+):
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
 async def add_invoice_impl(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:

@@ -20,6 +20,7 @@ from app.repositories.lightning import (
     get_wallet_balance,
     list_invoices,
     list_on_chain_tx,
+    list_payments,
     send_coins,
     send_payment,
 )
@@ -111,6 +112,35 @@ async def list_invoices_path(
 )
 async def list_on_chain_tx_path():
     return await list_on_chain_tx()
+
+
+@router.get(
+    "/list-payments",
+    name=f"{_PREFIX}.list-payments",
+    summary="Returns a list of all outgoing payments. Modeled after LND implementation.",
+    response_model=List[Payment],
+    response_description="A list of all payments made.",
+    dependencies=[Depends(JWTBearer())],
+)
+async def list_payments_path(
+    include_incomplete: bool = Query(
+        True,
+        description="If true, then return payments that have not yet fully completed. This means that pending payments, as well as failed payments will show up if this field is set to true. This flag doesn't change the meaning of the indices, which are tied to individual payments.",
+    ),
+    index_offset: int = Query(
+        0,
+        description="The index of a payment that will be used as either the start or end of a query to determine which payments should be returned in the response. The index_offset is exclusive. In the case of a zero index_offset, the query will start with the oldest payment when paginating forwards, or will end with the most recent payment when paginating backwards.",
+    ),
+    max_payments: int = Query(
+        0,
+        description="The maximal number of payments returned in the response to this query.",
+    ),
+    reversed: bool = Query(
+        False,
+        description="If set, the payments returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards. The order of the returned payments is always oldest first (ascending index order).",
+    ),
+):
+    return await list_payments(include_incomplete, index_offset, max_payments, reversed)
 
 
 @router.post(

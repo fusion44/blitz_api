@@ -23,6 +23,7 @@ if lightning_config.ln_node == "lnd":
         get_wallet_balance_impl,
         list_invoices_impl,
         list_on_chain_tx_impl,
+        list_payments_impl,
         listen_invoices,
         send_coins_impl,
         send_payment_impl,
@@ -36,6 +37,7 @@ else:
         get_wallet_balance_impl,
         list_invoices_impl,
         list_on_chain_tx_impl,
+        list_payments_impl,
         listen_invoices,
         send_coins_impl,
         send_payment_impl,
@@ -69,6 +71,14 @@ async def list_invoices(
 
 async def list_on_chain_tx() -> List[OnChainTransaction]:
     return await list_on_chain_tx_impl()
+
+
+async def list_payments(
+    include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
+) -> List[Payment]:
+    return await list_payments_impl(
+        include_incomplete, index_offset, max_payments, reversed
+    )
 
 
 async def add_invoice(

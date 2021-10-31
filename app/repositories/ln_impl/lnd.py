@@ -54,6 +54,19 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     return [OnChainTransaction.from_grpc(t) for t in response.transactions]
 
 
+async def list_payments_impl(
+    include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
+):
+    req = ln.ListPaymentsRequest(
+        include_incomplete=include_incomplete,
+        index_offset=index_offset,
+        max_payments=max_payments,
+        reversed=reversed,
+    )
+    response = await lncfg.lnd_stub.ListPayments(req)
+    return [Payment.from_grpc(p) for p in response.payments]
+
+
 async def add_invoice_impl(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
