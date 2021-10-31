@@ -8,40 +8,40 @@ from pydantic.types import conint
 
 
 class InvoiceState(str, Enum):
-    open = "open"
-    settled = "settled"
-    canceled = "canceled"
-    accepted = "accepted"
+    OPEN = "open"
+    SETTLED = "settled"
+    CANCELED = "canceled"
+    ACCEPTED = "accepted"
 
-
-def invoice_settled_from_grpc(id):
-    if id == 0:
-        return InvoiceState.open
-    elif id == 1:
-        return InvoiceState.settled
-    elif id == 2:
-        return InvoiceState.canceled
-    elif id == 3:
-        return InvoiceState.accepted
-    else:
-        raise NotImplementedError(f"InvoiceState {id} is not implemented")
+    @classmethod
+    def from_grpc(cls, id) -> "InvoiceState":
+        if id == 0:
+            return InvoiceState.OPEN
+        elif id == 1:
+            return InvoiceState.SETTLED
+        elif id == 2:
+            return InvoiceState.CANCELED
+        elif id == 3:
+            return InvoiceState.ACCEPTED
+        else:
+            raise NotImplementedError(f"InvoiceState {id} is not implemented")
 
 
 class InvoiceHTLCState(str, Enum):
-    accepted = "accepted"
-    settled = "settled"
-    canceled = "canceled"
+    ACCEPTED = "accepted"
+    SETTLED = "settled"
+    CANCELED = "canceled"
 
-
-def invoice_settled_from_grpc(id):
-    if id == 0:
-        return InvoiceHTLCState.accepted
-    elif id == 1:
-        return InvoiceHTLCState.settled
-    elif id == 2:
-        return InvoiceHTLCState.canceled
-    else:
-        raise NotImplementedError(f"InvoiceHTLCState {id} is not implemented")
+    @classmethod
+    def from_grpc(cls, id) -> "InvoiceHTLCState":
+        if id == 0:
+            return InvoiceHTLCState.ACCEPTED
+        elif id == 1:
+            return InvoiceHTLCState.SETTLED
+        elif id == 2:
+            return InvoiceHTLCState.CANCELED
+        else:
+            raise NotImplementedError(f"InvoiceHTLCState {id} is not implemented")
 
 
 class Feature(BaseModel):
@@ -50,7 +50,7 @@ class Feature(BaseModel):
     is_known: bool
 
     @classmethod
-    def from_grpc(cls, f):
+    def from_grpc(cls, f) -> "Feature":
         return cls(
             name=f.name,
             is_required=f.is_required,
@@ -63,7 +63,7 @@ class FeaturesEntry(BaseModel):
     value: Feature
 
     @classmethod
-    def from_grpc(cls, entry_key, feature):
+    def from_grpc(cls, entry_key, feature) -> "FeaturesEntry":
         return cls(
             key=entry_key,
             value=Feature.from_grpc(feature),
@@ -90,27 +90,27 @@ class AMP(BaseModel):
     # is in InvoiceState_ACCEPTED or InvoiceState_SETTLED.
     preimage: str
 
-
-def amp_from_grpc(a) -> AMP:
-    return AMP(
-        root_share=a.root_share.hex(),
-        set_id=a.set_id.hex(),
-        child_index=a.child_index,
-        hash=a.hash.hex(),
-        preimage=a.preimage.hex(),
-    )
+    @classmethod
+    def from_grpc(cls, a) -> "AMP":
+        return cls(
+            root_share=a.root_share.hex(),
+            set_id=a.set_id.hex(),
+            child_index=a.child_index,
+            hash=a.hash.hex(),
+            preimage=a.preimage.hex(),
+        )
 
 
 class CustomRecordsEntry(BaseModel):
     key: int
     value: str
 
-
-def custom_record_entry_from_grpc(e) -> CustomRecordsEntry:
-    return CustomRecordsEntry(
-        key=e.key,
-        value=e.value,
-    )
+    @classmethod
+    def from_grpc(cls, e) -> "CustomRecordsEntry":
+        return cls(
+            key=e.key,
+            value=e.value,
+        )
 
 
 class InvoiceHTLC(BaseModel):
@@ -148,27 +148,27 @@ class InvoiceHTLC(BaseModel):
     # if this is an AMP HTLC.
     amp: AMP
 
+    @classmethod
+    def from_grpc(cls, h) -> "InvoiceHTLC":
+        def _crecords(recs):
+            l = []
+            for r in recs:
+                l.append(CustomRecordsEntry.from_grpc(r))
+            return l
 
-def invoice_htlc_from_grpc(h) -> InvoiceHTLC:
-    def _crecords(recs):
-        l = []
-        for r in recs:
-            l.append(custom_record_entry_from_grpc(r))
-        return l
-
-    return InvoiceHTLC(
-        chan_id=h.chan_id,
-        htlc_index=h.htlc_index,
-        amt_msat=h.amt_msat,
-        accept_height=h.accept_height,
-        accept_time=h.accept_time,
-        resolve_time=h.resolve_time,
-        expiry_height=h.expiry_height,
-        state=invoice_settled_from_grpc(h.state),
-        custom_records=_crecords(h.custom_records),
-        mpp_total_amt_msat=h.mpp_total_amt_msat,
-        amp=amp_from_grpc(h.amp),
-    )
+        return cls(
+            chan_id=h.chan_id,
+            htlc_index=h.htlc_index,
+            amt_msat=h.amt_msat,
+            accept_height=h.accept_height,
+            accept_time=h.accept_time,
+            resolve_time=h.resolve_time,
+            expiry_height=h.expiry_height,
+            state=InvoiceHTLCState.from_grpc(h.state),
+            custom_records=_crecords(h.custom_records),
+            mpp_total_amt_msat=h.mpp_total_amt_msat,
+            amp=AMP.from_grpc(h.amp),
+        )
 
 
 class RouteHint(BaseModel):
@@ -307,53 +307,53 @@ class Invoice(BaseModel):
     # Signals whether or not this is an AMP invoice.
     is_amp: Optional[bool]
 
+    @classmethod
+    def from_grpc(cls, i) -> "Invoice":
+        def _route_hints(hints):
+            l = []
+            for h in hints:
+                l.append(RouteHint.from_grpc((h)))
+            return l
 
-def invoice_from_grpc(i) -> Invoice:
-    def _route_hints(hints):
-        l = []
-        for h in hints:
-            l.append(RouteHint.from_grpc((h)))
-        return l
+        def _htlcs(htlcs):
+            l = []
+            for h in htlcs:
+                l.append(InvoiceHTLC.from_grpc(h))
+            return l
 
-    def _htlcs(htlcs):
-        l = []
-        for h in htlcs:
-            l.append(invoice_htlc_from_grpc(h))
-        return l
+        def _features(features):
+            l = []
+            for k in features:
+                l.append(FeaturesEntry.from_grpc(k, features[k]))
+            return l
 
-    def _features(features):
-        l = []
-        for k in features:
-            l.append(FeaturesEntry.from_grpc(k, features[k]))
-        return l
-
-    return Invoice(
-        memo=i.memo,
-        r_preimage=i.r_preimage.hex(),
-        r_hash=i.r_hash.hex(),
-        value=i.value,
-        value_msat=i.value_msat,
-        settled=i.settled,
-        creation_date=i.creation_date,
-        settle_date=i.settle_date,
-        payment_request=i.payment_request,
-        description_hash=i.description_hash,
-        expiry=i.expiry,
-        fallback_addr=i.fallback_addr,
-        cltv_expiry=i.cltv_expiry,
-        route_hints=_route_hints(i.route_hints),
-        private=i.private,
-        add_index=i.add_index,
-        settle_index=i.settle_index,
-        amt_paid_sat=i.amt_paid_sat,
-        amt_paid_msat=i.amt_paid_msat,
-        state=invoice_settled_from_grpc(i.state),
-        htlcs=_htlcs(i.htlcs),
-        features=_features(i.features),
-        is_keysend=i.is_keysend,
-        payment_addr=i.payment_addr.hex(),
-        is_amp=i.is_amp,
-    )
+        return cls(
+            memo=i.memo,
+            r_preimage=i.r_preimage.hex(),
+            r_hash=i.r_hash.hex(),
+            value=i.value,
+            value_msat=i.value_msat,
+            settled=i.settled,
+            creation_date=i.creation_date,
+            settle_date=i.settle_date,
+            payment_request=i.payment_request,
+            description_hash=i.description_hash,
+            expiry=i.expiry,
+            fallback_addr=i.fallback_addr,
+            cltv_expiry=i.cltv_expiry,
+            route_hints=_route_hints(i.route_hints),
+            private=i.private,
+            add_index=i.add_index,
+            settle_index=i.settle_index,
+            amt_paid_sat=i.amt_paid_sat,
+            amt_paid_msat=i.amt_paid_msat,
+            state=InvoiceState.from_grpc(i.state),
+            htlcs=_htlcs(i.htlcs),
+            features=_features(i.features),
+            is_keysend=i.is_keysend,
+            payment_addr=i.payment_addr.hex(),
+            is_amp=i.is_amp,
+        )
 
 
 class PaymentStatus(str, Enum):
@@ -362,18 +362,18 @@ class PaymentStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
 
-
-def payment_status_from_grpc(id):
-    if id == 0:
-        return PaymentStatus.UNKNOWN
-    elif id == 1:
-        return PaymentStatus.IN_FLIGHT
-    elif id == 2:
-        return PaymentStatus.SUCCEEDED
-    elif id == 3:
-        return PaymentStatus.FAILED
-    else:
-        raise NotImplementedError(f"PaymentStatus {id} is not implemented")
+    @classmethod
+    def from_grpc(cls, id) -> "PaymentStatus":
+        if id == 0:
+            return PaymentStatus.UNKNOWN
+        elif id == 1:
+            return PaymentStatus.IN_FLIGHT
+        elif id == 2:
+            return PaymentStatus.SUCCEEDED
+        elif id == 3:
+            return PaymentStatus.FAILED
+        else:
+            raise NotImplementedError(f"PaymentStatus {id} is not implemented")
 
 
 class PaymentFailureReason(str, Enum):
@@ -398,22 +398,22 @@ class PaymentFailureReason(str, Enum):
     # Insufficient local balance.
     FAILURE_REASON_INSUFFICIENT_BALANCE = "FAILURE_REASON_INSUFFICIENT_BALANCE"
 
-
-def payment_failure_reason(f) -> PaymentFailureReason:
-    if f == 0:
-        return PaymentFailureReason.FAILURE_REASON_NONE
-    elif f == 1:
-        return PaymentFailureReason.FAILURE_REASON_TIMEOUT
-    elif f == 2:
-        return PaymentFailureReason.FAILURE_REASON_NO_ROUTE
-    elif f == 3:
-        return PaymentFailureReason.FAILURE_REASON_ERROR
-    elif f == 4:
-        return PaymentFailureReason.FAILURE_REASON_INCORRECT_PAYMENT_DETAILS
-    elif f == 5:
-        return PaymentFailureReason.FAILURE_REASON_INSUFFICIENT_BALANCE
-    else:
-        raise NotImplementedError(f"PaymentFailureReason {id} is not implemented")
+    @classmethod
+    def from_grpc(cls, f) -> "PaymentFailureReason":
+        if f == 0:
+            return PaymentFailureReason.FAILURE_REASON_NONE
+        elif f == 1:
+            return PaymentFailureReason.FAILURE_REASON_TIMEOUT
+        elif f == 2:
+            return PaymentFailureReason.FAILURE_REASON_NO_ROUTE
+        elif f == 3:
+            return PaymentFailureReason.FAILURE_REASON_ERROR
+        elif f == 4:
+            return PaymentFailureReason.FAILURE_REASON_INCORRECT_PAYMENT_DETAILS
+        elif f == 5:
+            return PaymentFailureReason.FAILURE_REASON_INSUFFICIENT_BALANCE
+        else:
+            raise NotImplementedError(f"PaymentFailureReason {id} is not implemented")
 
 
 class ChannelUpdate(BaseModel):
@@ -467,22 +467,22 @@ class ChannelUpdate(BaseModel):
     # network in a forwards compatible manner.
     extra_opaque_data: str
 
-
-def channel_update_from_grpc(u) -> ChannelUpdate:
-    return ChannelUpdate(
-        signature=u.signature,
-        chain_hash=u.chain_hash,
-        chan_id=u.chan_id,
-        timestamp=u.timestamp,
-        message_flags=u.message_flags,
-        channel_flags=u.channel_flags,
-        time_lock_delta=u.time_lock_delta,
-        htlc_minimum_msat=u.htlc_minimum_msat,
-        base_fee=u.base_fee,
-        fee_rate=u.fee_rate,
-        htlc_maximum_msat=u.htlc_maximum_msat,
-        extra_opaque_data=u.extra_opaque_data,
-    )
+    @classmethod
+    def from_grpc(cls, u) -> "ChannelUpdate":
+        return cls(
+            signature=u.signature,
+            chain_hash=u.chain_hash,
+            chan_id=u.chan_id,
+            timestamp=u.timestamp,
+            message_flags=u.message_flags,
+            channel_flags=u.channel_flags,
+            time_lock_delta=u.time_lock_delta,
+            htlc_minimum_msat=u.htlc_minimum_msat,
+            base_fee=u.base_fee,
+            fee_rate=u.fee_rate,
+            htlc_maximum_msat=u.htlc_maximum_msat,
+            extra_opaque_data=u.extra_opaque_data,
+        )
 
 
 class Hop(BaseModel):
@@ -507,31 +507,31 @@ class Hop(BaseModel):
     # to true for them to be encoded properly.
     tlv_payload: bool
 
-
-def hop_from_grpc(h) -> Hop:
-    return Hop(
-        chan_id=h.chan_id,
-        chan_capacity=h.chan_capacity,
-        amt_to_forward=h.amt_to_forward,
-        fee=h.fee,
-        expiry=h.expiry,
-        amt_to_forward_msat=h.amt_to_forward_msat,
-        fee_msat=h.fee_msat,
-        pub_key=h.pub_key,
-        tlv_payload=h.tlv_payload,
-    )
+    @classmethod
+    def from_grpc(cls, h) -> "Hop":
+        return cls(
+            chan_id=h.chan_id,
+            chan_capacity=h.chan_capacity,
+            amt_to_forward=h.amt_to_forward,
+            fee=h.fee,
+            expiry=h.expiry,
+            amt_to_forward_msat=h.amt_to_forward_msat,
+            fee_msat=h.fee_msat,
+            pub_key=h.pub_key,
+            tlv_payload=h.tlv_payload,
+        )
 
 
 class MPPRecord(BaseModel):
     payment_addr: str
     total_amt_msat: int
 
-
-def mpp_record_from_grpc(r) -> MPPRecord:
-    return MPPRecord(
-        payment_addr=r.payment_addr,
-        total_amt_msat=r.total_amt_msat,
-    )
+    @classmethod
+    def from_grpc(cls, r) -> "MPPRecord":
+        return cls(
+            payment_addr=r.payment_addr,
+            total_amt_msat=r.total_amt_msat,
+        )
 
 
 class AMPRecord(BaseModel):
@@ -539,13 +539,13 @@ class AMPRecord(BaseModel):
     set_id: str
     child_index: int
 
-
-def amp_record_from_grpc(r) -> AMPRecord:
-    return AMPRecord(
-        root_share=r.root_share,
-        set_id=r.set_id,
-        child_index=r.child_index,
-    )
+    @classmethod
+    def from_grpc(cls, r) -> "AMPRecord":
+        return cls(
+            root_share=r.root_share,
+            set_id=r.set_id,
+            child_index=r.child_index,
+        )
 
 
 class Route(BaseModel):
@@ -559,43 +559,43 @@ class Route(BaseModel):
     amp_record: Union[AMPRecord, None]
     custom_records: List[CustomRecordsEntry]
 
+    @classmethod
+    def from_grpc(cls, r):
+        def _crecords(recs):
+            l = []
+            for r in recs:
+                l.append(CustomRecordsEntry(r))
+            return l
 
-def route_from_grpc(r):
-    def _crecords(recs):
-        l = []
-        for r in recs:
-            l.append(custom_record_entry_from_grpc(r))
-        return l
+        def _get_hops(hops) -> List[Hop]:
+            l = []
+            for h in hops:
+                l.append(Hop.from_grpc(h))
+            return l
 
-    def _get_hops(hops) -> List[Hop]:
-        l = []
-        for h in hops:
-            l.append(hop_from_grpc(h))
-        return l
+        mpp = None
+        if hasattr(r, "mpp_record"):
+            mpp = MPPRecord.from_grpc(r.mpp_record)
 
-    mpp = None
-    if hasattr(r, "mpp_record"):
-        mpp = mpp_record_from_grpc(r.mpp_record)
+        amp = None
+        if hasattr(r, "amp_record"):
+            amp = AMPRecord.from_grpc(r.amp_record)
 
-    amp = None
-    if hasattr(r, "amp_record"):
-        amp = amp_record_from_grpc(r.amp_record)
+        crecords = []
+        if hasattr(r, "custom_records"):
+            crecords = _crecords(r.custom_records)
 
-    crecords = []
-    if hasattr(r, "custom_records"):
-        crecords = _crecords(r.custom_records)
-
-    return Route(
-        total_time_lock=r.total_time_lock,
-        total_fees=r.total_fees,
-        total_amt=r.total_amt,
-        hops=_get_hops(r.hops),
-        total_fees_msat=r.total_fees_msat,
-        total_amt_msat=r.total_amt_msat,
-        mpp_record=mpp,
-        amp_record=amp,
-        custom_records=crecords,
-    )
+        return cls(
+            total_time_lock=r.total_time_lock,
+            total_fees=r.total_fees,
+            total_amt=r.total_amt,
+            hops=_get_hops(r.hops),
+            total_fees_msat=r.total_fees_msat,
+            total_amt_msat=r.total_amt_msat,
+            mpp_record=mpp,
+            amp_record=amp,
+            custom_records=crecords,
+        )
 
 
 class HTLCAttemptFailure(BaseModel):
@@ -625,43 +625,43 @@ class HTLCAttemptFailure(BaseModel):
     # A failure type-dependent block height.
     height: int
 
+    @classmethod
+    def from_grpc(cls, f) -> "HTLCAttemptFailure":
+        code = None
+        if hasattr(f, "code"):
+            code = f.code
 
-def htlc_attempt_failure_from_grpc(f) -> HTLCAttemptFailure:
-    code = None
-    if hasattr(f, "code"):
-        code = f.code
+        htlc_msat = None
+        if hasattr(f, "htlc_msat"):
+            htlc_msat = f.htlc_msat
 
-    htlc_msat = None
-    if hasattr(f, "htlc_msat"):
-        htlc_msat = f.htlc_msat
-
-    return HTLCAttemptFailure(
-        code=code,
-        channel_update=channel_update_from_grpc(f.channel_update),
-        htlc_msat=htlc_msat,
-        onion_sha_256=f.onion_sha_256,
-        cltv_expiry=f.cltv_expiry,
-        flags=f.flags,
-        failure_source_index=f.failure_source_index,
-        height=f.height,
-    )
+        return cls(
+            code=code,
+            channel_update=ChannelUpdate.from_grpc(f.channel_update),
+            htlc_msat=htlc_msat,
+            onion_sha_256=f.onion_sha_256,
+            cltv_expiry=f.cltv_expiry,
+            flags=f.flags,
+            failure_source_index=f.failure_source_index,
+            height=f.height,
+        )
 
 
 class HTLCStatus(str, Enum):
-    IN_FLIGHT = "IN_FLIGHT"
-    SUCCEEDED = "SUCCEEDED"
-    FAILED = "FAILED"
+    IN_FLIGHT = "in_flight"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
 
-
-def htlc_status_from_grpc(s) -> HTLCStatus:
-    if s == 0:
-        return HTLCStatus.IN_FLIGHT
-    elif s == 1:
-        return HTLCStatus.SUCCEEDED
-    elif s == 2:
-        return HTLCStatus.FAILED
-    else:
-        raise NotImplementedError(f"HTLCStatus {id} is not implemented")
+    @classmethod
+    def from_grpc(cls, s) -> "HTLCStatus":
+        if s == 0:
+            return HTLCStatus.IN_FLIGHT
+        elif s == 1:
+            return HTLCStatus.SUCCEEDED
+        elif s == 2:
+            return HTLCStatus.FAILED
+        else:
+            raise NotImplementedError(f"HTLCStatus {id} is not implemented")
 
 
 class HTLCAttempt(BaseModel):
@@ -687,17 +687,17 @@ class HTLCAttempt(BaseModel):
     # The preimage that was used to settle the HTLC.
     preimage: str
 
-
-def htlc_attempt_from_grpc(a: HTLCAttempt) -> HTLCAttempt:
-    return HTLCAttempt(
-        attempt_id=a.attempt_id,
-        status=htlc_status_from_grpc(a.status),
-        route=route_from_grpc(a.route),
-        attempt_time_ns=a.attempt_time_ns,
-        resolve_time_ns=a.resolve_time_ns,
-        failure=htlc_attempt_failure_from_grpc(a.failure),
-        preimage=a.preimage.hex(),
-    )
+    @classmethod
+    def from_grpc(cls, a) -> "HTLCAttempt":
+        return cls(
+            attempt_id=a.attempt_id,
+            status=HTLCStatus.from_grpc(a.status),
+            route=Route.from_grpc(a.route),
+            attempt_time_ns=a.attempt_time_ns,
+            resolve_time_ns=a.resolve_time_ns,
+            failure=HTLCAttemptFailure.from_grpc(a.failure),
+            preimage=a.preimage.hex(),
+        )
 
 
 class Payment(BaseModel):
@@ -733,26 +733,26 @@ class Payment(BaseModel):
     # The failure reason
     failure_reason: PaymentFailureReason
 
+    @classmethod
+    def from_grpc(cls, p) -> "Payment":
+        def _get_attempts(attempts):
+            l = []
+            for a in attempts:
+                l.append(HTLCAttempt.from_grpc(a))
+            return l
 
-def payment_from_grpc(p) -> Payment:
-    def _get_attempts(attempts):
-        l = []
-        for a in attempts:
-            l.append(htlc_attempt_from_grpc(a))
-        return l
-
-    return Payment(
-        payment_hash=p.payment_hash,
-        payment_preimage=p.payment_preimage,
-        value_msat=p.value_msat,
-        payment_request=p.payment_request,
-        status=payment_status_from_grpc(p.status),
-        fee_msat=p.fee_msat,
-        creation_time_ns=p.creation_time_ns,
-        htlcs=_get_attempts(p.htlcs),
-        payment_index=p.payment_index,
-        failure_reason=payment_failure_reason(p.failure_reason),
-    )
+        return cls(
+            payment_hash=p.payment_hash,
+            payment_preimage=p.payment_preimage,
+            value_msat=p.value_msat,
+            payment_request=p.payment_request,
+            status=PaymentStatus.from_grpc(p.status),
+            fee_msat=p.fee_msat,
+            creation_time_ns=p.creation_time_ns,
+            htlcs=_get_attempts(p.htlcs),
+            payment_index=p.payment_index,
+            failure_reason=PaymentFailureReason.from_grpc(p.failure_reason),
+        )
 
 
 class SendCoinsInput(BaseModel):
@@ -872,37 +872,37 @@ class LnInfo(BaseModel):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    @classmethod
+    def from_grpc(cls, i) -> "LnInfo":
+        _chains = []
+        for c in i.chains:
+            _chains.append(Chain(chain=c.chain, network=c.network))
 
-def ln_info_from_grpc(i) -> LnInfo:
-    _chains = []
-    for c in i.chains:
-        _chains.append(Chain(chain=c.chain, network=c.network))
+        _features = []
+        for f in i.features:
+            _features.append(FeaturesEntry.from_grpc(f, i.features[f]))
 
-    _features = []
-    for f in i.features:
-        _features.append(FeaturesEntry.from_grpc(f, i.features[f]))
+        _uris = [u for u in i.uris]
 
-    _uris = [u for u in i.uris]
-
-    return LnInfo(
-        version=i.version,
-        commit_hash=i.commit_hash,
-        identity_pubkey=i.identity_pubkey,
-        alias=i.alias,
-        color=i.color,
-        num_pending_channels=i.num_pending_channels,
-        num_active_channels=i.num_active_channels,
-        num_inactive_channels=i.num_inactive_channels,
-        num_peers=i.num_peers,
-        block_height=i.block_height,
-        block_hash=i.block_hash,
-        best_header_timestamp=i.best_header_timestamp,
-        synced_to_chain=i.synced_to_chain,
-        synced_to_graph=i.synced_to_graph,
-        chains=_chains,
-        uris=_uris,
-        features=_features,
-    )
+        return LnInfo(
+            version=i.version,
+            commit_hash=i.commit_hash,
+            identity_pubkey=i.identity_pubkey,
+            alias=i.alias,
+            color=i.color,
+            num_pending_channels=i.num_pending_channels,
+            num_active_channels=i.num_active_channels,
+            num_inactive_channels=i.num_inactive_channels,
+            num_peers=i.num_peers,
+            block_height=i.block_height,
+            block_hash=i.block_hash,
+            best_header_timestamp=i.best_header_timestamp,
+            synced_to_chain=i.synced_to_chain,
+            synced_to_graph=i.synced_to_graph,
+            chains=_chains,
+            uris=_uris,
+            features=_features,
+        )
 
 
 class LightningInfoLite(BaseModel):

@@ -14,9 +14,6 @@ from app.models.lightning import (
     SendCoinsInput,
     SendCoinsResponse,
     WalletBalance,
-    invoice_from_grpc,
-    ln_info_from_grpc,
-    payment_from_grpc,
 )
 from app.utils import SSE
 from app.utils import lightning_config as lncfg
@@ -56,7 +53,7 @@ async def add_invoice_impl(
 
     response = await lncfg.lnd_stub.AddInvoice(i)
 
-    # Can't use invoice_from_grpc() here because
+    # Can't use Invoice.from_grpc() here because
     # the response is not a standard invoice
     invoice = Invoice(
         memo=memo,
@@ -65,7 +62,7 @@ async def add_invoice_impl(
         payment_request=response.payment_request,
         add_index=response.add_index,
         payment_addr=response.payment_addr.hex(),
-        state=InvoiceState.open,
+        state=InvoiceState.OPEN,
         is_keysend=is_keysend,
     )
 
@@ -131,7 +128,7 @@ async def send_payment_impl(
 
         p = None
         async for response in lncfg.router_stub.SendPaymentV2(r):
-            p = payment_from_grpc(response)
+            p = Payment.from_grpc(response)
             await send_sse_message(SSE.LN_PAYMENT_STATUS, p.dict())
         return p
     except grpc.aio._call.AioRpcError as error:
@@ -151,13 +148,13 @@ async def send_payment_impl(
 async def get_ln_info_impl() -> LnInfo:
     req = ln.GetInfoRequest()
     response = await lncfg.lnd_stub.GetInfo(req)
-    return ln_info_from_grpc(response)
+    return LnInfo.from_grpc(response)
 
 
 async def listen_invoices() -> Invoice:
     request = ln.InvoiceSubscription()
     try:
         async for r in lncfg.lnd_stub.SubscribeInvoices(request):
-            yield invoice_from_grpc(r)
+            yield Invoice.from_grpc(r)
     except error:
         print(error)
