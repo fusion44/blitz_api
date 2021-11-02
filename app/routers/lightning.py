@@ -2,6 +2,7 @@ from typing import List
 
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
+    GenericTx,
     Invoice,
     LightningInfoLite,
     LnInfo,
@@ -18,6 +19,7 @@ from app.repositories.lightning import (
     get_ln_info,
     get_ln_info_lite,
     get_wallet_balance,
+    list_all_tx,
     list_invoices,
     list_on_chain_tx,
     list_payments,
@@ -71,6 +73,37 @@ async def getwalletbalance():
         raise HTTPException(r.status_code, detail=r.reason)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/list-all-tx",
+    name=f"{_PREFIX}.list-all-tx",
+    summary="Lists all on-chain transactions, payments and invoices in the wallet",
+    description="""Returns a list with all on-chain transaction, payments and invoices combined into one list. 
+    The index of each tx is only valid for each identical set of parameters.
+    """,
+    dependencies=[Depends(JWTBearer())],
+    response_model=List[GenericTx],
+)
+async def list_all_tx_path(
+    successfull_only: bool = Query(
+        False,
+        description="If set, only successful transaction will be returned in the response.",
+    ),
+    index_offset: int = Query(
+        0,
+        description="The index of an transaction that will be used as either the start or end of a query to determine which invoices should be returned in the response.",
+    ),
+    max_tx: int = Query(
+        0,
+        description="The max number of transaction to return in the response to this query. Will return all transactions when set to 0 or null.",
+    ),
+    reversed: bool = Query(
+        False,
+        description="If set, the transactions returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards.",
+    ),
+):
+    return await list_all_tx(successfull_only, index_offset, max_tx, reversed)
 
 
 @router.get(

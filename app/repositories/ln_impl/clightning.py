@@ -1,6 +1,7 @@
 from typing import List
 
 from app.models.lightning import (
+    GenericTx,
     Invoice,
     LnInfo,
     OnChainTransaction,
@@ -16,6 +17,12 @@ def get_implementation_name() -> str:
 
 
 async def get_wallet_balance_impl():
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def list_all_tx_impl(
+    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+) -> List[GenericTx]:
     raise NotImplementedError("c-lightning not yet implemented")
 
 

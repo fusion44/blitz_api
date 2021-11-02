@@ -2,6 +2,7 @@ import asyncio
 from typing import List
 
 from app.models.lightning import (
+    GenericTx,
     Invoice,
     LightningInfoLite,
     LnInfo,
@@ -21,6 +22,7 @@ if lightning_config.ln_node == "lnd":
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
+        list_all_tx_impl,
         list_invoices_impl,
         list_on_chain_tx_impl,
         list_payments_impl,
@@ -35,6 +37,7 @@ else:
         get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
+        list_all_tx_impl,
         list_invoices_impl,
         list_on_chain_tx_impl,
         list_payments_impl,
@@ -56,6 +59,12 @@ async def get_ln_info_lite() -> LightningInfoLite:
 
 async def get_wallet_balance():
     return await get_wallet_balance_impl()
+
+
+async def list_all_tx(
+    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+) -> List[GenericTx]:
+    return await list_all_tx_impl(successfull_only, index_offset, max_tx, reversed)
 
 
 async def list_invoices(

@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Optional, Union
 
+import app.models.lightning_docs as docs
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
 from pydantic import BaseModel
@@ -1048,4 +1049,116 @@ class OnChainTransaction(BaseModel):
             total_fees=t.total_fees,
             dest_addresses=addrs,
             label=t.label,
+        )
+
+
+class TxCategory(str, Enum):
+    ONCHAIN = "onchain"
+    LIGHTNING = "ln"
+
+
+class TxType(str, Enum):
+    UNKNOWN = "unknown"
+    SEND = "send"
+    RECEIVE = "receive"
+
+
+class TxStatus(str, Enum):
+    UNKNOWN = "unknown"
+    IN_FLIGHT = "in_flight"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class GenericTx(BaseModel):
+    index: int = Query(0, description="The index of the transaction.")
+    id: str = Query(..., description=docs.tx_id_desc)
+    category: TxCategory = Query(
+        ...,
+        description="Whether this is an onchain (**onchain**) or lightning (**ln**) transaction.",
+    )
+    type: TxType = Query(
+        ...,
+        description="Whether this is an outgoing (**send**) transaction or an incoming (**receive**) transaction.",
+    )
+    amount: int = Query(..., description=docs.tx_amount_desc)
+    time_stamp: int = Query(..., description=docs.tx_time_stamp_desc)
+    comment: str = Query("", description="Optional comment for this transaction")
+    status: TxStatus = Query(..., description=docs.tx_status_desc)
+    block_height: int = Query(
+        None,
+        description="Block height, if included in a block. Only applicable for category **onchain**.",
+    )
+    num_confs: int = Query(
+        None,
+        description="Number of confirmations. Only applicable for category **onchain**.",
+    )
+    total_fees: int = Query(None, description="Total fees paid for this transaction")
+
+    @classmethod
+    def from_grpc_invoice(cls, i):
+        status = TxStatus.UNKNOWN
+        time_stamp = i.creation_date
+        amount = i.value_msat
+        if i.settled:
+            status = TxStatus.SUCCEEDED
+            time_stamp = i.settle_date
+            amount = i.amt_paid_msat
+        elif i.state == 0 or i.state == 3:  # state is OPEN or ACCEPTED
+            status = TxStatus.IN_FLIGHT
+        elif i.state == 2:  # state is CANCELED
+            status = TxStatus.FAILED
+
+        return cls(
+            id=i.payment_request,
+            category=TxCategory.LIGHTNING,
+            type=TxType.RECEIVE,
+            amount=amount,
+            time_stamp=time_stamp,
+            comment=i.memo,
+            status=status,
+        )
+
+    @classmethod
+    def from_grpc_onchain_tx(cls, tx):
+        s = TxStatus.SUCCEEDED if tx.num_confirmations > 0 else TxStatus.IN_FLIGHT
+
+        t = TxType.UNKNOWN
+        if tx.amount > 0:
+            t = TxType.RECEIVE
+        elif tx.amount < 0:
+            t = TxType.SEND
+        # else == 0 => unknown
+
+        return cls(
+            id=tx.tx_hash,
+            category=TxCategory.ONCHAIN,
+            type=t,
+            amount=tx.amount,
+            time_stamp=tx.time_stamp,
+            status=s,
+            comment=tx.label,
+            block_height=tx.block_height,
+            num_confs=tx.num_confirmations,
+        )
+
+    @classmethod
+    def from_grpc_payment(cls, payment, comment: str = ""):
+        status = TxStatus.UNKNOWN
+        if payment.status == 1:
+            status = TxStatus.IN_FLIGHT
+        elif payment.status == 2:
+            status = TxStatus.SUCCEEDED
+        elif payment.status == 3:
+            status = TxStatus.FAILED
+
+        return cls(
+            id=payment.payment_request,
+            category=TxCategory.LIGHTNING,
+            type=TxType.SEND,
+            time_stamp=payment.creation_date,
+            amount=-payment.value_msat,
+            status=status,
+            total_fees=payment.fee_msat,
+            comment=comment,
         )

@@ -1,3 +1,5 @@
+import asyncio
+import time
 from os import error
 from typing import List
 
@@ -5,6 +7,7 @@ import app.repositories.ln_impl.protos.router_pb2 as router
 import app.repositories.ln_impl.protos.rpc_pb2 as ln
 import grpc
 from app.models.lightning import (
+    GenericTx,
     Invoice,
     InvoiceState,
     LnInfo,
@@ -35,6 +38,72 @@ async def get_wallet_balance_impl() -> WalletBalance:
     return WalletBalance.from_grpc(onchain, channel)
 
 
+# Decoding the payment request take a long time,
+# hence we build a simple cache here.
+memo_cache = {}
+
+
+async def list_all_tx_impl(
+    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+) -> List[GenericTx]:
+    # TODO: find a better caching strategy
+    list_invoice_req = ln.ListInvoiceRequest(
+        pending_only=successfull_only,
+        index_offset=0,
+        num_max_invoices=0,
+        reversed=reversed,
+    )
+
+    get_tx_req = ln.GetTransactionsRequest()
+
+    list_payments_req = ln.ListPaymentsRequest(
+        include_incomplete=not successfull_only,
+        index_offset=0,
+        max_payments=0,
+        reversed=reversed,
+    )
+
+    res = await asyncio.gather(
+        *[
+            lncfg.lnd_stub.ListInvoices(list_invoice_req),
+            lncfg.lnd_stub.GetTransactions(get_tx_req),
+            lncfg.lnd_stub.ListPayments(list_payments_req),
+        ]
+    )
+
+    tx = []
+    for i in res[0].invoices:
+        tx.append(GenericTx.from_grpc_invoice(i))
+    for t in res[1].transactions:
+        tx.append(GenericTx.from_grpc_onchain_tx(t))
+    for p in res[2].payments:
+        comment = ""
+        if p.payment_request in memo_cache:
+            comment = memo_cache[p.payment_request]
+        else:
+            pr = await decode_pay_request_impl(p.payment_request)
+            comment = pr.description
+            memo_cache[p.payment_request] = pr.description
+        tx.append(GenericTx.from_grpc_payment(p, comment))
+
+    def sortKey(e: GenericTx):
+        return e.time_stamp
+
+    tx.sort(key=sortKey)
+
+    if reversed:
+        tx.reverse()
+
+    l = len(tx)
+    for i in range(l):
+        tx[i].index = i
+
+    if max_tx == 0:
+        max_tx = l
+
+    return tx[index_offset : index_offset + max_tx]
+
+
 async def list_invoices_impl(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
 ):
@@ -49,7 +118,7 @@ async def list_invoices_impl(
 
 
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
-    req = ln.GetInfoRequest()
+    req = ln.GetTransactionsRequest()
     response = await lncfg.lnd_stub.GetTransactions(req)
     return [OnChainTransaction.from_grpc(t) for t in response.transactions]
 
