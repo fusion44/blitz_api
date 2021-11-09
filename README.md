@@ -63,5 +63,3 @@ curl --header "Content-Type: application/json" \
 ### Acknowledgements
 Integrated Libraries:
 * [sse-starlette](https://github.com/sysid/sse-starlette)
-
---
