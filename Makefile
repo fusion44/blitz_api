@@ -7,6 +7,7 @@ help:
 	@echo "To run the project type 'make run'"
 	@echo "To test the project type 'make test'"
 	@echo "To assess test coverage type 'make coverage'"
+	@echo "To generate the requirements.txt file for pip type 'make requirements'"
 	@echo "------------------------------------"
 
 clean:
@@ -29,3 +30,6 @@ test:
 coverage:
 	python -m coverage run --source=. -m pytest
 	python -m coverage html
+
+requirements:
+	poetry export > requirements.txt
