@@ -811,6 +811,9 @@ class Chain(BaseModel):
 
 
 class LnInfo(BaseModel):
+    implementation: str = Query(
+        ..., description="Lightning software implementation (LND, c-lightning)"
+    )
     # The version of the LND software that the node is running.
     version: str
 
@@ -874,7 +877,7 @@ class LnInfo(BaseModel):
         return not self.__eq__(other)
 
     @classmethod
-    def from_grpc(cls, i) -> "LnInfo":
+    def from_grpc(cls, implementation, i) -> "LnInfo":
         _chains = []
         for c in i.chains:
             _chains.append(Chain(chain=c.chain, network=c.network))
@@ -886,6 +889,7 @@ class LnInfo(BaseModel):
         _uris = [u for u in i.uris]
 
         return LnInfo(
+            implementation=implementation,
             version=i.version,
             commit_hash=i.commit_hash,
             identity_pubkey=i.identity_pubkey,
@@ -914,6 +918,7 @@ class LightningInfoLite(BaseModel):
     num_pending_channels: int = Query(..., description="Number of pending channels")
     num_active_channels: int = Query(..., description="Number of active channels")
     num_inactive_channels: int = Query(..., description="Number of inactive channels")
+    num_peers: int = Query(..., description="Number of peers")
     block_height: int = Query(
         ..., description="The node's current view of the height of the best block"
     )
@@ -926,13 +931,14 @@ class LightningInfoLite(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, name: str, info: LnInfo):
+    def from_grpc(cls, info: LnInfo):
         return cls(
-            implementation=name,
+            implementation=info.implementation,
             version=info.version,
             num_pending_channels=info.num_pending_channels,
             num_active_channels=info.num_active_channels,
             num_inactive_channels=info.num_inactive_channels,
+            num_peers=info.num_peers,
             block_height=info.block_height,
             synced_to_chain=info.synced_to_chain,
             synced_to_graph=info.synced_to_graph,

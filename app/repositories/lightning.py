@@ -19,7 +19,6 @@ if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
         add_invoice_impl,
         decode_pay_request_impl,
-        get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
         list_all_tx_impl,
@@ -34,7 +33,6 @@ else:
     from app.repositories.ln_impl.clightning import (
         add_invoice_impl,
         decode_pay_request_impl,
-        get_implementation_name,
         get_ln_info_impl,
         get_wallet_balance_impl,
         list_all_tx_impl,
@@ -53,8 +51,7 @@ _CACHE = {"wallet_balance": None}
 
 async def get_ln_info_lite() -> LightningInfoLite:
     ln_info = await get_ln_info_impl()
-    name = get_implementation_name()
-    return LightningInfoLite.from_grpc(name, ln_info)
+    return LightningInfoLite.from_grpc(ln_info)
 
 
 async def get_wallet_balance():
@@ -126,13 +123,19 @@ async def register_lightning_listener():
 
 async def _handle_info_listener():
     last_info = None
+    last_info_lite = None
     while True:
         info = await get_ln_info_impl()
 
         if last_info != info:
-            info_lite = LightningInfoLite.from_grpc(get_implementation_name(), info)
-            await send_sse_message(SSE.LN_INFO_LITE, info_lite.dict())
+            await send_sse_message(SSE.LN_INFO, info.dict())
             last_info = info
+
+        info_lite = LightningInfoLite.from_grpc(info)
+
+        if last_info_lite != info_lite:
+            await send_sse_message(SSE.LN_INFO_LITE, info_lite.dict())
+            last_info_lite = info_lite
 
         await asyncio.sleep(GATHER_INFO_INTERVALL)
 

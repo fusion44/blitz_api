@@ -243,7 +243,7 @@ async def send_payment_impl(
 async def get_ln_info_impl() -> LnInfo:
     req = ln.GetInfoRequest()
     response = await lncfg.lnd_stub.GetInfo(req)
-    return LnInfo.from_grpc(response)
+    return LnInfo.from_grpc(get_implementation_name(), response)
 
 
 async def listen_invoices() -> Invoice:
