@@ -148,7 +148,6 @@ deepdiff==5.5.0; python_version >= "3.6" \
 fastapi-plugins==0.8.2; python_full_version >= "3.6.0" \
     --hash=sha256:3b331bb56904114d6f6507382ad35b822f6417574aa0d59728859195d9910788 \
     --hash=sha256:ec5a1137b6db6d750588997e708597f7d4f99af826979e92ce75bfba3b7dc59f
-fastapi-versioning @ git+https://github.com/fusion44/fastapi-versioning@master ; python_version >= "3.6"
 fastapi==0.68.1; python_version >= "3.6" \
     --hash=sha256:94d2820906c36b9b8303796fb7271337ec89c74223229e3cfcf056b5a7d59e23 \
     --hash=sha256:644bb815bae326575c4b2842469fb83053a4b974b82fa792ff9283d17fbbd99d

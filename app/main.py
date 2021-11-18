@@ -10,11 +10,11 @@ from fastapi_plugins import (
     redis_plugin,
     registered_configuration,
 )
-from fastapi_versioning import VersionedFastAPI
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
+from app.external import VersionedFastAPI
 from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
