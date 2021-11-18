@@ -14,7 +14,8 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
-from app.external import VersionedFastAPI
+from app.external.fastapi_versioning import VersionedFastAPI
+from app.external.sse_startlette import EventSourceResponse
 from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
@@ -23,7 +24,6 @@ from app.repositories.lightning import register_lightning_listener
 from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
-from app.sse_starlette import EventSourceResponse
 from app.utils import SSE
 
 

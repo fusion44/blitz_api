@@ -2,6 +2,7 @@ import secrets
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
+from app.external.sse_startlette import EventSourceResponse
 from app.models.system import LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
@@ -16,7 +17,6 @@ from app.routers.system_docs import (
     get_debug_logs_raw_summary,
     get_hw_info_json,
 )
-from app.sse_starlette import EventSourceResponse
 from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends

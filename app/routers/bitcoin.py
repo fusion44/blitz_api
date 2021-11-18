@@ -1,4 +1,5 @@
 from app.auth.auth_bearer import JWTBearer
+from app.external.sse_startlette import EventSourceResponse
 from app.models.bitcoind import BlockchainInfo, BtcInfo, NetworkInfo
 from app.repositories.bitcoin import (
     get_blockchain_info,
@@ -7,7 +8,6 @@ from app.repositories.bitcoin import (
     handle_block_sub,
 )
 from app.routers.bitcoin_docs import blocks_sub_doc
-from app.sse_starlette import EventSourceResponse
 from app.utils import bitcoin_rpc
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends

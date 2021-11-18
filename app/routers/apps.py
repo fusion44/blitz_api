@@ -1,7 +1,7 @@
 import app.repositories.apps as repo
 import app.routers.apps_docs as docs
 from app.auth.auth_bearer import JWTBearer
-from app.sse_starlette import EventSourceResponse
+from app.external.sse_startlette import EventSourceResponse
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 
