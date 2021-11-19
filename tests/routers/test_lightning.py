@@ -2,87 +2,30 @@ from app.models.lightning import LightningInfoLite
 from app.routers import lightning
 from fastapi import status
 from starlette.testclient import TestClient
+from tests.routers.utils import call_route
 from tests.utils import monkeypatch_auth
 
 from .test_lightning_utils import get_valid_lightning_info_lite
 
 
 def test_route_authentications_latest(test_client: TestClient):
-    prefix = "/latest/lightning"
-    response = test_client.get(f"{prefix}/get-info-lite")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    prefixes = ["/latest/lightning", "/v1/lightning"]
 
-    response = test_client.post(f"{prefix}/add-invoice", params={"value_msat": 1337})
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/get-balance")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-all-tx")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-invoices")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-onchain-tx")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-payments")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.post(
-        f"{prefix}/send-coins",
-        params={"amount": "", "address": ""},
-    )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.post(f"{prefix}/send-payment", params={"pay_req": "1337"})
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/get-info")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/decode-pay-req", params={"pay_req": ""})
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-def test_route_authentications_v1(test_client: TestClient):
-    prefix = "/v1/lightning"
-    response = test_client.get(f"{prefix}/get-info-lite")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.post(f"{prefix}/add-invoice", params={"value_msat": 1337})
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/get-balance")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-all-tx")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-invoices")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-onchain-tx")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/list-payments")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.post(
-        f"{prefix}/send-coins",
-        params={"amount": "", "address": ""},
-    )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.post(f"{prefix}/send-payment", params={"pay_req": ""})
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/get-info")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    response = test_client.get(f"{prefix}/decode-pay-req", params={"pay_req": ""})
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    for prefix in prefixes:
+        p = {"value_msat": 1337}
+        call_route(test_client, f"{prefix}/add-invoice", params=p, method="p")
+        call_route(test_client, f"{prefix}/get-balance")
+        call_route(test_client, f"{prefix}/list-all-tx")
+        call_route(test_client, f"{prefix}/list-invoices")
+        call_route(test_client, f"{prefix}/list-onchain-tx")
+        call_route(test_client, f"{prefix}/list-payments")
+        p = {"amount": "", "address": ""}
+        call_route(test_client, f"{prefix}/send-coins", params=p, method="p")
+        p = {"pay_req": "1337"}
+        call_route(test_client, f"{prefix}/send-payment", params=p, method="p")
+        call_route(test_client, f"{prefix}/get-info-lite")
+        call_route(test_client, f"{prefix}/get-info")
+        call_route(test_client, f"{prefix}/decode-pay-req", params={"pay_req": ""})
 
 
 def test_get_ln_status(test_client: TestClient, monkeypatch):
