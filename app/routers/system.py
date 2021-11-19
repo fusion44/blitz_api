@@ -41,6 +41,17 @@ def login(i: LoginInput):
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
 
 
+@router.post(
+    "/refresh-token",
+    name=f"{_PREFIX}.refresh-token",
+    summary="Endpoint to refresh an authentication token",
+    response_description="Returns a fresh JWT token.",
+    dependencies=[Depends(JWTBearer())],
+)
+def refresh_token():
+    return signJWT()
+
+
 @router.get(
     "/get-system-info",
     name=f"{_PREFIX}.get-system-info",
