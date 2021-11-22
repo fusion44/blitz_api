@@ -11,6 +11,8 @@ from app.models.lightning import (
     Invoice,
     InvoiceState,
     LnInfo,
+    NewAddressInput,
+    OnchainAddressType,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -178,6 +180,18 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
+
+
+async def new_address_impl(input: NewAddressInput) -> str:
+    t = 1 if input.type == OnchainAddressType.NP2WKH else 2
+    try:
+        req = ln.NewAddressRequest(type=t)
+        response = await lncfg.lnd_stub.NewAddress(req)
+        return response.address
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
 
 
 async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:

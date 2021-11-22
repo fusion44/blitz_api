@@ -4,6 +4,7 @@ from app.models.lightning import (
     GenericTx,
     Invoice,
     LnInfo,
+    NewAddressInput,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -49,6 +50,10 @@ async def add_invoice_impl(
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def new_address_impl(input: NewAddressInput) -> str:
     raise NotImplementedError("c-lightning not yet implemented")
 
 

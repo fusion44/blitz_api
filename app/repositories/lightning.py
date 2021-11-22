@@ -6,6 +6,7 @@ from app.models.lightning import (
     Invoice,
     LightningInfoLite,
     LnInfo,
+    NewAddressInput,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -26,6 +27,7 @@ if lightning_config.ln_node == "lnd":
         list_on_chain_tx_impl,
         list_payments_impl,
         listen_invoices,
+        new_address_impl,
         send_coins_impl,
         send_payment_impl,
     )
@@ -40,6 +42,7 @@ else:
         list_on_chain_tx_impl,
         list_payments_impl,
         listen_invoices,
+        new_address_impl,
         send_coins_impl,
         send_payment_impl,
     )
@@ -95,6 +98,10 @@ async def add_invoice(
 
 async def decode_pay_request(pay_req: str) -> PaymentRequest:
     return await decode_pay_request_impl(pay_req)
+
+
+async def new_address(input: NewAddressInput) -> str:
+    return await new_address_impl(input)
 
 
 async def send_coins(input: SendCoinsInput) -> SendCoinsResponse:

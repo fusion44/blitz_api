@@ -8,6 +8,11 @@ from pydantic import BaseModel
 from pydantic.types import conint
 
 
+class OnchainAddressType(str, Enum):
+    P2WKH = "p2wkh"
+    NP2WKH = "np2wkh"
+
+
 class InvoiceState(str, Enum):
     OPEN = "open"
     SETTLED = "settled"
@@ -754,6 +759,17 @@ class Payment(BaseModel):
             payment_index=p.payment_index,
             failure_reason=PaymentFailureReason.from_grpc(p.failure_reason),
         )
+
+
+class NewAddressInput(BaseModel):
+    type: OnchainAddressType = Query(
+        ...,
+        description="""
+Address-types has to be one of:
+* p2wkh:  Pay to witness key hash (bech32)
+* np2wkh: Pay to nested witness key hash
+    """,
+    )
 
 
 class SendCoinsInput(BaseModel):

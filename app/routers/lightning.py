@@ -6,6 +6,7 @@ from app.models.lightning import (
     Invoice,
     LightningInfoLite,
     LnInfo,
+    NewAddressInput,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -23,11 +24,13 @@ from app.repositories.lightning import (
     list_invoices,
     list_on_chain_tx,
     list_payments,
+    new_address,
     send_coins,
     send_payment,
 )
 from app.routers.lightning_docs import (
     get_balance_response_desc,
+    new_address_desc,
     send_coins_desc,
     send_payment_desc,
 )
@@ -174,6 +177,24 @@ async def list_payments_path(
     ),
 ):
     return await list_payments(include_incomplete, index_offset, max_payments, reversed)
+
+
+@router.post(
+    "/new-address",
+    name=f"{_PREFIX}.new-address",
+    summary="Generate a new on-chain address",
+    description=new_address_desc,
+    response_description="The newly generated wallet address",
+    dependencies=[Depends(JWTBearer())],
+    response_model=str,
+)
+async def new_address_path(input: NewAddressInput):
+    try:
+        return await new_address(input)
+    except HTTPException as r:
+        raise HTTPException(r.status_code, detail=r.detail)
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.post(

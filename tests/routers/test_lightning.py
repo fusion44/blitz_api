@@ -19,6 +19,8 @@ def test_route_authentications_latest(test_client: TestClient):
         call_route(test_client, f"{prefix}/list-invoices")
         call_route(test_client, f"{prefix}/list-onchain-tx")
         call_route(test_client, f"{prefix}/list-payments")
+        p = {"type": "p2wkh"}
+        call_route(test_client, f"{prefix}/new-address", params=p, method="p")
         p = {"amount": "", "address": ""}
         call_route(test_client, f"{prefix}/send-coins", params=p, method="p")
         p = {"pay_req": "1337"}

@@ -3,6 +3,12 @@ A JSON String with on chain wallet balances with on-chain balances in
 **sat** and channel balances in **msat**. Detailed description is in 
 the schema"""
 
+new_address_desc = """
+Generate a wallet new address. Address-types has to be one of:
+* **p2wkh**:  Pay to witness key hash (bech32)
+* **np2wkh**: Pay to nested witness key hash
+    """
+
 send_coins_desc = """
 __send-coins__ executes a request to send coins to a particular address. 
 
