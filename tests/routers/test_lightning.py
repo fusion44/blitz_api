@@ -1,6 +1,5 @@
 from app.models.lightning import LightningInfoLite
 from app.routers import lightning
-from fastapi import status
 from starlette.testclient import TestClient
 from tests.routers.utils import call_route
 from tests.utils import monkeypatch_auth
@@ -28,6 +27,8 @@ def test_route_authentications_latest(test_client: TestClient):
         call_route(test_client, f"{prefix}/get-info-lite")
         call_route(test_client, f"{prefix}/get-info")
         call_route(test_client, f"{prefix}/decode-pay-req", params={"pay_req": ""})
+        p = {"password": "1"}
+        call_route(test_client, f"{prefix}/unlock-wallet", params=p, method="p")
 
 
 def test_get_ln_status(test_client: TestClient, monkeypatch):

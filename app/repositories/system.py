@@ -28,8 +28,13 @@ _check_shell_scripts_status()
 
 
 async def get_system_info() -> SystemInfo:
-    lninfo = await get_ln_info()
-    return SystemInfo.from_rpc(lninfo)
+    try:
+        lninfo = await get_ln_info()
+        return SystemInfo.from_rpc(lninfo)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 async def subscribe_hardware_info(request: Request):

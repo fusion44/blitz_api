@@ -15,6 +15,8 @@ from app.models.lightning import (
 )
 from app.utils import SSE, lightning_config, send_sse_message
 from decouple import config
+from fastapi import status
+from fastapi.exceptions import HTTPException
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
@@ -30,6 +32,7 @@ if lightning_config.ln_node == "lnd":
         new_address_impl,
         send_coins_impl,
         send_payment_impl,
+        unlock_wallet_impl,
     )
 else:
     from app.repositories.ln_impl.clightning import (
@@ -45,11 +48,13 @@ else:
         new_address_impl,
         send_coins_impl,
         send_payment_impl,
+        unlock_wallet_impl,
     )
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=5, cast=float)
 
 _CACHE = {"wallet_balance": None}
+_WALLET_UNLOCK_LISTENERS = []
 
 
 async def get_ln_info_lite() -> LightningInfoLite:
@@ -122,10 +127,33 @@ async def get_ln_info() -> LnInfo:
     return await get_ln_info_impl()
 
 
+async def unlock_wallet(password: str) -> bool:
+    res = await unlock_wallet_impl(password)
+    if res:
+        for l in _WALLET_UNLOCK_LISTENERS:
+            await l.put("unlocked")
+    return res
+
+
 async def register_lightning_listener():
-    loop = asyncio.get_event_loop()
-    loop.create_task(_handle_info_listener())
-    loop.create_task(_handle_invoice_listener())
+    """
+    Registers all lightning listeners
+
+    By calling get_ln_info_impl() once, we ensure that wallet is unlocked.
+    Implementation will throw HTTPException with status_code 423_LOCKED if otherwise.
+    It is the task of the caller to call register_lightning_listener() again
+    """
+
+    try:
+        await get_ln_info_impl()
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(_handle_info_listener())
+        loop.create_task(_handle_invoice_listener())
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 async def _handle_info_listener():
@@ -163,3 +191,13 @@ def _update_wallet_balance():
 
     loop = asyncio.get_event_loop()
     loop.create_task(_perform_update())
+
+
+def register_wallet_unlock_listener(q: asyncio.Queue):
+    if q not in _WALLET_UNLOCK_LISTENERS:
+        _WALLET_UNLOCK_LISTENERS.append(q)
+
+
+def unregister_wallet_unlock_listener(func):
+    if func in _WALLET_UNLOCK_LISTENERS:
+        _WALLET_UNLOCK_LISTENERS.remove(func)

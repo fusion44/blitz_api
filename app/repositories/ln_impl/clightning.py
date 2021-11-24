@@ -71,5 +71,9 @@ async def get_ln_info_impl() -> LnInfo:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
+async def unlock_wallet_impl(password: str) -> bool:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
 async def listen_invoices() -> Invoice:
     raise NotImplementedError("c-lightning not yet implemented")

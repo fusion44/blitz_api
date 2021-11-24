@@ -772,6 +772,10 @@ Address-types has to be one of:
     )
 
 
+class UnlockWalletInput(BaseModel):
+    password: str = Query(..., description="The wallet password")
+
+
 class SendCoinsInput(BaseModel):
     address: str = Query(
         ...,

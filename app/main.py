@@ -4,6 +4,7 @@ import json
 from aioredis import Channel, Redis
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import HTTPException
 from fastapi_plugins import (
     RedisSettings,
     get_config,
@@ -20,7 +21,11 @@ from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
-from app.repositories.lightning import register_lightning_listener
+from app.repositories.lightning import (
+    register_lightning_listener,
+    register_wallet_unlock_listener,
+    unregister_wallet_unlock_listener,
+)
 from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
@@ -86,10 +91,24 @@ def index(req: Request):
 num_connections = 0
 connections = {}
 new_connections = []
+wallet_locked = True
 
 
-@app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
+@app.get(
+    "/sse/subscribe",
+    status_code=status.HTTP_200_OK,
+    responses={
+        423: {"description": "Wallet is locked. Unlock via /lightning/unlock-wallet"}
+    },
+)
 async def stream(request: Request):
+    global wallet_locked
+    if wallet_locked:
+        raise HTTPException(
+            status.HTTP_423_LOCKED,
+            detail="Wallet is locked. Unlock via /lightning/unlock-wallet",
+        )
+
     global num_connections
     q = asyncio.Queue()
     connections[num_connections] = q
@@ -144,15 +163,38 @@ async def subscribe(request: Request, id: int, q: asyncio.Queue):
         await request.close()
 
 
+register_handlers_finished = False
+
+
 async def register_all_handlers(redis: Redis):
-    await register_bitcoin_zmq_sub()
-    await register_bitcoin_status_gatherer()
-    await register_hardware_info_gatherer()
-    await register_lightning_listener()
+    global register_handlers_finished
+    global wallet_locked
+
+    if register_handlers_finished:
+        raise RuntimeError("register_all_handlers() must not be called twice.")
+
+    try:
+        await register_bitcoin_zmq_sub()
+        await register_bitcoin_status_gatherer()
+        await register_hardware_info_gatherer()
+        await register_lightning_listener()
+        wallet_locked = False
+    except HTTPException as r:
+        if r.status_code == status.HTTP_423_LOCKED:
+            # When the node is locked we must call register_lightning_listener
+            # again when the user unlocks the wallet.
+            print("Wallet is locked... waiting for unlock.")
+            loop = asyncio.get_event_loop()
+            loop.create_task(_handle_ln_wallet_locked())
+        else:
+            raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
     (sub,) = await redis.subscribe(channel=Channel("default", False))
     loop = asyncio.get_event_loop()
     loop.create_task(broadcast_data_sse(sub))
+    register_handlers_finished = True
 
 
 async def broadcast_data_sse(sub):
@@ -161,3 +203,16 @@ async def broadcast_data_sse(sub):
         for k in connections.keys():
             if connections.get(k):
                 await connections.get(k).put(data)
+
+
+async def _handle_ln_wallet_locked():
+    global wallet_locked
+    q = asyncio.Queue()
+    register_wallet_unlock_listener(q)
+    await q.get()
+    # Give the node a few seconds to fully start up
+    await asyncio.sleep(5)
+    print("Wallet was unlocked.")
+    await register_lightning_listener()
+    wallet_locked = False
+    unregister_wallet_unlock_listener(q)

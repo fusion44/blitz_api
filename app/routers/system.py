@@ -58,9 +58,17 @@ def refresh_token():
     summary="Get system status information",
     dependencies=[Depends(JWTBearer())],
     response_model=SystemInfo,
+    responses={
+        423: {"description": "Wallet is locked. Unlock via /lightning/unlock-wallet"}
+    },
 )
 async def get_system_info_path():
-    return await get_system_info()
+    try:
+        return await get_system_info()
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.get(
