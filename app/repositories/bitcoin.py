@@ -77,6 +77,7 @@ async def _handle_gather_bitcoin_status():
     while True:
         try:
             info = await get_btc_info()
+            info.verification_progress = round(info.verification_progress, 2)
         except HTTPException as e:
             print(e)
             await asyncio.sleep(2)
