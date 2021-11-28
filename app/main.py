@@ -15,6 +15,11 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
+from app.auth.auth_handler import (
+    handle_local_cookie,
+    register_cookie_updater,
+    remove_local_cookie,
+)
 from app.external.fastapi_versioning import VersionedFastAPI
 from app.external.sse_startlette import EventSourceResponse
 from app.repositories.bitcoin import (
@@ -73,11 +78,14 @@ async def on_startup():
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
     await register_all_handlers(redis_plugin.redis)
+    handle_local_cookie()
+    register_cookie_updater()
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
     await redis_plugin.terminate()
+    remove_local_cookie()
 
 
 @app.get("/")
