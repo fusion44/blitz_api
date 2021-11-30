@@ -27,6 +27,7 @@ from app.repositories.bitcoin import (
     register_bitcoin_zmq_sub,
 )
 from app.repositories.lightning import (
+    listen_for_ssh_unlock,
     register_lightning_listener,
     register_wallet_unlock_listener,
     unregister_wallet_unlock_listener,
@@ -217,6 +218,7 @@ async def _handle_ln_wallet_locked():
     global wallet_locked
     q = asyncio.Queue()
     register_wallet_unlock_listener(q)
+    listen_for_ssh_unlock()
     await q.get()
     # Give the node a few seconds to fully start up
     await asyncio.sleep(5)

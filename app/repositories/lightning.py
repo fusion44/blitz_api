@@ -201,3 +201,33 @@ def register_wallet_unlock_listener(q: asyncio.Queue):
 def unregister_wallet_unlock_listener(func):
     if func in _WALLET_UNLOCK_LISTENERS:
         _WALLET_UNLOCK_LISTENERS.remove(func)
+
+
+rpc_startup_error_msg = (
+    "RPC server is in the process of starting up, but not yet ready to accept calls"
+)
+
+
+def listen_for_ssh_unlock():
+    async def _do_check_unlock():
+        while True:
+            try:
+                _ = await get_ln_info_impl()
+                for l in _WALLET_UNLOCK_LISTENERS:
+                    await l.put("unlocked")
+                break
+            except HTTPException as r:
+                if r.status_code == 423 or (
+                    r.status_code == 500 and rpc_startup_error_msg in r.detail
+                ):
+                    await asyncio.sleep(3)
+                else:
+                    print(
+                        f"Got {r.status_code} with message {r.detail} while watching for SSH wallet unlock. Stopping ..."
+                    )
+                    raise
+            except NotImplementedError as r:
+                raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+    loop = asyncio.get_event_loop()
+    loop.create_task(_do_check_unlock())
