@@ -158,3 +158,4 @@ class SSE:
     LN_ONCHAIN_PAYMENT_STATUS = "ln_onchain_payment_status"
 
     WALLET_BALANCE = "wallet_balance"
+    WALLET_LOCK_STATUS = "wallet_lock_status"

@@ -35,7 +35,7 @@ from app.repositories.lightning import (
 from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
-from app.utils import SSE
+from app.utils import SSE, send_sse_message
 
 
 @registered_configuration
@@ -103,28 +103,23 @@ new_connections = []
 wallet_locked = True
 
 
-@app.get(
-    "/sse/subscribe",
-    status_code=status.HTTP_200_OK,
-    responses={
-        423: {"description": "Wallet is locked. Unlock via /lightning/unlock-wallet"}
-    },
-)
+@app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
 async def stream(request: Request):
     global wallet_locked
-    if wallet_locked:
-        raise HTTPException(
-            status.HTTP_423_LOCKED,
-            detail="Wallet is locked. Unlock via /lightning/unlock-wallet",
-        )
-
     global num_connections
     q = asyncio.Queue()
     connections[num_connections] = q
     num_connections += 1
     new_connections.append(q)
 
-    if len(new_connections) == 1:
+    if wallet_locked:
+        # send the the wallet locked event to the new connection
+        await q.put(_make_evt_data(SSE.WALLET_LOCK_STATUS, {"locked": True}))
+    else:
+        await q.put(_make_evt_data(SSE.WALLET_LOCK_STATUS, {"locked": False}))
+
+    if not wallet_locked and len(new_connections) == 1:
+        # if the wallet is locked, we'll handle the warmup in _handle_ln_wallet_locked()
         loop = asyncio.get_event_loop()
         loop.create_task(warmup_new_connections())
 
@@ -226,3 +221,11 @@ async def _handle_ln_wallet_locked():
     await register_lightning_listener()
     wallet_locked = False
     unregister_wallet_unlock_listener(q)
+
+    # send a wallet unlocked message to all connections before
+    # sending the warmup messages
+    await send_sse_message(SSE.WALLET_LOCK_STATUS, {"locked": False})
+
+    # send the connection warmup messages
+    loop = asyncio.get_event_loop()
+    loop.create_task(warmup_new_connections())
