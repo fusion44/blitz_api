@@ -177,7 +177,7 @@ class InvoiceHTLC(BaseModel):
         )
 
 
-class RouteHint(BaseModel):
+class HopHint(BaseModel):
     # The public key of the node at the start of the channel.
     node_id: str
 
@@ -195,7 +195,7 @@ class RouteHint(BaseModel):
     cltv_expiry_delta: int
 
     @classmethod
-    def from_grpc(cls, h) -> "RouteHint":
+    def from_grpc(cls, h) -> "HopHint":
         return cls(
             node_id=h.node_id,
             chan_id=h.chan_id,
@@ -203,6 +203,18 @@ class RouteHint(BaseModel):
             fee_proportional_millionths=h.fee_proportional_millionths,
             cltv_expiry_delta=h.cltv_expiry_delta,
         )
+
+
+class RouteHint(BaseModel):
+    hop_hints: List[HopHint] = Query(
+        [],
+        description="A list of hop hints that when chained together can assist in reaching a specific destination.",
+    )
+
+    @classmethod
+    def from_grpc(cls, h) -> "RouteHint":
+        hop_hints = [HopHint.from_grpc(hh) for hh in h.hop_hints]
+        return cls(hop_hints=hop_hints)
 
 
 class Invoice(BaseModel):
@@ -1021,7 +1033,9 @@ class PaymentRequest(BaseModel):
     description_hash: str
     fallback_addr: Optional[str]
     cltv_expiry: int
-    route_hints: List[RouteHint] = Query([])
+    route_hints: List[RouteHint] = Query(
+        [], description="A list of [HopHint] for the RouteHint"
+    )
     payment_addr: str = Query(..., description="The payment address in hex format")
     num_msat: int
     features: List[FeaturesEntry] = Query([])
