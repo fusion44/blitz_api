@@ -4,7 +4,7 @@ import json
 
 import zmq
 import zmq.asyncio
-from app.models.bitcoind import BlockchainInfo, BtcInfo, NetworkInfo
+from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
 from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
 from fastapi import Request
 from fastapi.exceptions import HTTPException
@@ -18,6 +18,29 @@ async def get_blockchain_info() -> BlockchainInfo:
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"]
         )
     return BlockchainInfo.from_rpc(result["result"])
+
+
+async def estimate_fee(
+    target_conf: int = 6,
+    mode: FeeEstimationMode = FeeEstimationMode.CONSERVATIVE,
+) -> int:
+    result = await bitcoin_rpc_async("estimatesmartfee", [target_conf, mode])
+    if result["error"] != None:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"]
+        )
+    if "errors" in result["result"]:
+        errors = "Bitcoin Core returned error(s):\n"
+        for e in result["result"]["errors"]:
+            errors += f"{e}\n"
+
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=errors[0 : len(errors) - 1]
+        )
+
+    # returned in BTC by Bitcoincoin Core => convert to msat
+    rate_btc = result["result"]["feerate"]
+    return rate_btc * 100000000
 
 
 async def get_network_info() -> NetworkInfo:
