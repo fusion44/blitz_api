@@ -80,8 +80,8 @@ async def get_system_info_path():
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
 )
-def hw_info() -> map:
-    return get_hardware_info()
+async def hw_info() -> map:
+    return await get_hardware_info()
 
 
 @router.get(
