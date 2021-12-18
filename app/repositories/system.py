@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request, status
 
 PLATFORM = config("platform")
 if PLATFORM == None:
-    PLATFORM = "native_python"
+    PLATFORM = "raspiblitz"
 
 if PLATFORM == "raspiblitz":
     from app.repositories.hardware_impl.raspiblitz import (
