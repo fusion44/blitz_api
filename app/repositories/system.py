@@ -7,10 +7,7 @@ from app.utils import SSE, send_sse_message
 from decouple import config
 from fastapi import HTTPException, Request, status
 
-PLATFORM = config("platform")
-if PLATFORM == None:
-    PLATFORM = "raspiblitz"
-
+PLATFORM = config("platform", default="raspiblitz")
 if PLATFORM == "raspiblitz":
     from app.repositories.hardware_impl.raspiblitz import (
         HW_INFO_YIELD_TIME,
