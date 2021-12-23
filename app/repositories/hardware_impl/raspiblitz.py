@@ -65,7 +65,6 @@ async def get_hardware_info_impl() -> map:
     ]
 
     info["networks"] = {
-        "public_ip": await _redis_get("publicIP"),
         "internet_online": await _redis_get("internet_online"),
         "tor_web_addr": await _redis_get("tor_web_addr"),
         "internet_localip=": await _redis_get("internet_localip"),
