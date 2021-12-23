@@ -1,4 +1,5 @@
 import time
+import logging
 
 HW_INFO_YIELD_TIME = 2
 
@@ -8,6 +9,11 @@ from fastapi_plugins import redis_plugin as r
 
 async def _redis_get(key: str) -> str:
     v = await r.redis.get(key)
+
+    if not v:
+        logging.warning(f"Key '{key}' not found in Redis DB.")
+        return ""
+
     return v.decode("utf-8")
 
 
@@ -46,11 +52,17 @@ async def get_hardware_info_impl() -> map:
 
     total = int(await _redis_get("hdd_capacity_bytes"))
     free = int(await _redis_get("hdd_free_bytes"))
-    info["hdd"] = {
-        "hdd_capacity_bytes": total,
-        "hdd_free_bytes": free,
-        "hdd_free_percent": (100 / total) * free,
-    }
+    info["disks"] = [
+        {
+            "device": "/",
+            "mountpoint": "/",
+            "filesystem_type": "ext4",
+            "partition_total_bytes": total,
+            "partition_used_bytes": total - free,
+            "partition_free_bytes": free,
+            "partition_percent": (100 / total) * free,
+        }
+    ]
 
     info["networks"] = {
         "public_ip": await _redis_get("publicIP"),
