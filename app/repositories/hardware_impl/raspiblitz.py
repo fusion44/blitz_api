@@ -27,7 +27,7 @@ async def get_hardware_info_impl() -> map:
         value = float(l)
         total += value
         iloads.append(value)
-    info["cpu_overall_percent"] = total / len(loads)
+    info["cpu_overall_percent"] = round(total / len(loads), 2)
     info["cpu_per_cpu_percent"] = iloads
 
     info["vram_total_bytes"] = int(await _redis_get("system_ram_mb")) * 1000 * 1000
@@ -37,9 +37,9 @@ async def get_hardware_info_impl() -> map:
     )
 
     info["vram_used_bytes"] = info["vram_total_bytes"] - info["vram_available_bytes"]
-    info["vram_usage_percent"] = (100 / info["vram_total_bytes"]) * info[
-        "vram_used_bytes"
-    ]
+    info["vram_usage_percent"] = round(
+        (100 / info["vram_total_bytes"]) * info["vram_used_bytes"], 2
+    )
 
     info["temperatures_celsius"] = {
         "system_temp": float(await _redis_get("system_temp_celsius")),
@@ -60,7 +60,7 @@ async def get_hardware_info_impl() -> map:
             "partition_total_bytes": total,
             "partition_used_bytes": total - free,
             "partition_free_bytes": free,
-            "partition_percent": (100 / total) * free,
+            "partition_percent": round((100 / total) * free, 2),
         }
     ]
 
