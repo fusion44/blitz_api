@@ -64,12 +64,27 @@ class HealthState(str, Enum):
     STOPPED = "stopped"
 
 
+class APIPlatform(str, Enum):
+    RASPIBLITZ = "raspiblitz"
+    NATIVE_PYTHON = "native_python"
+
+
 class SystemInfo(BaseModel):
     alias: str = Query("", description="Name of the node (same as Lightning alias)")
     color: str = Query(
         ..., description="The color of the current node in hex code format"
     )
-    version: str = Query(..., description="The software version of this RaspiBlitz")
+    platform: APIPlatform = Query(
+        APIPlatform.RASPIBLITZ,
+        description="The platform this API is running on.",
+    )
+    platform_version: str = Query(
+        "",
+        description="The version of this platform",
+    )
+    api_version: str = Query(
+        ..., description="Version of the API software on this system."
+    )
     health: HealthState = Query(
         ..., description="General health state of the Raspiblitz"
     )
@@ -91,29 +106,6 @@ class SystemInfo(BaseModel):
         ...,
         description="The current chain this node is connected to (mainnet, testnet or signet)",
     )
-
-    @classmethod
-    def from_rpc(cls, lninfo: LnInfo):
-        # TODO: implement rest of the calls
-        return cls(
-            alias=lninfo.alias,
-            color=lninfo.color,
-            version="v1.8.0",
-            health=HealthState.ATTENTION_REQUIRED,
-            health_messages=[
-                HealthMessage(
-                    id=25, level=HealthMessagePriority.WARNING, message="HDD 85% full"
-                )
-            ],
-            tor_web_ui="arg6ybal4b7dszmsncsrudcpdfkxadzfdi24ktceodah7tgmdopgpyfd.onion",
-            tor_api="arg6ybal4b7dszmsncsrudcpdfkxadzfdi24ktceodah7tgmdopgpyfd.onion/api",
-            lan_web_ui="http://192.168.1.12/",
-            lan_api="http://192.168.1.12/api",
-            ssh_address="http://192.168.1.12/",
-            chain=lninfo.chains[
-                0
-            ].network,  # for now, assume we are only on bitcoin chain
-        )
 
 
 class RawDebugLogData(BaseModel):

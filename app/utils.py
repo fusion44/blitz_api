@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from types import coroutine
 from typing import Dict
@@ -138,6 +139,16 @@ async def send_sse_message(id: str, json_data: Dict):
     await redis_plugin.redis.publish_json(
         "default", {"event": id, "data": json.dumps(jsonable_encoder(json_data))}
     )
+
+
+async def redis_get(key: str) -> str:
+    v = await redis_plugin.redis.get(key)
+
+    if not v:
+        logging.warning(f"Key '{key}' not found in Redis DB.")
+        return ""
+
+    return v.decode("utf-8")
 
 
 class SSE:

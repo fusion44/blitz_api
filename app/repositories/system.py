@@ -1,23 +1,24 @@
 import asyncio
 from os import path
 
-from app.models.system import RawDebugLogData, SystemInfo
-from app.repositories.lightning import get_ln_info
+from app.models.system import APIPlatform, RawDebugLogData, SystemInfo
 from app.utils import SSE, send_sse_message
 from decouple import config
 from fastapi import HTTPException, Request, status
 
-PLATFORM = config("platform", default="raspiblitz")
-if PLATFORM == "raspiblitz":
+PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
+if PLATFORM == APIPlatform.RASPIBLITZ:
     from app.repositories.hardware_impl.raspiblitz import (
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
-elif PLATFORM == "native_python":
+    from app.repositories.system_impl.raspiblitz import get_system_info_impl
+elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
+    from app.repositories.system_impl.native_python import get_system_info_impl
 else:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
 
@@ -38,8 +39,7 @@ _check_shell_scripts_status()
 
 async def get_system_info() -> SystemInfo:
     try:
-        lninfo = await get_ln_info()
-        return SystemInfo.from_rpc(lninfo)
+        return await get_system_info_impl()
     except HTTPException as r:
         raise
     except NotImplementedError as r:
