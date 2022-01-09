@@ -6,6 +6,7 @@ import app.repositories.ln_impl.protos.router_pb2 as router
 import app.repositories.ln_impl.protos.walletunlocker_pb2 as unlocker
 import grpc
 from app.models.lightning import (
+    FeeRevenue,
     GenericTx,
     Invoice,
     InvoiceState,
@@ -216,6 +217,12 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
+
+
+async def get_fee_revenue_impl() -> FeeRevenue:
+    req = ln.FeeReportRequest()
+    res = await lncfg.lnd_stub.FeeReport(req)
+    return FeeRevenue.from_grpc(res)
 
 
 async def new_address_impl(input: NewAddressInput) -> str:

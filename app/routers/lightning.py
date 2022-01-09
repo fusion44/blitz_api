@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
+    FeeRevenue,
     GenericTx,
     Invoice,
     LightningInfoLite,
@@ -18,6 +19,7 @@ from app.models.lightning import (
 from app.repositories.lightning import (
     add_invoice,
     decode_pay_request,
+    get_fee_revenue,
     get_ln_info,
     get_ln_info_lite,
     get_wallet_balance,
@@ -30,7 +32,6 @@ from app.repositories.lightning import (
     send_payment,
     unlock_wallet,
 )
-
 from app.routers.lightning_docs import (
     get_balance_response_desc,
     new_address_desc,
@@ -81,6 +82,27 @@ async def addinvoice(
 async def getwalletbalance():
     try:
         return await get_wallet_balance()
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/get-fee-revenue",
+    name=f"{_PREFIX}.get-fee-revenue",
+    summary="Returns the daily, weekly and monthly fee revenue earned.",
+    description="""
+Currently, year and total fees are always null. Backends don't return these values by default. 
+Implementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64). 
+    """,
+    dependencies=[Depends(JWTBearer())],
+    response_model=FeeRevenue,
+    responses=responses,
+)
+async def get_fee_revenue_path() -> FeeRevenue:
+    try:
+        return await get_fee_revenue()
     except HTTPException as r:
         raise
     except NotImplementedError as r:

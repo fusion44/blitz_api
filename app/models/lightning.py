@@ -50,6 +50,28 @@ class InvoiceHTLCState(str, Enum):
             raise NotImplementedError(f"InvoiceHTLCState {id} is not implemented")
 
 
+class FeeRevenue(BaseModel):
+    day: int = Query(..., description="Fee revenue earned in the last 24 hours")
+    week: int = Query(..., description="Fee revenue earned in the last 7days")
+    month: int = Query(..., description="Fee revenue earned in the last month")
+    year: int = Query(
+        None,
+        description="Fee revenue earned in the last year. Might be null if not implemented by backend.",
+    )
+    total: int = Query(
+        None,
+        description="Fee revenue earned in the last year. Might be null if not implemented by backend",
+    )
+
+    @classmethod
+    def from_grpc(cls, fee_report) -> "FeeRevenue":
+        return cls(
+            day=int(fee_report.day_fee_sum),
+            week=int(fee_report.week_fee_sum),
+            month=int(fee_report.month_fee_sum),
+        )
+
+
 class Feature(BaseModel):
     name: str
     is_required: bool

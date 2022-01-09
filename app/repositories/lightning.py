@@ -2,6 +2,7 @@ import asyncio
 from typing import List, Optional
 
 from app.models.lightning import (
+    FeeRevenue,
     GenericTx,
     Invoice,
     LightningInfoLite,
@@ -22,6 +23,7 @@ if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
         add_invoice_impl,
         decode_pay_request_impl,
+        get_fee_revenue_impl,
         get_ln_info_impl,
         get_wallet_balance_impl,
         list_all_tx_impl,
@@ -38,6 +40,7 @@ else:
     from app.repositories.ln_impl.clightning import (
         add_invoice_impl,
         decode_pay_request_impl,
+        get_fee_revenue_impl,
         get_ln_info_impl,
         get_wallet_balance_impl,
         list_all_tx_impl,
@@ -136,6 +139,10 @@ async def unlock_wallet(password: str) -> bool:
         for l in _WALLET_UNLOCK_LISTENERS:
             await l.put("unlocked")
     return res
+
+
+async def get_fee_revenue() -> FeeRevenue:
+    return await get_fee_revenue_impl()
 
 
 async def register_lightning_listener():

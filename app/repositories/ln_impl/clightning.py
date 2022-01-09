@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from app.models.lightning import (
+    FeeRevenue,
     GenericTx,
     Invoice,
     LnInfo,
@@ -50,6 +51,10 @@ async def add_invoice_impl(
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def get_fee_revenue_impl() -> FeeRevenue:
     raise NotImplementedError("c-lightning not yet implemented")
 
 

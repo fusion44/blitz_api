@@ -14,6 +14,7 @@ def test_route_authentications_latest(test_client: TestClient):
         p = {"value_msat": 1337}
         call_route(test_client, f"{prefix}/add-invoice", params=p, method="p")
         call_route(test_client, f"{prefix}/get-balance")
+        call_route(test_client, f"{prefix}/get-fee-revenue")
         call_route(test_client, f"{prefix}/list-all-tx")
         call_route(test_client, f"{prefix}/list-invoices")
         call_route(test_client, f"{prefix}/list-onchain-tx")
