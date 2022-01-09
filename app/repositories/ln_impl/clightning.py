@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from app.models.lightning import (
     GenericTx,
@@ -62,7 +62,10 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
 
 
 async def send_payment_impl(
-    pay_req: str, timeout_seconds: int, fee_limit_msat: int
+    pay_req: str,
+    timeout_seconds: int,
+    fee_limit_msat: int,
+    amount_msat: Optional[int] = None,
 ) -> Payment:
     raise NotImplementedError("c-lightning not yet implemented")
 

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
@@ -265,13 +265,27 @@ async def send_coins_path(input: SendCoinsInput):
     response_description="Either an error or a Payment object on success",
     dependencies=[Depends(JWTBearer())],
     response_model=Payment,
-    responses=responses,
+    responses={
+        400: {
+            "description": """
+Possible error messages:
+* invalid bech32 string
+* amount must be specified when paying a zero amount invoice
+* amount must not be specified when paying a non-zero amount invoice
+"""
+        },
+        409: {"description": "When attempting to pay an already paid invoice."},
+        423: responses[423],
+    },
 )
 async def sendpayment(
-    pay_req: str, timeout_seconds: int = 5, fee_limit_msat: int = 8000
+    pay_req: str,
+    timeout_seconds: int = 5,
+    fee_limit_msat: int = 8000,
+    amount_msat: Optional[int] = None,
 ):
     try:
-        return await send_payment(pay_req, timeout_seconds, fee_limit_msat)
+        return await send_payment(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
     except HTTPException as r:
         raise
     except NotImplementedError as r:

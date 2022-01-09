@@ -1,5 +1,5 @@
 import asyncio
-from typing import List
+from typing import List, Optional
 
 from app.models.lightning import (
     GenericTx,
@@ -116,9 +116,12 @@ async def send_coins(input: SendCoinsInput) -> SendCoinsResponse:
 
 
 async def send_payment(
-    pay_req: str, timeout_seconds: int, fee_limit_msat: int
+    pay_req: str,
+    timeout_seconds: int,
+    fee_limit_msat: int,
+    amount_msat: Optional[int] = None,
 ) -> Payment:
-    res = await send_payment_impl(pay_req, timeout_seconds, fee_limit_msat)
+    res = await send_payment_impl(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
     _update_wallet_balance()
     return res
 

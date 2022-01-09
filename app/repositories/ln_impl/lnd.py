@@ -1,5 +1,5 @@
 import asyncio
-from typing import List
+from typing import List, Optional
 
 import app.repositories.ln_impl.protos.lightning_pb2 as ln
 import app.repositories.ln_impl.protos.router_pb2 as router
@@ -264,13 +264,17 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
 
 
 async def send_payment_impl(
-    pay_req: str, timeout_seconds: int, fee_limit_msat: int
+    pay_req: str,
+    timeout_seconds: int,
+    fee_limit_msat: int,
+    amount_msat: Optional[int] = None,
 ) -> Payment:
     try:
         r = router.SendPaymentRequest(
             payment_request=pay_req,
             timeout_seconds=timeout_seconds,
             fee_limit_msat=fee_limit_msat,
+            amt_msat=amount_msat,
         )
 
         p = None
@@ -279,13 +283,42 @@ async def send_payment_impl(
             await send_sse_message(SSE.LN_PAYMENT_STATUS, p.dict())
         return p
     except grpc.aio._call.AioRpcError as error:
-        _check_if_locked()
+        _check_if_locked(error)
         if (
             error.details() != None
             and error.details().find("invalid bech32 string") > -1
         ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+            )
+        elif (
+            error.details() != None
+            and error.details().find(
+                "amount must be specified when paying a zero amount invoice"
+            )
+            > -1
+        ):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="amount must be specified when paying a zero amount invoice",
+            )
+        elif (
+            error.details() != None
+            and error.details().find(
+                "amount must not be specified when paying a non-zero  amount invoice"
+            )
+            > -1
+        ):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="amount must not be specified when paying a non-zero amount invoice",
+            )
+        elif (
+            error.details() != None
+            and error.details().find("invoice is already paid") > -1
+        ):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="invoice is already paid"
             )
         else:
             raise HTTPException(
