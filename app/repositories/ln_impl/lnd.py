@@ -7,6 +7,7 @@ import app.repositories.ln_impl.protos.walletunlocker_pb2 as unlocker
 import grpc
 from app.models.lightning import (
     FeeRevenue,
+    ForwardSuccessEvent,
     GenericTx,
     Invoice,
     InvoiceState,
@@ -368,6 +369,44 @@ async def listen_invoices() -> Invoice:
     try:
         async for r in lncfg.lnd_stub.SubscribeInvoices(request):
             yield Invoice.from_grpc(r)
+    except grpc.aio._call.AioRpcError as error:
+        _check_if_locked(error)
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
+async def listen_forward_events() -> ForwardSuccessEvent:
+    request = router.SubscribeHtlcEventsRequest()
+    try:
+        _fwd_cache = {}
+
+        async for e in lncfg.router_stub.SubscribeHtlcEvents(request):
+            if e.event_type != 3:
+                continue
+
+            evt = str(e)
+            failed_event = "forward_fail_event" in evt or "link_fail_event" in evt
+            if not e.incoming_htlc_id in _fwd_cache and not failed_event:
+                _fwd_cache[e.incoming_htlc_id] = e
+            elif e.incoming_htlc_id in _fwd_cache and not failed_event:
+                if hasattr(e, "settle_event") and len(e.settle_event.preimage) > 0:
+                    old_e = _fwd_cache[e.incoming_htlc_id]
+                    del _fwd_cache[e.incoming_htlc_id]
+                    amt_in_msat = old_e.forward_event.info.incoming_amt_msat
+                    amt_out_msat = old_e.forward_event.info.outgoing_amt_msat
+                    fee = amt_in_msat - amt_out_msat
+                    yield ForwardSuccessEvent(
+                        timestamp_ns=e.timestamp_ns,
+                        chan_id_in=e.incoming_channel_id,
+                        chan_id_out=e.outgoing_channel_id,
+                        amt_in_msat=amt_in_msat,
+                        amt_out_msat=amt_out_msat,
+                        fee_msat=fee,
+                    )
+            elif failed_event and e.incoming_htlc_id in _fwd_cache:
+                del _fwd_cache[e.incoming_htlc_id]
+
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(

@@ -167,6 +167,7 @@ class SSE:
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"
     LN_ONCHAIN_PAYMENT_STATUS = "ln_onchain_payment_status"
-
+    LN_FEE_REVENUE = "ln_fee_revenue"
+    LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
     WALLET_LOCK_STATUS = "wallet_lock_status"

@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from app.models.lightning import (
     FeeRevenue,
+    ForwardSuccessEvent,
     GenericTx,
     Invoice,
     LnInfo,
@@ -84,4 +85,8 @@ async def unlock_wallet_impl(password: str) -> bool:
 
 
 async def listen_invoices() -> Invoice:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def listen_forward_events() -> ForwardSuccessEvent:
     raise NotImplementedError("c-lightning not yet implemented")

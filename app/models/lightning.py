@@ -72,6 +72,44 @@ class FeeRevenue(BaseModel):
         )
 
 
+class ForwardSuccessEvent(BaseModel):
+    timestamp_ns: int = Query(
+        ...,
+        description="The number of nanoseconds elapsed since January 1, 1970 UTC when this circuit was completed.",
+    )
+    chan_id_in: str = Query(
+        ...,
+        description="The incoming channel ID that carried the HTLC that created the circuit.",
+    )
+    chan_id_out: str = Query(
+        ...,
+        description="The outgoing channel ID that carried the preimage that completed the circuit.",
+    )
+    amt_in_msat: int = Query(
+        ...,
+        description="The total amount (in millisatoshis) of the incoming HTLC that created half the circuit.",
+    )
+    amt_out_msat: str = Query(
+        ...,
+        description="The total amount (in millisatoshis) of the outgoing HTLC that created the second half of the circuit.",
+    )
+    fee_msat: int = Query(
+        ...,
+        description="The total fee (in millisatoshis) that this payment circuit carried.",
+    )
+
+    @classmethod
+    def from_grpc(cls, evt) -> "ForwardSuccessEvent":
+        return cls(
+            timestamp=int(evt.timestamp),
+            chan_id_in=int(evt.chan_id_in),
+            chan_id_out=int(evt.chan_id_out),
+            amt_in_msat=int(evt.amt_in_msat),
+            amt_out_msat=int(evt.amt_out_msat),
+            fee_msat=int(evt.fee_msat),
+        )
+
+
 class Feature(BaseModel):
     name: str
     is_required: bool

@@ -30,6 +30,7 @@ if lightning_config.ln_node == "lnd":
         list_invoices_impl,
         list_on_chain_tx_impl,
         list_payments_impl,
+        listen_forward_events,
         listen_invoices,
         new_address_impl,
         send_coins_impl,
@@ -47,6 +48,7 @@ else:
         list_invoices_impl,
         list_on_chain_tx_impl,
         list_payments_impl,
+        listen_forward_events,
         listen_invoices,
         new_address_impl,
         send_coins_impl,
@@ -54,10 +56,19 @@ else:
         unlock_wallet_impl,
     )
 
-GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=5, cast=float)
+GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
 
 _CACHE = {"wallet_balance": None}
 _WALLET_UNLOCK_LISTENERS = []
+
+ENABLE_FWD_NOTIFICATIONS = config(
+    "sse_notify_forward_successes", default=False, cast=bool
+)
+
+FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float)
+
+if FWD_GATHER_INTERVAL < 0.3:
+    raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
 
 
 async def get_ln_info_lite() -> LightningInfoLite:
@@ -160,6 +171,7 @@ async def register_lightning_listener():
         loop = asyncio.get_event_loop()
         loop.create_task(_handle_info_listener())
         loop.create_task(_handle_invoice_listener())
+        loop.create_task(_handle_forward_event_listener())
     except HTTPException as r:
         raise
     except NotImplementedError as r:
@@ -190,6 +202,38 @@ async def _handle_invoice_listener():
         await send_sse_message(SSE.LN_INVOICE_STATUS, i.dict())
         _update_wallet_balance()
 
+
+_fwd_update_scheduled = False
+_fwd_successes = []
+
+
+async def _handle_forward_event_listener():
+    async def _schedule_fwd_update():
+        global _fwd_update_scheduled
+        global _fwd_successes
+
+        _fwd_update_scheduled = True
+
+        await asyncio.sleep(FWD_GATHER_INTERVAL)
+
+        if len(_fwd_successes) > 0:
+            l = _fwd_successes
+            _fwd_successes = []
+            await send_sse_message(SSE.LN_FORWARD_SUCCESSES, l)
+
+        _update_wallet_balance()
+        rev = await get_fee_revenue()
+        await send_sse_message(SSE.LN_FEE_REVENUE, rev.dict())
+
+        _fwd_update_scheduled = False
+
+    async for i in listen_forward_events():
+        if ENABLE_FWD_NOTIFICATIONS:
+            _fwd_successes.append(i.dict())
+
+        if not _fwd_update_scheduled:
+            loop = asyncio.get_event_loop()
+            loop.create_task(_schedule_fwd_update())
 
 
 _wallet_balance_update_scheduled = False
