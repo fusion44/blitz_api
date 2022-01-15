@@ -125,7 +125,7 @@ async def new_address(input: NewAddressInput) -> str:
 
 async def send_coins(input: SendCoinsInput) -> SendCoinsResponse:
     res = await send_coins_impl(input)
-    _update_wallet_balance()
+    _schedule_wallet_balance_update()
     return res
 
 
@@ -136,7 +136,7 @@ async def send_payment(
     amount_msat: Optional[int] = None,
 ) -> Payment:
     res = await send_payment_impl(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
-    _update_wallet_balance()
+    _schedule_wallet_balance_update()
     return res
 
 
@@ -200,7 +200,7 @@ async def _handle_info_listener():
 async def _handle_invoice_listener():
     async for i in listen_invoices():
         await send_sse_message(SSE.LN_INVOICE_STATUS, i.dict())
-        _update_wallet_balance()
+        _schedule_wallet_balance_update()
 
 
 _fwd_update_scheduled = False
@@ -221,7 +221,7 @@ async def _handle_forward_event_listener():
             _fwd_successes = []
             await send_sse_message(SSE.LN_FORWARD_SUCCESSES, l)
 
-        _update_wallet_balance()
+        _schedule_wallet_balance_update()
         rev = await get_fee_revenue()
         await send_sse_message(SSE.LN_FEE_REVENUE, rev.dict())
 
@@ -239,7 +239,7 @@ async def _handle_forward_event_listener():
 _wallet_balance_update_scheduled = False
 
 
-def _update_wallet_balance():
+def _schedule_wallet_balance_update():
     async def _perform_update():
         global _wallet_balance_update_scheduled
         _wallet_balance_update_scheduled = True
