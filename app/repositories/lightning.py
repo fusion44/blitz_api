@@ -191,16 +191,26 @@ async def _handle_invoice_listener():
         _update_wallet_balance()
 
 
+
+_wallet_balance_update_scheduled = False
+
+
 def _update_wallet_balance():
     async def _perform_update():
+        global _wallet_balance_update_scheduled
+        _wallet_balance_update_scheduled = True
         await asyncio.sleep(1.1)
         wb = await get_wallet_balance_impl()
         if _CACHE["wallet_balance"] != wb:
             await send_sse_message(SSE.WALLET_BALANCE, wb.dict())
             _CACHE["wallet_balance"] = wb
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(_perform_update())
+        _wallet_balance_update_scheduled = False
+
+    global _wallet_balance_update_scheduled
+    if not _wallet_balance_update_scheduled:
+        loop = asyncio.get_event_loop()
+        loop.create_task(_perform_update())
 
 
 def register_wallet_unlock_listener(q: asyncio.Queue):
