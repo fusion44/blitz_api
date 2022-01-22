@@ -138,8 +138,9 @@ async def warmup_new_connections():
                 c.put(_make_evt_data(SSE.BTC_INFO, res[1].dict())),
                 c.put(_make_evt_data(SSE.LN_INFO, res[2].dict())),
                 c.put(_make_evt_data(SSE.LN_INFO_LITE, res[3].dict())),
-                c.put(_make_evt_data(SSE.WALLET_BALANCE, res[4].dict())),
-                c.put(_make_evt_data(SSE.INSTALLED_APP_STATUS, res[5])),
+                c.put(_make_evt_data(SSE.LN_FEE_REVENUE, res[4])),
+                c.put(_make_evt_data(SSE.WALLET_BALANCE, res[5].dict())),
+                c.put(_make_evt_data(SSE.INSTALLED_APP_STATUS, res[6])),
             ]
         )
 
