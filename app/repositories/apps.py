@@ -38,7 +38,7 @@ async def get_app_status_sub():
 
 
 def installApp(appName: str):
-    scriptPath = "%sconfig.scripts/bonus.%s.sh" % (SHELL_SCRIPT_PATH, appName)
+    scriptPath = "%sconfig.scripts/bonus.%s.sh on" % (SHELL_SCRIPT_PATH, appName)
     if(not path.exists(scriptPath)):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="script does not exist"
