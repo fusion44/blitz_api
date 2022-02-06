@@ -5,6 +5,7 @@ import subprocess
 from decouple import config
 from os import path
 from fastapi import HTTPException, status
+from app.repositories.utils import available_app_ids
 
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
@@ -38,11 +39,12 @@ async def get_app_status_sub():
 
 
 def installApp(appName: str):
-    scriptPath = "%sconfig.scripts/bonus.%s.sh on" % (SHELL_SCRIPT_PATH, appName)
-    if(not path.exists(scriptPath)):
+    if(not appName in available_app_ids):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="script does not exist"
         )
+    scriptPath = "%sconfig.scripts/bonus.%s.sh on" % (
+        SHELL_SCRIPT_PATH, appName)
     installResult = subprocess.call([scriptPath])
     if(installResult != 0):
         raise HTTPException(
