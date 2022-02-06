@@ -46,5 +46,6 @@ def installApp(appName: str):
     installResult = subprocess.call([scriptPath])
     if(installResult != 0):
         raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Script exited with status %s" % str(installResult)
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Script exited with status %s" % str(
+                installResult)
         )
