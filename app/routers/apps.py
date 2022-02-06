@@ -50,4 +50,4 @@ async def get_status():
     dependencies=[Depends(JWTBearer())],
 )
 def install_app(name: str):
-    return repo.installApp(name)
+    return repo.install_app(name)

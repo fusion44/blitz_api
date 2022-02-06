@@ -38,7 +38,7 @@ async def get_app_status_sub():
         switch = not switch
 
 
-def installApp(appName: str):
+def install_app(appName: str):
     if(not appName in available_app_ids):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="script does not exist"
