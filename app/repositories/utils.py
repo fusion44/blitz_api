@@ -24,34 +24,3 @@ async def get_client_warmup_data() -> List:
         ]
     )
     return [*res, get_app_status()]
-
-
-available_app_ids = {
-    "bos",
-    "btc-rpc-explorer",
-    "btcpayserver",
-    "chantools",
-    "circuitbreaker",
-    "electrs",
-    "faraday",
-    "fullynoded",
-    "joinmarket",
-    "kindle-display",
-    "lit",
-    "lnbits",
-    "lndconnect",
-    "lndmanage",
-    "loop",
-    "mempool",
-    "pool",
-    "pyblock",
-    "rtl",
-    "specter",
-    "sphinxrelay",
-    "stacking-sats-kraken",
-    "suez",
-    "telegraf",
-    "thunderhub",
-    "whitepaper",
-    "zerotier"
-};

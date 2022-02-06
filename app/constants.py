@@ -1,1 +1,31 @@
 API_VERSION = "v0.5.0beta"
+
+available_app_ids = {
+    "bos",
+    "btc-rpc-explorer",
+    "btcpayserver",
+    "chantools",
+    "circuitbreaker",
+    "electrs",
+    "faraday",
+    "fullynoded",
+    "joinmarket",
+    "kindle-display",
+    "lit",
+    "lnbits",
+    "lndconnect",
+    "lndmanage",
+    "loop",
+    "mempool",
+    "pool",
+    "pyblock",
+    "rtl",
+    "specter",
+    "sphinxrelay",
+    "stacking-sats-kraken",
+    "suez",
+    "telegraf",
+    "thunderhub",
+    "whitepaper",
+    "zerotier"
+}
