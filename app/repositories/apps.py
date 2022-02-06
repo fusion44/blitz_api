@@ -1,6 +1,13 @@
 import asyncio
 import json
 import random
+import subprocess
+from decouple import config
+from os import path
+from fastapi import HTTPException, status
+
+
+SHELL_SCRIPT_PATH = config("shell_script_path")
 
 
 def get_app_status():
@@ -28,3 +35,16 @@ async def get_app_status_sub():
         yield json.dumps(app_list[i - 1])
         await asyncio.sleep(4)
         switch = not switch
+
+
+def installApp(appName: str):
+    scriptPath = "%sconfig.scripts/bonus.%s.sh" % (SHELL_SCRIPT_PATH, appName)
+    if(not path.exists(scriptPath)):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="script does not exist"
+        )
+    installResult = subprocess.call([scriptPath])
+    if(installResult != 0):
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Script exited with status %s" % str(installResult)
+        )

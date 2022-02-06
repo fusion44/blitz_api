@@ -22,7 +22,7 @@ def get_status():
     try:
         return repo.get_app_status()
     except:
-        return HTTPException(
+        raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
         )
 
@@ -38,6 +38,20 @@ async def get_status():
     try:
         return EventSourceResponse(repo.get_app_status_sub())
     except:
-        return HTTPException(
+        raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
         )
+
+@router.post(
+    "/install/{name}",
+    name=f"{_PREFIX}/install",
+    summary="Install app",
+    dependencies=[Depends(JWTBearer())],
+)
+def install_app(name: str):
+    # try:
+        return repo.installApp(name)
+    # except:
+    #     raise HTTPException(
+    #         status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
+    #     )
