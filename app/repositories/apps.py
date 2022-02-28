@@ -1,11 +1,11 @@
 import asyncio
 import json
 import random
-import subprocess
 
 from app.constants import available_app_ids
 from decouple import config
 from fastapi import HTTPException, status
+from fastapi.encoders import jsonable_encoder
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -37,16 +37,26 @@ async def get_app_status_sub():
         switch = not switch
 
 
-def install_app(appId: str):
+async def install_app_sub(appId: str):
     if(not appId in available_app_ids):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="script does not exist"
         )
     scriptPath = "%sconfig.scripts/bonus.%s.sh" % (
         SHELL_SCRIPT_PATH, appId)
-    installResult = subprocess.call([scriptPath, "on"])
-    if(installResult != 0):
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Script exited with status %s" % str(
-                installResult)
-        )
+
+    cmd = f"bash {scriptPath} on"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await proc.communicate()
+
+    print(f'[{cmd!r} exited with {proc.returncode}]')
+    if stdout:
+        print(f'[stdout]\n{stdout.decode()}')
+    if stderr:
+        print(f'[stderr]\n{stderr.decode()}')
+    yield jsonable_encoder({"event": "install", "data": json.dumps({"id": appId})})

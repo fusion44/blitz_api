@@ -49,5 +49,5 @@ async def get_status():
     summary="Install app",
     dependencies=[Depends(JWTBearer())],
 )
-def install_app(name: str):
-    return repo.install_app(name)
+async def install_app(name: str):
+    return EventSourceResponse(repo.install_app_sub(name))
