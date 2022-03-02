@@ -50,4 +50,14 @@ async def get_status():
     dependencies=[Depends(JWTBearer())],
 )
 async def install_app(name: str):
-    return EventSourceResponse(repo.install_app_sub(name))
+    return await repo.install_app_sub(name)
+
+
+@router.post(
+    "/uninstall/{name}",
+    name=f"{_PREFIX}/install",
+    summary="Uninstall app",
+    dependencies=[Depends(JWTBearer())],
+)
+async def uninstall_app(name: str):
+    return await repo.uninstall_app_sub(name)

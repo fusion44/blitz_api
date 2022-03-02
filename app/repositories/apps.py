@@ -3,6 +3,7 @@ import json
 import random
 
 from app.constants import available_app_ids
+from app.utils import SSE, send_sse_message
 from decouple import config
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -12,11 +13,14 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 
 def get_app_status():
     return [
-        {"id": "specter", "name": "Specter Desktop", "status": "online"},
-        {"id": "sphinx", "name": "Sphinx Chat", "status": "online"},
-        {"id": "btc-pay", "name": "BTCPay Server", "status": "offline"},
-        {"id": "rtl", "name": "Ride the Lightning", "status": "online"},
-        {"id": "bos", "name": "Balance of Satoshis", "status": "offline"},
+        {"id": "specter", "status": "online",
+            "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
+        {"id": "btc-pay", "status": "offline",
+            "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
+        {"id": "rtl", "status": "online",
+            "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
+        {"id": "lnbits", "status": "online",
+         "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
     ]
 
 
@@ -37,15 +41,37 @@ async def get_app_status_sub():
         switch = not switch
 
 
-async def install_app_sub(appId: str):
-    if(not appId in available_app_ids):
+async def install_app_sub(app_id: str):
+    if(not app_id in available_app_ids):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="script does not exist"
         )
-    scriptPath = "%sconfig.scripts/bonus.%s.sh" % (
-        SHELL_SCRIPT_PATH, appId)
 
-    cmd = f"bash {scriptPath} on"
+    await send_sse_message(SSE.INSTALL_APP, {"id": app_id})
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_bonus_script(app_id, "on"))
+
+    return jsonable_encoder({"id": app_id})
+
+
+async def uninstall_app_sub(app_id: str):
+    if(not app_id in available_app_ids):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="script does not exist"
+        )
+
+    await send_sse_message(SSE.INSTALL_APP, {"id": app_id})
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_bonus_script(app_id, "off"))
+
+    return jsonable_encoder({"id": app_id})
+
+
+async def run_bonus_script(app_id: str, params: str):
+    script_path = f"{SHELL_SCRIPT_PATH}config.scripts/bonus.{app_id}.sh"
+    print(script_path)
+    cmd = f"bash {script_path} {params}"
+
     proc = await asyncio.create_subprocess_shell(
         cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -59,4 +85,6 @@ async def install_app_sub(appId: str):
         print(f'[stdout]\n{stdout.decode()}')
     if stderr:
         print(f'[stderr]\n{stderr.decode()}')
-    yield jsonable_encoder({"event": "install", "data": json.dumps({"id": appId})})
+
+    await send_sse_message(SSE.INSTALL_APP, {"id": None})
+    # TODO: send installed_app_status to update the installed apps in frontend

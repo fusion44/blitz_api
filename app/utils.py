@@ -181,6 +181,7 @@ class SSE:
     SYSTEM_INFO = "system_info"
     HARDWARE_INFO = "hardware_info"
 
+    INSTALL_APP = "install"
     INSTALLED_APP_STATUS = "installed_app_status"
 
     BTC_NETWORK_STATUS = "btc_network_status"
