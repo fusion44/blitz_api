@@ -13,6 +13,7 @@ from app.repositories.system import (
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
+    shutdown,
     subscribe_hardware_info,
 )
 from app.routers.system_docs import (
@@ -35,11 +36,13 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     status_code=status.HTTP_200_OK,
 )
 def login(i: LoginInput):
-    match = secrets.compare_digest(i.password, config("login_password", cast=str))
+    match = secrets.compare_digest(
+        i.password, config("login_password", cast=str))
     if match:
         return signJWT()
 
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                        detail="Password is wrong")
 
 
 @router.post(
@@ -116,8 +119,8 @@ async def hw_info_sub(request: Request):
     summary="Reboots the system",
     dependencies=[Depends(JWTBearer())],
 )
-def reboot_system():
-    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+async def reboot_system():
+    return await shutdown(True)
 
 
 @router.post(
@@ -126,5 +129,5 @@ def reboot_system():
     summary="Shuts the system down",
     dependencies=[Depends(JWTBearer())],
 )
-def reboot_system():
-    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+async def reboot_system():
+    return await shutdown(False)

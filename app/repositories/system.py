@@ -24,7 +24,8 @@ else:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
-GET_DEBUG_LOG_SCRIPT = path.join(SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh")
+GET_DEBUG_LOG_SCRIPT = path.join(
+    SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh")
 
 
 def _check_shell_scripts_status():
@@ -32,7 +33,8 @@ def _check_shell_scripts_status():
         raise Exception(f"invalid shell script path: {SHELL_SCRIPT_PATH}")
 
     if not path.isfile(GET_DEBUG_LOG_SCRIPT):
-        raise Exception(f"Required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
+        raise Exception(
+            f"Required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
 
 
 _check_shell_scripts_status()
@@ -102,3 +104,25 @@ async def _handle_gather_hardware_info():
 async def register_hardware_info_gatherer():
     loop = asyncio.get_event_loop()
     loop.create_task(_handle_gather_hardware_info())
+
+
+async def shutdown(reboot: bool):
+    params = ""
+    if(reboot):
+        params = "reboot"
+    script = f"{SHELL_SCRIPT_PATH}config.scripts/blitz.shutdown.sh"
+    cmd = f"bash {script} {params}"
+
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await proc.communicate()
+
+    print(f'[{cmd!r} exited with {proc.returncode}]')
+    if stdout:
+        print(f'[stdout]\n{stdout.decode()}')
+    if stderr:
+        print(f'[stderr]\n{stderr.decode()}')
