@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 
 from decouple import config
@@ -120,7 +121,9 @@ async def hw_info_sub(request: Request):
     dependencies=[Depends(JWTBearer())],
 )
 async def reboot_system():
-    return await shutdown(True)
+    loop = asyncio.get_event_loop()
+    loop.create_task(shutdown(True))
+    return
 
 
 @router.post(
@@ -130,4 +133,6 @@ async def reboot_system():
     dependencies=[Depends(JWTBearer())],
 )
 async def reboot_system():
-    return await shutdown(False)
+    loop = asyncio.get_event_loop()
+    loop.create_task(shutdown(False))
+    return
