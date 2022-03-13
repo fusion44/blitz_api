@@ -8,4 +8,13 @@ local=.
 remote=admin@$ip:/home/admin/blitz_api
 
 # Needs sshpass installed
-sshpass -p "$password" rsync -re ssh --progress $local $remote
+sshpass -p "$password" rsync -re ssh $local $remote
+
+# Restart the blitz service to activate changes
+sshpass -p "$password" ssh admin@$ip 'sudo systemctl restart blitzapi.service'
+
+# Get latest logs entries
+sshpass -p "$password" ssh admin@$ip 'sudo journalctl -u blitzapi.service -n 10 --no-pager --no-hostname'
+
+# Watch the logs
+sshpass -p "$password" ssh admin@$ip 'sudo journalctl -u blitzapi.service -f --no-hostname'
