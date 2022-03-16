@@ -151,6 +151,11 @@ async def redis_get(key: str) -> str:
     return v.decode("utf-8")
 
 
+# TODO
+# idea is to have a second redis channel called system, that the API subscribes to. If for example
+# the 'state' value gets changed by the _cache.sh script, it should publish this to this channel
+# so the API can forward the change to thru the SSE to the WebUI
+
 class SSE:
     SYSTEM_INFO = "system_info"
     HARDWARE_INFO = "hardware_info"
