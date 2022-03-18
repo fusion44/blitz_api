@@ -1,57 +1,76 @@
 import asyncio
+import logging
 from enum import Enum
 from os import stat
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from aioredis import Redis
+from app.utils import redis_get
 from fastapi_plugins import depends_redis, redis_plugin
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 
-def make_error(
-    error_id: int, endpoint_url: str, err_description: str, description: str
-):
-    return {
-        "error_id": error_id,
-        "endpoint_url": endpoint_url,
-        "error_description": err_description,
-        "description": description,
-    }
+# helper function to deal with redis
+async def _redis_get(key: str) -> str:
+    v = await redis_plugin.redis.get(key)
+    if not v:
+        logging.warning(f"Key '{key}' not found in Redis DB.")
+        return ""
+    return v.decode("utf-8")
 
-
-def set_status(status: int, endpoint_url: str, description: str):
-    return {
-        "status": status,
-        "endpoint_url": endpoint_url,
-        "description": description,
-    }
-
-# status normally is a tripple "setupPhase", "state" & "message" if we want to keep it similar with SSH process 
-# can always be called without credentials
-@router.get("/status")
-def get_status():
-    return set_status(2, "/setup/start_setup", "HDD needs setup (2)")
-
+# can always be called without credentials to check if
+# the system needs or is in setup (setupPhase!="done")
 # for example in the beginning setupPhase can be (see controlSetupDialog.sh)
 # 1) recovery = same version on fresh sd card
 # 2) update = updated version on fresh sd card
 # 3) migration = hdd got data from another node projcect
-#   additional data fields:
-#   hddGotMigrationData = 'umbrel', 'mynode', 'citadel'
-#   migrationMode= 'normal' or 'outdatedLightning' (later means RaspiBlitz has an older lightning version - dont convert)
 # 4) setup = a fresh blitz to setup
-#   additional data fields:
-#   existingBlockchain = 'BITCOIN' or empty (if not empty ask user to keep or delete blockchain data)
+@router.get("/status")
+async def get_status():
+    setupPhase = await _redis_get("setupPhase")
+    state = await _redis_get("state")
+    message = await _redis_get("message")
+    return {
+        "setupPhase": setupPhase,
+        "state": state,
+        "message": message
+    }
 
+# if setupPhase!="done" && state="waitsetup" then
+# 'setup/setup_start_info' should be called
 # We can do the "MIGRATION" option later - because it would need an additional step after formatting hdd
 # People that need to migrate can do for now by SSH option
 
 @router.get("/setup_start_info")
-async def setup_start_info(redis: Redis = Depends(depends_redis)):
-    # TODO: get additional infos needed to display 
-    return set_status(2, "/setup/start_setup", "HDD needs setup (2)")
+async def setup_start_info():
+
+    # first check that node is really in setup state
+    setupPhase = await _redis_get("setupPhase")
+    state = await _redis_get("state")
+    if setupPhase != "done":
+        logging.warning(f"/setup_start_info can only be called when nodes awaits setup (setupPhase)")
+        return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE)
+    if state != "waitsetup":
+        logging.warning(f"/setup_start_info can only be called when nodes awaits setup (state)")
+        return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    # get all the additional info needed to do setup dialog
+    hddGotMigrationData = await _redis_get("hddGotMigrationData")
+    hddGotBlockchain = await _redis_get("hddBlocksBitcoin")
+    migrationMode = await _redis_get("migrationMode")
+    lan = await _redis_get("internet_localip")
+    tor = await _redis_get("tor_web_addr")
+    # return info as JSON
+    return {
+        "setupPhase": setupPhase,
+        "migrationMode": migrationMode, # 'normal', 'outdatedLightning'
+        "hddGotMigrationData": hddGotMigrationData, # 'umbrel', 'mynode', 'citadel'
+        "hddGotBlockchain": hddGotBlockchain,
+        "ssh_login": f"ssh admin@{lan}",
+        "tor_web_ui": tor
+    }
 
 # With all this info the WebUi can run its own runs its dialogs and in the end makes a call to 
 @router.post("/setup_start_done")
