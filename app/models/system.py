@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from app.models.lightning import LnInfo
 from app.routers.system_docs import get_debug_data_sample_str
+from decouple import config
 from fastapi import Query
 from fastapi.param_functions import Query
 from pydantic import BaseModel
@@ -67,6 +68,17 @@ class HealthState(str, Enum):
 class APIPlatform(str, Enum):
     RASPIBLITZ = "raspiblitz"
     NATIVE_PYTHON = "native_python"
+    UNKNOWN = "unknown"
+
+    @staticmethod
+    def get_current():
+        p = config("platform", default="raspiblitz")
+        if p == "raspiblitz":
+            return APIPlatform.RASPIBLITZ
+        elif p == "native_python":
+            return APIPlatform.NATIVE_PYTHON
+        else:
+            return APIPlatform.UNKNOWN
 
 
 class SystemInfo(BaseModel):

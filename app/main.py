@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 from aioredis import Channel, Redis
 from fastapi import FastAPI, Request
@@ -22,6 +23,7 @@ from app.auth.auth_handler import (
 )
 from app.external.fastapi_versioning import VersionedFastAPI
 from app.external.sse_startlette import EventSourceResponse
+from app.models.system import APIPlatform
 from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
@@ -78,7 +80,7 @@ app.add_middleware(
 async def on_startup():
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
-    await register_all_handlers(redis_plugin.redis)
+    await check_defer_register_handlers()
     handle_local_cookie()
     register_cookie_updater()
 
@@ -169,6 +171,37 @@ async def subscribe(request: Request, id: int, q: asyncio.Queue):
 
 
 register_handlers_finished = False
+
+
+async def check_defer_register_handlers():
+    """
+    Special case for RaspiBlitz: Depending on the current setup step
+    there still isn't a Bitcoin Deamon or Lightning Node running.
+    We must defer the registration of all those handlers until later
+    when everything is properly setup.
+
+    Since there is a final reboot after the setup there is no need to
+    check in the background whether setup is finished. The API server
+    is restartet anyway.
+    """
+
+    platform = APIPlatform.get_current()
+    if platform != APIPlatform.RASPIBLITZ:
+        # Handle everything BUT RaspiBlitz normally
+        await register_all_handlers(redis_plugin.redis)
+    else:
+        # Handle Raspiblitz
+        res = await redis_plugin.redis.get("setupPhase")
+        setup_phase = ""
+        if res != None:
+            setup_phase = res.decode("utf-8")
+
+        if setup_phase == "done":
+            await register_all_handlers(redis_plugin.redis)
+        else:
+            logging.warning(
+                f"Setup not finished. Defering handler startup. Current phase: '{setup_phase}'"
+            )
 
 
 async def register_all_handlers(redis: Redis):
