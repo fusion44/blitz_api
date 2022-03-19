@@ -37,7 +37,7 @@ from app.repositories.lightning import (
 from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, redis_get, send_sse_message
 
 
 @registered_configuration
@@ -191,10 +191,7 @@ async def check_defer_register_handlers():
         await register_all_handlers(redis_plugin.redis)
     else:
         # Handle Raspiblitz
-        res = await redis_plugin.redis.get("setupPhase")
-        setup_phase = ""
-        if res != None:
-            setup_phase = res.decode("utf-8")
+        setup_phase = await redis_get("setupPhase")
 
         if setup_phase == "done":
             await register_all_handlers(redis_plugin.redis)
