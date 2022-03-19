@@ -16,6 +16,15 @@ sshpassInstalled=$(sshpass -V | grep -c "sshpass")
 if [ ${sshpassInstalled} -eq 0 ]; then
     echo "FAIL: please make sure that sshpass is installed on your system"
     echo "macOS: brew install hudochenkov/sshpass/sshpass"
+    echo "Linux(Debian): apt install sshpass"
+    exit 
+fi
+
+# check if ping is installed
+pingInstalled=$(ping -V | grep -c "ping")
+if [ ${pingInstalled} -eq 0 ]; then
+    echo "FAIL: please make sure that ping is installed on your system"
+    echo "Linux(Debian): apt install inetutils-ping OR apt install iputils-ping"
     exit 
 fi
 
