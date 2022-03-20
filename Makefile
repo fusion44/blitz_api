@@ -15,17 +15,17 @@ clean:
 	echo "Removing htmlcov folder and .coverage file"
 	rm -rf htmlcov .coverage
 	python -m pyclean .
-	
+
 install:
 	python -m pip install -r requirements.txt
 
 install_dev:
-	poetry shell && poetry install
+	poetry shell && poetry install && pre-commit install
 
 run:
 	python -m uvicorn app.main:app --reload
 
-test: 
+test:
 	python -m pytest
 
 coverage:
@@ -37,3 +37,6 @@ requirements:
 
 sync_to_blitz:
 	bash scripts/sync_to_blitz.sh
+
+pre_commit:
+	pre-commit run --all-files

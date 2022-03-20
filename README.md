@@ -1,5 +1,7 @@
 # blitz_api
 
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+
 ## Configuration
 
 Create a `.env` file with your `bitcoind` and `lnd` configuration. See the `.env_sample` file for all configuration options.
@@ -8,7 +10,7 @@ Create a `.env` file with your `bitcoind` and `lnd` configuration. See the `.env
 
 - [Python in version 3.7](https://www.python.org/downloads/)
 - [Redis](https://redis.io)
-- [Polar](https://github.com/jamaljsr/polar)  
+- [Polar](https://github.com/jamaljsr/polar)
   If you need an easy option to run a simple bitcoind & lnd client
 
 ## Installation
@@ -69,6 +71,7 @@ poetry shell
 
 ```
 poetry install
+pre-commit install
 ```
 
 or
@@ -93,7 +96,7 @@ Make sure to include tests for important pieces of submitted code.
 #### Run the tests with pytest
 
 ```sh
-make tests
+make test
 ```
 
 #### Run tests and generate a coverage
@@ -103,6 +106,10 @@ make coverage
 ```
 
 This will run tests and generate a coverage html file in this folder: `./htmlcov`
+
+### Before you commit
+
+This project uses [pre-commit](https://pre-commit.com) to keep the source code structured. Please make sure to run either `make pre_commit` or `pre-commit run --all-files`. The CI pipeline will reject pull requests that fail this step. This step helps to ensures that the source code is formatted consistently and pull requests are as tidy as possible.
 
 ### [Swagger](https://swagger.io)
 
