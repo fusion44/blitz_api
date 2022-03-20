@@ -1,11 +1,12 @@
 from enum import Enum
 from typing import List, Optional, Union
 
-import app.models.lightning_docs as docs
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
 from pydantic import BaseModel
 from pydantic.types import conint
+
+import app.models.lightning_docs as docs
 
 
 class OnchainAddressType(str, Enum):

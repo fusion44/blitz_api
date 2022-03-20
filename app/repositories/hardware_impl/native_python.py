@@ -1,7 +1,6 @@
 import psutil
 from decouple import config
 
-
 SLEEP_TIME = config("gather_hw_info_interval", default=2, cast=float)
 CPU_AVG_PERIOD = config("cpu_usage_averaging_period", default=0.5, cast=float)
 HW_INFO_YIELD_TIME = SLEEP_TIME + CPU_AVG_PERIOD

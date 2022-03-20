@@ -1,13 +1,13 @@
 from enum import Enum
 from typing import List, Optional
 
-from app.models.lightning import LnInfo
-from app.routers.system_docs import get_debug_data_sample_str
 from decouple import config
 from fastapi import Query
 from fastapi.param_functions import Query
 from pydantic import BaseModel
 from pydantic.types import constr
+
+from app.routers.system_docs import get_debug_data_sample_str
 
 
 class LoginInput(BaseModel):
@@ -29,7 +29,7 @@ class HealthMessage(BaseModel):
     id: int = Query(
         None,
         description="""ID of the message.
-Idea behind the ID is that messages can be replacable on the client. 
+Idea behind the ID is that messages can be replacable on the client.
 To prevent spamming the user with multiple messages, message with ID 25 will be replaced with never data of ID 25
         """,
         example="""
@@ -44,7 +44,7 @@ To prevent spamming the user with multiple messages, message with ID 25 will be 
     level: HealthMessagePriority = Query(
         HealthMessagePriority.INFO,
         description="""Priority level of the message. For more info see `message`.
-        
+
 `INFO`:       FYI, can normally be ignored.\n
 `WARNING`:    Potential problem might occur, user interaction possibly required.\n
 `ERROR`:      Something bad happened. User interaction definitely required.

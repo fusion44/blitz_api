@@ -81,7 +81,7 @@ get_hw_info_json = """
 
 get_debug_data_sample_str = """
 ***************************************************************
-* RASPIBLITZ DEBUG LOGS 
+* RASPIBLITZ DEBUG LOGS
 ***************************************************************
 blitzversion: 1.7.0
 chainnetwork: bitcoin / main
@@ -371,8 +371,8 @@ use the following command and share the resulting link:
 
 get_debug_logs_raw_summary = "Get raw system logs as a text string."
 get_debug_logs_raw_desc = """
-This endpoint will gather latest system logs and return it in a 
-raw string. This endpoint will **not** return immediately because 
+This endpoint will gather latest system logs and return it in a
+raw string. This endpoint will **not** return immediately because
 it gathers all data on time of the request.
 """
 

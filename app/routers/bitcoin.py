@@ -1,3 +1,6 @@
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.params import Depends, Query
+
 from app.auth.auth_bearer import JWTBearer
 from app.external.sse_startlette import EventSourceResponse
 from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
@@ -10,8 +13,6 @@ from app.repositories.bitcoin import (
 )
 from app.routers.bitcoin_docs import blocks_sub_doc, estimate_fee_mode_desc
 from app.utils import bitcoin_rpc
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.params import Depends, Query
 
 _PREFIX = "bitcoin"
 

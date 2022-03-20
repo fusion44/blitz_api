@@ -1,6 +1,7 @@
+from starlette.testclient import TestClient
+
 from app.models.lightning import LightningInfoLite
 from app.routers import lightning
-from starlette.testclient import TestClient
 from tests.routers.utils import call_route
 from tests.utils import monkeypatch_auth
 

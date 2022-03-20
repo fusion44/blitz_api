@@ -1,6 +1,10 @@
 import asyncio
-from typing import List, Optional
 import logging
+from typing import List, Optional
+
+from decouple import config
+from fastapi import status
+from fastapi.exceptions import HTTPException
 
 from app.models.lightning import (
     FeeRevenue,
@@ -16,9 +20,6 @@ from app.models.lightning import (
     SendCoinsResponse,
 )
 from app.utils import SSE, lightning_config, send_sse_message
-from decouple import config
-from fastapi import status
-from fastapi.exceptions import HTTPException
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
@@ -181,7 +182,7 @@ Unable to connect to LND. Possible reasons:
 * Node is not reachable (ports, network down, ...)
 * Maccaroon is not correct
 * IP is not included in LND tls certificate
-    Add tlsextraip=192.168.1.xxx to lnd.conf and restart LND. 
+    Add tlsextraip=192.168.1.xxx to lnd.conf and restart LND.
     This will recreate the TLS certificate. The .env must be adpted accordingly.
 * TLS certificate is wrong. (settings changed, ...)
 

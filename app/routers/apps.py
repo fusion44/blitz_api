@@ -1,9 +1,10 @@
+from fastapi import APIRouter, HTTPException, status
+from fastapi.params import Depends
+
 import app.repositories.apps as repo
 import app.routers.apps_docs as docs
 from app.auth.auth_bearer import JWTBearer
 from app.external.sse_startlette import EventSourceResponse
-from fastapi import APIRouter, HTTPException, status
-from fastapi.params import Depends
 
 _PREFIX = "apps"
 

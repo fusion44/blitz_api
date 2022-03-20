@@ -1,5 +1,8 @@
 from typing import List, Optional
 
+from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.params import Depends
+
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
     FeeRevenue,
@@ -38,8 +41,6 @@ from app.routers.lightning_docs import (
     send_coins_desc,
     send_payment_desc,
 )
-from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.params import Depends
 
 _PREFIX = "lightning"
 
@@ -93,8 +94,8 @@ async def getwalletbalance():
     name=f"{_PREFIX}.get-fee-revenue",
     summary="Returns the daily, weekly and monthly fee revenue earned.",
     description="""
-Currently, year and total fees are always null. Backends don't return these values by default. 
-Implementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64). 
+Currently, year and total fees are always null. Backends don't return these values by default.
+Implementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64).
     """,
     dependencies=[Depends(JWTBearer())],
     response_model=FeeRevenue,
@@ -113,7 +114,7 @@ async def get_fee_revenue_path() -> FeeRevenue:
     "/list-all-tx",
     name=f"{_PREFIX}.list-all-tx",
     summary="Lists all on-chain transactions, payments and invoices in the wallet",
-    description="""Returns a list with all on-chain transaction, payments and invoices combined into one list. 
+    description="""Returns a list with all on-chain transaction, payments and invoices combined into one list.
     The index of each tx is only valid for each identical set of parameters.
     """,
     dependencies=[Depends(JWTBearer())],

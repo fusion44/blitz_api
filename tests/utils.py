@@ -1,5 +1,6 @@
-from app.auth.auth_bearer import JWTBearer
 from fastapi.security import HTTPAuthorizationCredentials
+
+from app.auth.auth_bearer import JWTBearer
 
 
 def monkeypatch_auth(monkeypatch):

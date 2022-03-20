@@ -1,10 +1,11 @@
 import asyncio
 from os import path
 
-from app.models.system import APIPlatform, RawDebugLogData, SystemInfo
-from app.utils import SSE, send_sse_message
 from decouple import config
 from fastapi import HTTPException, Request, status
+
+from app.models.system import APIPlatform, RawDebugLogData, SystemInfo
+from app.utils import SSE, send_sse_message
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:

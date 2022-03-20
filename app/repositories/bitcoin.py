@@ -5,11 +5,12 @@ import logging
 
 import zmq
 import zmq.asyncio
-from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
-from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
 from fastapi import Request
 from fastapi.exceptions import HTTPException
 from starlette import status
+
+from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
+from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
 
 
 async def get_blockchain_info() -> BlockchainInfo:

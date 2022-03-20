@@ -1,5 +1,9 @@
 import secrets
 
+from decouple import config
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.params import Depends
+
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
 from app.external.sse_startlette import EventSourceResponse
@@ -17,9 +21,6 @@ from app.routers.system_docs import (
     get_debug_logs_raw_summary,
     get_hw_info_json,
 )
-from decouple import config
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.params import Depends
 
 _PREFIX = "system"
 

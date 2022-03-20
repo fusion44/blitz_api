@@ -14,7 +14,6 @@ _sym_db = _symbol_database.Default()
 
 import app.repositories.ln_impl.protos.lightning_pb2 as lightning__pb2
 
-
 DESCRIPTOR = _descriptor.FileDescriptor(
     name="walletunlocker.proto",
     package="lnrpc",

@@ -2,12 +2,13 @@ import asyncio
 import logging
 
 from aioredis import Redis
-from app.auth.auth_bearer import JWTBearer
-from app.auth.auth_handler import signJWT
-from app.utils import redis_get
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from fastapi_plugins import depends_redis
+
+from app.auth.auth_bearer import JWTBearer
+from app.auth.auth_handler import signJWT
+from app.utils import redis_get
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 

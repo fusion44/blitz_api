@@ -1,3 +1,5 @@
+from decouple import config
+
 from app.constants import API_VERSION
 from app.models.system import (
     APIPlatform,
@@ -7,7 +9,6 @@ from app.models.system import (
     SystemInfo,
 )
 from app.repositories.lightning import get_ln_info
-from decouple import config
 
 
 async def get_system_info_impl() -> SystemInfo:
