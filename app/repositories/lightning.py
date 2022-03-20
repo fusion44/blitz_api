@@ -1,5 +1,6 @@
 import asyncio
 from typing import List, Optional
+import logging
 
 from app.models.lightning import (
     FeeRevenue,
@@ -173,7 +174,25 @@ async def register_lightning_listener():
         loop.create_task(_handle_invoice_listener())
         loop.create_task(_handle_forward_event_listener())
     except HTTPException as r:
-        raise
+        if r.detail == "failed to connect to all addresses":
+            logging.error(
+                """
+Unable to connect to LND. Possible reasons:
+* Node is not reachable (ports, network down, ...)
+* Maccaroon is not correct
+* IP is not included in LND tls certificate
+    Add tlsextraip=192.168.1.xxx to lnd.conf and restart LND. 
+    This will recreate the TLS certificate. The .env must be adpted accordingly.
+* TLS certificate is wrong. (settings changed, ...)
+
+To Debug gRPC problems uncomment the following line in app.utils.LightningConfig._init():
+# os.environ["GRPC_VERBOSITY"] = "DEBUG"
+This will show more debug information.
+"""
+            )
+            exit(1)
+        else:
+            raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 

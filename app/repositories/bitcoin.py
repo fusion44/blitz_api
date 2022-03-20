@@ -1,6 +1,7 @@
 import asyncio
 import binascii
 import json
+import logging
 
 import zmq
 import zmq.asyncio
@@ -85,8 +86,8 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
 
     while True:
         _, body, _ = await zmq_socket.recv_multipart()
-        hash = binascii.hexlify(body).decode('utf-8')
-        r = await bitcoin_rpc_async('getblock', [hash, verbosity])
+        hash = binascii.hexlify(body).decode("utf-8")
+        r = await bitcoin_rpc_async("getblock", [hash, verbosity])
         await send_sse_message(SSE.BTC_NEW_BLOC, r["result"])
 
 
@@ -102,7 +103,7 @@ async def _handle_gather_bitcoin_status():
             info = await get_btc_info()
             info.verification_progress = round(info.verification_progress, 2)
         except HTTPException as e:
-            print(e)
+            logging.error(e.detail)
             await asyncio.sleep(2)
             continue
 

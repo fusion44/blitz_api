@@ -10,6 +10,7 @@ import requests
 from decouple import config
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+from starlette import status
 
 import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
 import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
@@ -51,8 +52,8 @@ class LightningConfig:
             os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
 
             # Uncomment to see full gRPC logs
-            # os.environ["GRPC_TRACE"] = 'all'
-            # os.environ["GRPC_VERBOSITY"] = 'DEBUG'
+            # os.environ["GRPC_TRACE"] = "all"
+            # os.environ["GRPC_VERBOSITY"] = "DEBUG"
 
             self.lnd_macaroon = config("lnd_macaroon")
             self._lnd_cert = bytes.fromhex(config("lnd_cert"))
@@ -122,7 +123,23 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
 
     async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
         async with session.post(bitcoin_config.rpc_url, data=data) as resp:
-            return await resp.json()
+            if resp.status == status.HTTP_200_OK:
+                return await resp.json()
+            elif resp.status == status.HTTP_401_UNAUTHORIZED:
+                return {
+                    "error": "Access denied to Bitcoin Core RPC. Check if username and password is correct",
+                    "status": status.HTTP_403_FORBIDDEN,
+                }
+            elif resp.status == status.HTTP_403_FORBIDDEN:
+                return {
+                    "error": "Access denied to Bitcoin Core RPC. If this is a remote node, check if 'network.rpcallowip=0.0.0.0/0' is set.",
+                    "status": status.HTTP_403_FORBIDDEN,
+                }
+            else:
+                return {
+                    "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
+                    "status": resp.status,
+                }
 
 
 async def send_sse_message(id: str, json_data: Dict):
@@ -155,6 +172,7 @@ async def redis_get(key: str) -> str:
 # idea is to have a second redis channel called system, that the API subscribes to. If for example
 # the 'state' value gets changed by the _cache.sh script, it should publish this to this channel
 # so the API can forward the change to thru the SSE to the WebUI
+
 
 class SSE:
     SYSTEM_INFO = "system_info"
