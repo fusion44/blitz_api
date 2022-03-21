@@ -73,6 +73,9 @@ class LightningConfig:
         elif self.ln_node == "clightning":
             # TODO: implement c-lightning
             pass
+        elif self.ln_node == "":
+            # its ok to run raspiblitz also without lightning
+            pass
         else:
             raise NameError(
                 f'Node type "{self.ln_node}" is unknown. Use "lnd" or "clightning"'
