@@ -1,5 +1,7 @@
 import asyncio
 from os import path
+import logging
+import re
 
 from decouple import config
 from fastapi import HTTPException, Request, status
@@ -37,6 +39,39 @@ def _check_shell_scripts_status():
 
 _check_shell_scripts_status()
 
+async def callScript(scriptPath) -> str:
+    cmd = f"bash {scriptPath}"
+    logging.warning(f"running script: {cmd}")
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return stdout.decode()
+    if stderr:
+        logging.error(stderr.decode())
+    return ""
+
+def parseKeyValueLines(lines:list) -> dict:
+    Dict = {}
+    for line in lines:
+        logging.warning(f"line({line})")
+        if len(line.strip()) == 0: continue
+        if line.strip().startswith('#'): continue
+        if line.find('=') <=0: continue
+        key, value = line.strip().split('=',1)
+        Dict[key] = value.strip('"').strip("'")
+    return Dict
+
+def parseKeyValueText(text:str) -> dict:
+    return parseKeyValueLines(text.splitlines())
+
+def passwordValid(password : str):
+    if len(password) < 8: return False
+    if password.find(' ') >= 0: return False
+    return re.match('^[a-zA-Z0-9]*$', password) 
 
 async def get_system_info() -> SystemInfo:
     try:

@@ -1,4 +1,5 @@
 import secrets
+import logging
 
 from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
@@ -14,6 +15,9 @@ from app.repositories.system import (
     get_hardware_info,
     get_system_info,
     subscribe_hardware_info,
+    callScript,
+    parseKeyValueText,
+    passwordValid
 )
 from app.routers.system_docs import (
     get_debug_logs_raw_desc,
@@ -34,13 +38,25 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     response_description="JWT token for the current session.",
     status_code=status.HTTP_200_OK,
 )
-def login(i: LoginInput):
-    match = secrets.compare_digest(i.password, config("login_password", cast=str))
-    if match:
-        return signJWT()
+async def login(i: LoginInput):
 
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
+    platform = ""
+    try:
+        platform = config("platform", cast=str)
+    except:
+        logging.warning(f"please set platform in env config file")
 
+    if platform == "raspiblitz":
+        # script does not work when called from api yet
+        if passwordValid(i.password):
+            result = await callScript(f"/home/admin/config.scripts/blitz.setpassword.sh check-a {i.password}")
+            data = parseKeyValueText(result)
+            if data["correct"] == "1": return signJWT()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
+    else:
+        match = secrets.compare_digest(i.password, config("login_password", cast=str))
+        if match: return signJWT()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
 
 @router.post(
     "/refresh-token",
