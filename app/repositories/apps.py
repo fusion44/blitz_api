@@ -81,11 +81,11 @@ async def run_bonus_script(app_id: str, params: str):
 
     stdout, stderr = await proc.communicate()
 
-    logging.log(f'[{cmd!r} exited with {proc.returncode}]')
+    logging.info(f'[{cmd!r} exited with {proc.returncode}]')
     if stdout:
-        logging.log(f'[stdout]\n{stdout.decode()}')
+        logging.info(f'[stdout]\n{stdout.decode()}')
     if stderr:
-        logging.log(f'[stderr]\n{stderr.decode()}')
+        logging.error(f'[stderr]\n{stderr.decode()}')
 
     await send_sse_message(SSE.INSTALL_APP, {"id": None})
     # TODO: send installed_app_status to update the installed apps in frontend
