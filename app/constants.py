@@ -27,5 +27,5 @@ available_app_ids = {
     "telegraf",
     "thunderhub",
     "whitepaper",
-    "zerotier"
+    "zerotier",
 }

@@ -15,14 +15,30 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 
 def get_app_status():
     return [
-        {"id": "specter", "status": "online",
-            "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
-        {"id": "btc-pay", "status": "offline",
-            "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
-        {"id": "rtl", "status": "online",
-            "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
-        {"id": "lnbits", "status": "online",
-         "address": "http://192.168.0.1", "hiddenService": "blablablabla.onion"},
+        {
+            "id": "specter",
+            "status": "online",
+            "address": "http://192.168.0.1",
+            "hiddenService": "blablablabla.onion",
+        },
+        {
+            "id": "btc-pay",
+            "status": "offline",
+            "address": "http://192.168.0.1",
+            "hiddenService": "blablablabla.onion",
+        },
+        {
+            "id": "rtl",
+            "status": "online",
+            "address": "http://192.168.0.1",
+            "hiddenService": "blablablabla.onion",
+        },
+        {
+            "id": "lnbits",
+            "status": "online",
+            "address": "http://192.168.0.1",
+            "hiddenService": "blablablabla.onion",
+        },
     ]
 
 
@@ -44,7 +60,7 @@ async def get_app_status_sub():
 
 
 async def install_app_sub(app_id: str):
-    if(not app_id in available_app_ids):
+    if not app_id in available_app_ids:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail=app_id + "install script does not exist"
         )
@@ -57,10 +73,8 @@ async def install_app_sub(app_id: str):
 
 
 async def uninstall_app_sub(app_id: str):
-    if(not app_id in available_app_ids):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail="script does not exist"
-        )
+    if not app_id in available_app_ids:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="script does not exist")
 
     await send_sse_message(SSE.INSTALL_APP, {"id": app_id})
     loop = asyncio.get_event_loop()
@@ -81,11 +95,11 @@ async def run_bonus_script(app_id: str, params: str):
 
     stdout, stderr = await proc.communicate()
 
-    logging.info(f'[{cmd!r} exited with {proc.returncode}]')
+    logging.info(f"[{cmd!r} exited with {proc.returncode}]")
     if stdout:
-        logging.info(f'[stdout]\n{stdout.decode()}')
+        logging.info(f"[stdout]\n{stdout.decode()}")
     if stderr:
-        logging.error(f'[stderr]\n{stderr.decode()}')
+        logging.error(f"[stderr]\n{stderr.decode()}")
 
     await send_sse_message(SSE.INSTALL_APP, {"id": None})
     # TODO: send installed_app_status to update the installed apps in frontend

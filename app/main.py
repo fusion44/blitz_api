@@ -6,23 +6,33 @@ from aioredis import Channel, Redis
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
-from fastapi_plugins import (RedisSettings, get_config, redis_plugin,
-                             registered_configuration)
+from fastapi_plugins import (
+    RedisSettings,
+    get_config,
+    redis_plugin,
+    registered_configuration,
+)
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
-from app.auth.auth_handler import (handle_local_cookie,
-                                   register_cookie_updater,
-                                   remove_local_cookie)
+from app.auth.auth_handler import (
+    handle_local_cookie,
+    register_cookie_updater,
+    remove_local_cookie,
+)
 from app.external.fastapi_versioning import VersionedFastAPI
 from app.external.sse_startlette import EventSourceResponse
-from app.repositories.bitcoin import (register_bitcoin_status_gatherer,
-                                      register_bitcoin_zmq_sub)
-from app.repositories.lightning import (listen_for_ssh_unlock,
-                                        register_lightning_listener,
-                                        register_wallet_unlock_listener,
-                                        unregister_wallet_unlock_listener)
+from app.repositories.bitcoin import (
+    register_bitcoin_status_gatherer,
+    register_bitcoin_zmq_sub,
+)
+from app.repositories.lightning import (
+    listen_for_ssh_unlock,
+    register_lightning_listener,
+    register_wallet_unlock_listener,
+    unregister_wallet_unlock_listener,
+)
 from app.repositories.system import register_hardware_info_gatherer
 from app.repositories.utils import get_client_warmup_data
 from app.routers import apps, bitcoin, lightning, setup, system
