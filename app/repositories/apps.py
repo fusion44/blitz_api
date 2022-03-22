@@ -1,12 +1,14 @@
 import asyncio
 import json
+import logging
 import random
 
-from app.constants import available_app_ids
-from app.utils import SSE, send_sse_message
 from decouple import config
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
+
+from app.constants import available_app_ids
+from app.utils import SSE, send_sse_message
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -44,7 +46,7 @@ async def get_app_status_sub():
 async def install_app_sub(app_id: str):
     if(not app_id in available_app_ids):
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail="script does not exist"
+            status.HTTP_400_BAD_REQUEST, detail=app_id + "install script does not exist"
         )
 
     await send_sse_message(SSE.INSTALL_APP, {"id": app_id})
@@ -69,7 +71,6 @@ async def uninstall_app_sub(app_id: str):
 
 async def run_bonus_script(app_id: str, params: str):
     script_path = f"{SHELL_SCRIPT_PATH}config.scripts/bonus.{app_id}.sh"
-    print(script_path)
     cmd = f"bash {script_path} {params}"
 
     proc = await asyncio.create_subprocess_shell(
@@ -80,11 +81,11 @@ async def run_bonus_script(app_id: str, params: str):
 
     stdout, stderr = await proc.communicate()
 
-    print(f'[{cmd!r} exited with {proc.returncode}]')
+    logging.log(f'[{cmd!r} exited with {proc.returncode}]')
     if stdout:
-        print(f'[stdout]\n{stdout.decode()}')
+        logging.log(f'[stdout]\n{stdout.decode()}')
     if stderr:
-        print(f'[stderr]\n{stderr.decode()}')
+        logging.log(f'[stderr]\n{stderr.decode()}')
 
     await send_sse_message(SSE.INSTALL_APP, {"id": None})
     # TODO: send installed_app_status to update the installed apps in frontend
