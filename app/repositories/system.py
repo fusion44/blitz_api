@@ -104,25 +104,3 @@ async def _handle_gather_hardware_info():
 async def register_hardware_info_gatherer():
     loop = asyncio.get_event_loop()
     loop.create_task(_handle_gather_hardware_info())
-
-
-async def shutdown(reboot: bool):
-    params = ""
-    if(reboot):
-        params = "reboot"
-    script = f"{SHELL_SCRIPT_PATH}config.scripts/blitz.shutdown.sh"
-    cmd = f"bash {script} {params}"
-
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-
-    stdout, stderr = await proc.communicate()
-
-    print(f'[{cmd!r} exited with {proc.returncode}]')
-    if stdout:
-        print(f'[stdout]\n{stdout.decode()}')
-    if stderr:
-        print(f'[stderr]\n{stderr.decode()}')

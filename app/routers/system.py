@@ -14,9 +14,9 @@ from app.repositories.system import (
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
-    shutdown,
     subscribe_hardware_info,
 )
+from app.repositories.system_impl.raspiblitz import shutdown
 from app.routers.system_docs import (
     get_debug_logs_raw_desc,
     get_debug_logs_raw_resp_desc,
@@ -120,10 +120,9 @@ async def hw_info_sub(request: Request):
     summary="Reboots the system",
     dependencies=[Depends(JWTBearer())],
 )
-async def reboot_system():
-    loop = asyncio.get_event_loop()
-    loop.create_task(shutdown(True))
-    return
+async def reboot_system() -> bool:
+    await shutdown(True)
+    return True
 
 
 @router.post(
@@ -132,7 +131,6 @@ async def reboot_system():
     summary="Shuts the system down",
     dependencies=[Depends(JWTBearer())],
 )
-async def reboot_system():
-    loop = asyncio.get_event_loop()
-    loop.create_task(shutdown(False))
-    return
+async def shutdown() -> bool:
+    await shutdown(False)
+    return True
