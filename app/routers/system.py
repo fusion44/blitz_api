@@ -1,4 +1,3 @@
-import asyncio
 import secrets
 
 from decouple import config
