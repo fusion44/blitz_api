@@ -7,9 +7,10 @@ from fastapi.params import Depends
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
 from app.external.sse_startlette import EventSourceResponse
-from app.models.system import LoginInput, RawDebugLogData, SystemInfo
+from app.models.system import APIPlatform, LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
+    PLATFORM,
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
@@ -36,13 +37,11 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     status_code=status.HTTP_200_OK,
 )
 def login(i: LoginInput):
-    match = secrets.compare_digest(
-        i.password, config("login_password", cast=str))
+    match = secrets.compare_digest(i.password, config("login_password", cast=str))
     if match:
         return signJWT()
 
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED,
-                        detail="Password is wrong")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
 
 
 @router.post(
@@ -120,8 +119,13 @@ async def hw_info_sub(request: Request):
     dependencies=[Depends(JWTBearer())],
 )
 async def reboot_system() -> bool:
-    await shutdown(True)
-    return True
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        await shutdown(True)
+        return True
+    else:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
+        )
 
 
 @router.post(
@@ -131,5 +135,10 @@ async def reboot_system() -> bool:
     dependencies=[Depends(JWTBearer())],
 )
 async def shutdown() -> bool:
-    await shutdown(False)
-    return True
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        await shutdown(False)
+        return True
+    else:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
+        )
