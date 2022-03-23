@@ -1,6 +1,7 @@
 import asyncio
 #from asyncio.windows_events import NULL
 import logging
+from pickle import FALSE
 import re
 
 from aioredis import Redis
@@ -12,6 +13,7 @@ from setuptools import setup
 from app.repositories.system import (
     callScript,
     parseKeyValueLines,
+    nameValid,
     passwordValid
 )
 
@@ -81,32 +83,80 @@ def writeTextFile(filename: str, arrayOfLines):
 # With all this info the WebUi can run its own runs its dialogs and in the end makes a call to
 @router.post("/setup-start-done")
 async def setup_start_done(
-    passwordA : str = ""
+    hostname        : str = "",
+    keepBlockchain  : bool = FALSE,
+    lightning       : str = "",
+    passwordA       : str = "",
+    passwordB       : str = "",
+    passwordC       : str = ""
 ):
     logging.warning(f"START /setup-start-done") 
 
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
+    hddGotBlockchain = await redis_get("hddBlocksBitcoin")
     if state != "waitsetup":
         logging.warning(f"/setup-start-done can only be called when nodes awaits setup")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    if setupPhase == "recovery": 
+    #### SETUP ####
+    if setupPhase == "setup": 
+        if nameValid(hostname) == False:
+            logging.warning(f"hostname is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if lightning!="lnd" and lightning!="cl" and lightning!="none":
+            logging.warning(f"lightning is not valid") 
+        if passwordValid(passwordA) == False:
+            logging.warning(f"passwordA is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if passwordValid(passwordB) == False:
+            logging.warning(f"passwordB is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if lightning!="none" and passwordValid(passwordC)==False:
+            logging.warning(f"passwordC is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if hddGotBlockchain!="1" and keepBlockchain:
+            logging.warning(f"cannot keep blockchain that does not exists")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if keepBlockchain:
+            formatHDD=0
+            cleanHDD=1
+        else:
+            formatHDD=1
+            cleanHDD=0
+        writeTextFile(setupFilePath,[
+            f"formatHDD={formatHDD}",
+            f"cleanHDD={cleanHDD}",
+            "network=bitcoin",
+            "chain=main",
+            f"lightning={lightning}",
+            f"hostname={hostname}",
+            "setPasswordA=1",
+            "setPasswordB=1",
+            "setPasswordC=1",
+            f"passwordA='{passwordA}'",
+            f"passwordB='{passwordB}'",
+            f"passwordC='{passwordC}'"
+        ])
+
+    #### RECOVERY ####
+    elif setupPhase == "recovery": 
         logging.warning(f"check recovery data")
         if passwordValid(passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         writeTextFile(setupFilePath,[
-            f"setupType={setupPhase}",
             "setPasswordA=1",
             f"passwordA='{passwordA}'"
         ])
-        logging.warning(f"kicking off recovery")
-        await callScript("/home/admin/_cache.sh set state waitprovision")
+
     else:
         logging.warning(f"not handled setupPhase state ({setupPhase})")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    logging.warning(f"kicking off recovery")
+    await callScript("/home/admin/_cache.sh set state waitprovision")
 
     # TODO: Following input parameters:
     # lightning='lnd', 'cl' or 'none'
@@ -124,9 +174,6 @@ async def setup_start_done(
     # those values get stored in: /var/cache/raspiblitz/temp/raspiblitz.setup
     # also a skeleton raspiblitz.conf gets created (see controlSetupDialog.sh Line 318)
     # and then API sets state to `waitprovision` to kick-off provision
-    
-    # await redis.publish_json("default", {"data": "Starting setup"})
-    # await asyncio.sleep(1)
     return signJWT()
 
 
@@ -152,20 +199,13 @@ async def setup_final_info():
     data=parseKeyValueLines(resultlines)
     logging.warning(f"data({data})")
     try:
-        setupType = data["setupType"]
+        seedwordsNEW = data["seedwordsNEW"]
     except:
-        logging.warning("missing setupType in raspiblitz.setup")
-        setupType=""
-    if setupType == "setup":
-        return {
-            "setupType": setupType,
-            "seedwordsNEW": data["seedwordsNEW"]
-        }
-    else:
-        return {
-            "setupType": setupType,
-            "seedwordsNEW": ""
-        }
+        seedwordsNEW=""
+
+    return {
+        "seedwordsNEW": seedwordsNEW
+    }
 
 # When WebUI displayed seed words & user confirmed write the calls:
 @router.post("/setup-final-done", dependencies=[Depends(JWTBearer())])

@@ -71,7 +71,12 @@ def parseKeyValueText(text:str) -> dict:
 def passwordValid(password : str):
     if len(password) < 8: return False
     if password.find(' ') >= 0: return False
-    return re.match('^[a-zA-Z0-9]*$', password) 
+    return re.match('^[\.a-zA-Z0-9-]*$', password) 
+
+def nameValid(password : str):
+    if len(password) < 3: return False
+    if password.find(' ') >= 0: return False
+    return re.match('^[\.a-zA-Z0-9-_]*$', password) 
 
 async def get_system_info() -> SystemInfo:
     try:
