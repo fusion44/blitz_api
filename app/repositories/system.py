@@ -1,7 +1,7 @@
 import asyncio
-from os import path
 import logging
 import re
+from os import path
 
 from decouple import config
 from fastapi import HTTPException, Request, status
@@ -39,7 +39,8 @@ def _check_shell_scripts_status():
 
 _check_shell_scripts_status()
 
-async def callScript(scriptPath) -> str:
+
+async def call_script(scriptPath) -> str:
     cmd = f"bash {scriptPath}"
     logging.warning(f"running script: {cmd}")
     proc = await asyncio.create_subprocess_shell(
@@ -54,29 +55,41 @@ async def callScript(scriptPath) -> str:
         logging.error(stderr.decode())
     return ""
 
-def parseKeyValueLines(lines:list) -> dict:
+
+def parse_key_value_lines(lines: list) -> dict:
     Dict = {}
     for line in lines:
         logging.warning(f"line({line})")
-        if len(line.strip()) == 0: continue
-        if line.strip().startswith('#'): continue
-        if line.find('=') <=0: continue
-        key, value = line.strip().split('=',1)
+        if len(line.strip()) == 0:
+            continue
+        if line.strip().startswith("#"):
+            continue
+        if line.find("=") <= 0:
+            continue
+        key, value = line.strip().split("=", 1)
         Dict[key] = value.strip('"').strip("'")
     return Dict
 
-def parseKeyValueText(text:str) -> dict:
-    return parseKeyValueLines(text.splitlines())
 
-def passwordValid(password : str):
-    if len(password) < 8: return False
-    if password.find(' ') >= 0: return False
-    return re.match('^[\.a-zA-Z0-9-]*$', password) 
+def parse_key_value_text(text: str) -> dict:
+    return parse_key_value_lines(text.splitlines())
 
-def nameValid(password : str):
-    if len(password) < 3: return False
-    if password.find(' ') >= 0: return False
+
+def password_valid(password: str):
+    if len(password) < 8:
+        return False
+    if password.find(" ") >= 0:
+        return False
+    return re.match("^[a-zA-Z0-9]*$", password)
+
+
+def name_valid(password : str):
+    if len(password) < 3:
+        return False
+    if password.find(' ') >= 0:
+        return False
     return re.match('^[\.a-zA-Z0-9-_]*$', password) 
+
 
 async def get_system_info() -> SystemInfo:
     try:

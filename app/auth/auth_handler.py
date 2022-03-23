@@ -11,7 +11,7 @@ JWT_ALGORITHM = config("algorithm")
 JWT_EXPIRY_TIME = config("jwt_expiry_time", default=300, cast=int)
 
 
-def signJWT() -> Dict[str, str]:
+def sign_jwt() -> Dict[str, str]:
     payload = {
         "user_id": "admin",
         "expires": int(round(time.time() * 1000) + JWT_EXPIRY_TIME),
@@ -45,7 +45,7 @@ def handle_local_cookie():
 
     if enabled:
         f = open(full_cookie_file_path, "w")
-        f.write(signJWT()["access_token"])
+        f.write(sign_jwt()["access_token"])
         f.close()
 
 

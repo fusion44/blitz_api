@@ -4,7 +4,7 @@ from fastapi.params import Depends
 import app.repositories.apps as repo
 import app.routers.apps_docs as docs
 from app.auth.auth_bearer import JWTBearer
-from app.external.sse_startlette import EventSourceResponse
+from app.external.sse_starlette import EventSourceResponse
 
 _PREFIX = "apps"
 

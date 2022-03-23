@@ -1,5 +1,6 @@
 import asyncio
-#from asyncio.windows_events import NULL
+
+# from asyncio.windows_events import NULL
 import logging
 from pickle import FALSE
 import re
@@ -10,28 +11,22 @@ from fastapi.params import Depends
 from fastapi_plugins import depends_redis
 from setuptools import setup
 
-from app.repositories.system import (
-    callScript,
-    parseKeyValueLines,
-    nameValid,
-    passwordValid
-)
-
 from app.auth.auth_bearer import JWTBearer
-from app.auth.auth_handler import signJWT
+from app.auth.auth_handler import sign_jwt
+from app.repositories.system import call_script, parse_key_value_lines, password_valid, name_valid, parse_key_value_lines
 from app.utils import redis_get
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 
-setupFilePath="/var/cache/raspiblitz/temp/raspiblitz.setup"
-configFilePath="/mnt/hdd/raspiblitz.conf"
+setupFilePath = "/var/cache/raspiblitz/temp/raspiblitz.setup"
+configFilePath = "/mnt/hdd/raspiblitz.conf"
 
 # can always be called without credentials to check if
 # the system needs or is in setup (setupPhase!="done")
 # for example in the beginning setupPhase can be (see controlSetupDialog.sh)
 # 1) recovery = same version on fresh sd card
 # 2) update = updated version on fresh sd card
-# 3) migration = hdd got data from another node projcect
+# 3) migration = hdd got data from another node project
 # 4) setup = a fresh blitz to setup
 @router.get("/status")
 async def get_status():
@@ -46,6 +41,7 @@ async def get_status():
 # We can do the "MIGRATION" option later - because it would need an additional step after formatting hdd
 # People that need to migrate can do for now by SSH option
 
+
 @router.get("/setup-start-info")
 async def setup_start_info():
 
@@ -53,9 +49,7 @@ async def setup_start_info():
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
     if state != "waitsetup":
-        logging.warning(
-            f"/setup-start-info can only be called when nodes awaits setup"
-        )
+        logging.warning(f"/setup-start-info can only be called when nodes awaits setup")
         return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # get all the additional info needed to do setup dialog
@@ -75,10 +69,11 @@ async def setup_start_info():
     }
 
 
-def writeTextFile(filename: str, arrayOfLines):
+def write_text_file(filename: str, arrayOfLines):
     logging.warning(f"writing {filename}")
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(arrayOfLines))
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write("\n".join(arrayOfLines))
+
 
 # With all this info the WebUi can run its own runs its dialogs and in the end makes a call to
 @router.post("/setup-start-done")
@@ -102,18 +97,18 @@ async def setup_start_done(
 
     #### SETUP ####
     if setupPhase == "setup": 
-        if nameValid(hostname) == False:
+        if name_valid(hostname) == False:
             logging.warning(f"hostname is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         if lightning!="lnd" and lightning!="cl" and lightning!="none":
             logging.warning(f"lightning is not valid") 
-        if passwordValid(passwordA) == False:
+        if password_valid(passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if passwordValid(passwordB) == False:
+        if password_valid(passwordB) == False:
             logging.warning(f"passwordB is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if lightning!="none" and passwordValid(passwordC)==False:
+        if lightning!="none" and password_valid(passwordC)==False:
             logging.warning(f"passwordC is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         if hddGotBlockchain!="1" and keepBlockchain:
@@ -125,7 +120,7 @@ async def setup_start_done(
         else:
             formatHDD=1
             cleanHDD=0
-        writeTextFile(setupFilePath,[
+        write_text_file(setupFilePath,[
             f"formatHDD={formatHDD}",
             f"cleanHDD={cleanHDD}",
             "network=bitcoin",
@@ -143,10 +138,10 @@ async def setup_start_done(
     #### RECOVERY ####
     elif setupPhase == "recovery": 
         logging.warning(f"check recovery data")
-        if passwordValid(passwordA) == False:
+        if password_valid(passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        writeTextFile(setupFilePath,[
+        write_text_file(setupFilePath,[
             "setPasswordA=1",
             f"passwordA='{passwordA}'"
         ])
@@ -156,7 +151,7 @@ async def setup_start_done(
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     logging.warning(f"kicking off recovery")
-    await callScript("/home/admin/_cache.sh set state waitprovision")
+    await call_script("/home/admin/_cache.sh set state waitprovision")
 
     # TODO: Following input parameters:
     # lightning='lnd', 'cl' or 'none'
@@ -174,7 +169,8 @@ async def setup_start_done(
     # those values get stored in: /var/cache/raspiblitz/temp/raspiblitz.setup
     # also a skeleton raspiblitz.conf gets created (see controlSetupDialog.sh Line 318)
     # and then API sets state to `waitprovision` to kick-off provision
-    return signJWT()
+    
+    return sign_jwt()
 
 
 # WebUI now loops getting status until state=`waitfinal` then calls:
@@ -190,13 +186,15 @@ async def setup_final_info():
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
     if state != "waitfinal":
-        logging.warning(f"/setup-final-info can only be called when nodes awaits final ({state})")
+        logging.warning(
+            f"/setup-final-info can only be called when nodes awaits final ({state})"
+        )
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    resultlines=[]
-    with open (setupFilePath, "r") as setupfile:
-        resultlines=setupfile.readlines()
-    data=parseKeyValueLines(resultlines)
+    resultlines = []
+    with open(setupFilePath, "r") as setupfile:
+        resultlines = setupfile.readlines()
+    data = parse_key_value_lines(resultlines)
     logging.warning(f"data({data})")
     try:
         seedwordsNEW = data["seedwordsNEW"]
@@ -218,7 +216,5 @@ async def setup_final_done():
         logging.warning(f"/setup-final-done can only be called when nodes awaits final")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    await callScript("/home/admin/_cache.sh set state donefinal")
-    return {
-        "state": "donefinal"
-    }
+    await call_script("/home/admin/_cache.sh set state donefinal")
+    return {"state": "donefinal"}

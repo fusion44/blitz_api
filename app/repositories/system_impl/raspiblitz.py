@@ -1,3 +1,8 @@
+import asyncio
+import os
+
+from decouple import config
+
 from app.constants import API_VERSION
 from app.models.system import (
     APIPlatform,
@@ -8,6 +13,8 @@ from app.models.system import (
 )
 from app.repositories.lightning import get_ln_info
 from app.utils import redis_get
+
+SHELL_SCRIPT_PATH = config("shell_script_path")
 
 
 async def get_system_info_impl() -> SystemInfo:
@@ -34,3 +41,26 @@ async def get_system_info_impl() -> SystemInfo:
         ssh_address=f"admin@{lan}",
         chain=lninfo.chains[0].network,
     )
+
+
+async def shutdown(reboot: bool):
+    params = ""
+    if reboot:
+        params = "reboot"
+
+    script = os.path.join(SHELL_SCRIPT_PATH, "config.scripts", "blitz.shutdown.sh")
+    cmd = f"sudo bash {script} {params}"
+
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await proc.communicate()
+
+    print(f"[{cmd!r} exited with {proc.returncode}]")
+    if stdout:
+        print(f"[stdout]\n{stdout.decode()}")
+    if stderr:
+        print(f"[stderr]\n{stderr.decode()}")

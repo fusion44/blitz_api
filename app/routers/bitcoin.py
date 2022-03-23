@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends, Query
 
 from app.auth.auth_bearer import JWTBearer
-from app.external.sse_startlette import EventSourceResponse
+from app.external.sse_starlette import EventSourceResponse
 from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
 from app.repositories.bitcoin import (
     estimate_fee,

@@ -1,24 +1,26 @@
-import secrets
 import logging
+import secrets
 
 from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
-from app.auth.auth_handler import signJWT
-from app.external.sse_startlette import EventSourceResponse
-from app.models.system import LoginInput, RawDebugLogData, SystemInfo
+from app.auth.auth_handler import sign_jwt
+from app.external.sse_starlette import EventSourceResponse
+from app.models.system import APIPlatform, LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
+    PLATFORM,
+    call_script,
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
+    parse_key_value_text,
+    password_valid,
     subscribe_hardware_info,
-    callScript,
-    parseKeyValueText,
-    passwordValid
 )
+from app.repositories.system_impl.raspiblitz import shutdown
 from app.routers.system_docs import (
     get_debug_logs_raw_desc,
     get_debug_logs_raw_resp_desc,
@@ -48,15 +50,20 @@ async def login(i: LoginInput):
 
     if platform == "raspiblitz":
         # script does not work when called from api yet
-        if passwordValid(i.password):
-            result = await callScript(f"/home/admin/config.scripts/blitz.setpassword.sh check-a {i.password}")
-            data = parseKeyValueText(result)
-            if data["correct"] == "1": return signJWT()
+        if password_valid(i.password):
+            result = await call_script(
+                f"/home/admin/config.scripts/blitz.setpassword.sh check-a {i.password}"
+            )
+            data = parse_key_value_text(result)
+            if data["correct"] == "1":
+                return sign_jwt()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
     else:
         match = secrets.compare_digest(i.password, config("login_password", cast=str))
-        if match: return signJWT()
+        if match:
+            return sign_jwt()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
+
 
 @router.post(
     "/refresh-token",
@@ -66,7 +73,7 @@ async def login(i: LoginInput):
     dependencies=[Depends(JWTBearer())],
 )
 def refresh_token():
-    return signJWT()
+    return sign_jwt()
 
 
 @router.get(
@@ -132,8 +139,14 @@ async def hw_info_sub(request: Request):
     summary="Reboots the system",
     dependencies=[Depends(JWTBearer())],
 )
-def reboot_system():
-    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+async def reboot_system() -> bool:
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        await shutdown(True)
+        return True
+    else:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
+        )
 
 
 @router.post(
@@ -142,5 +155,11 @@ def reboot_system():
     summary="Shuts the system down",
     dependencies=[Depends(JWTBearer())],
 )
-def reboot_system():
-    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+async def shutdown() -> bool:
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        await shutdown(False)
+        return True
+    else:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
+        )
