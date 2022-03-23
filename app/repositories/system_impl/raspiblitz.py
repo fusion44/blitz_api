@@ -1,6 +1,8 @@
 import asyncio
 import os
 
+from decouple import config
+
 from app.constants import API_VERSION
 from app.models.system import (
     APIPlatform,
@@ -10,8 +12,9 @@ from app.models.system import (
     SystemInfo,
 )
 from app.repositories.lightning import get_ln_info
-from app.repositories.system import SHELL_SCRIPT_PATH
 from app.utils import redis_get
+
+SHELL_SCRIPT_PATH = config("shell_script_path")
 
 
 async def get_system_info_impl() -> SystemInfo:
