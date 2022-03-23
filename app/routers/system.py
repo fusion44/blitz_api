@@ -8,9 +8,10 @@ from fastapi.params import Depends
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import signJWT
 from app.external.sse_startlette import EventSourceResponse
-from app.models.system import LoginInput, RawDebugLogData, SystemInfo
+from app.models.system import APIPlatform, LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
+    PLATFORM,
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
@@ -19,6 +20,7 @@ from app.repositories.system import (
     parseKeyValueText,
     passwordValid
 )
+from app.repositories.system_impl.raspiblitz import shutdown
 from app.routers.system_docs import (
     get_debug_logs_raw_desc,
     get_debug_logs_raw_resp_desc,
@@ -132,8 +134,14 @@ async def hw_info_sub(request: Request):
     summary="Reboots the system",
     dependencies=[Depends(JWTBearer())],
 )
-def reboot_system():
-    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+async def reboot_system() -> bool:
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        await shutdown(True)
+        return True
+    else:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
+        )
 
 
 @router.post(
@@ -142,5 +150,11 @@ def reboot_system():
     summary="Shuts the system down",
     dependencies=[Depends(JWTBearer())],
 )
-def reboot_system():
-    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED)
+async def shutdown() -> bool:
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        await shutdown(False)
+        return True
+    else:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
+        )
