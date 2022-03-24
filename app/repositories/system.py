@@ -15,13 +15,19 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
-    from app.repositories.system_impl.raspiblitz import get_system_info_impl
+    from app.repositories.system_impl.raspiblitz import (
+        get_system_info_impl,
+        shutdown_impl,
+    )
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
-    from app.repositories.system_impl.native_python import get_system_info_impl
+    from app.repositories.system_impl.native_python import (
+        get_system_info_impl,
+        shutdown_impl,
+    )
 else:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
 
@@ -83,12 +89,12 @@ def password_valid(password: str):
     return re.match("^[a-zA-Z0-9]*$", password)
 
 
-def name_valid(password : str):
+def name_valid(password: str):
     if len(password) < 3:
         return False
-    if password.find(' ') >= 0:
+    if password.find(" ") >= 0:
         return False
-    return re.match('^[\.a-zA-Z0-9-_]*$', password) 
+    return re.match("^[\.a-zA-Z0-9-_]*$", password)
 
 
 async def get_system_info() -> SystemInfo:
@@ -102,6 +108,15 @@ async def get_system_info() -> SystemInfo:
 
 async def get_hardware_info() -> map:
     return await get_hardware_info_impl()
+
+
+async def shutdown(reboot: bool) -> bool:
+    if reboot:
+        await send_sse_message(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
+    else:
+        await send_sse_message(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
+
+    return await shutdown_impl(reboot=reboot)
 
 
 async def subscribe_hardware_info(request: Request):

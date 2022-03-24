@@ -8,25 +8,25 @@ from fastapi.params import Depends
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.external.sse_starlette import EventSourceResponse
-from app.models.system import APIPlatform, LoginInput, RawDebugLogData, SystemInfo
+from app.models.system import LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
-    PLATFORM,
     call_script,
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
     parse_key_value_text,
     password_valid,
+    shutdown,
     subscribe_hardware_info,
 )
-from app.repositories.system_impl.raspiblitz import shutdown
 from app.routers.system_docs import (
     get_debug_logs_raw_desc,
     get_debug_logs_raw_resp_desc,
     get_debug_logs_raw_summary,
     get_hw_info_json,
 )
+from app.utils import SSE
 
 _PREFIX = "system"
 
@@ -137,29 +137,33 @@ async def hw_info_sub(request: Request):
     "/reboot",
     name=f"{_PREFIX}.reboot",
     summary="Reboots the system",
+    description=f"""Attempts to reboot the system.
+    Will send a `{SSE.SYSTEM_REBOOT_NOTICE}` SSE message immediately to
+    all connected clients.
+    """,
+    response_description=f"""True if successful. False on failure.
+    A failure will also send an error message with id `{SSE.SYSTEM_REBOOT_ERROR}`
+    to all connected clients.
+    """,
     dependencies=[Depends(JWTBearer())],
 )
 async def reboot_system() -> bool:
-    if PLATFORM == APIPlatform.RASPIBLITZ:
-        await shutdown(True)
-        return True
-    else:
-        raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
-        )
+    return await shutdown(False)
 
 
 @router.post(
     "/shutdown",
     name=f"{_PREFIX}.shutdown",
     summary="Shuts the system down",
+    description=f"""Attempts to shutdown the system.
+    Will send a `{SSE.SYSTEM_SHUTDOWN_NOTICE}` SSE message immediately to all
+    connected clients.
+    """,
+    response_description=f"""True if successful. False on failure.
+    A failure will also send an error message with id {SSE.SYSTEM_SHUTDOWN_ERROR}
+    to all connected clients.
+    """,
     dependencies=[Depends(JWTBearer())],
 )
-async def shutdown() -> bool:
-    if PLATFORM == APIPlatform.RASPIBLITZ:
-        await shutdown(False)
-        return True
-    else:
-        raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented on native"
-        )
+async def shutdown_path() -> bool:
+    return await shutdown(False)

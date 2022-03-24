@@ -179,6 +179,10 @@ async def redis_get(key: str) -> str:
 
 class SSE:
     SYSTEM_INFO = "system_info"
+    SYSTEM_SHUTDOWN_NOTICE = "system_shutdown_initiated"
+    SYSTEM_SHUTDOWN_ERROR = "system_shutdown_error"
+    SYSTEM_REBOOT_NOTICE = "system_reboot_initiated"
+    SYSTEM_REBOOT_ERROR = "system_reboot_error"
     HARDWARE_INFO = "hardware_info"
 
     INSTALLED_APP_STATUS = "installed_app_status"

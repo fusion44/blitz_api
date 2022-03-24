@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 
 from decouple import config
@@ -12,7 +13,7 @@ from app.models.system import (
     SystemInfo,
 )
 from app.repositories.lightning import get_ln_info
-from app.utils import redis_get
+from app.utils import SSE, redis_get, send_sse_message
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -43,7 +44,7 @@ async def get_system_info_impl() -> SystemInfo:
     )
 
 
-async def shutdown(reboot: bool):
+async def shutdown_impl(reboot: bool) -> bool:
     params = ""
     if reboot:
         params = "reboot"
@@ -59,8 +60,19 @@ async def shutdown(reboot: bool):
 
     stdout, stderr = await proc.communicate()
 
-    print(f"[{cmd!r} exited with {proc.returncode}]")
+    logging.info(f"[{cmd!r} exited with {proc.returncode}]")
     if stdout:
-        print(f"[stdout]\n{stdout.decode()}")
+        logging.info(f"[stdout]\n{stdout.decode()}")
     if stderr:
-        print(f"[stderr]\n{stderr.decode()}")
+        logging.error(f"[stderr]\n{stderr.decode()}")
+
+    if proc.returncode > 0:
+        err = stderr.decode()
+        if reboot:
+            await send_sse_message(SSE.SYSTEM_REBOOT_ERROR, {"error_message": err})
+        else:
+            await send_sse_message(SSE.SYSTEM_SHUTDOWN_ERROR, {"error_message": err})
+
+        return False
+
+    return True
