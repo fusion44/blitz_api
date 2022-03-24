@@ -79,6 +79,7 @@ def write_text_file(filename: str, arrayOfLines):
 @router.post("/setup-start-done")
 async def setup_start_done(
     hostname        : str = "",
+    forceFreshSetup : bool = FALSE,
     keepBlockchain  : bool = FALSE,
     lightning       : str = "",
     passwordA       : str = "",
@@ -94,6 +95,11 @@ async def setup_start_done(
     if state != "waitsetup":
         logging.warning(f"/setup-start-done can only be called when nodes awaits setup")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # check if a fresh setup is forced
+    if forceFreshSetup:
+        logging.warning(f"forcing node to fresh setup")
+        setupPhase="setup"
 
     #### SETUP ####
     if setupPhase == "setup": 
@@ -132,7 +138,8 @@ async def setup_start_done(
             "setPasswordC=1",
             f"passwordA='{passwordA}'",
             f"passwordB='{passwordB}'",
-            f"passwordC='{passwordC}'"
+            f"passwordC='{passwordC}'",
+            ""
         ])
 
     #### RECOVERY ####
@@ -146,6 +153,32 @@ async def setup_start_done(
             f"passwordA='{passwordA}'"
         ])
 
+    #### MIGRATION ####
+    elif setupPhase == "migration": 
+        logging.warning(f"check migration data")
+        hddGotMigrationData = await redis_get("hddGotMigrationData")
+        if hddGotMigrationData == "":
+            logging.warning(f"hddGotMigrationData is not available")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)    
+        if password_valid(passwordA) == False:
+            logging.warning(f"passwordA is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if password_valid(passwordB) == False:
+            logging.warning(f"passwordB is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if password_valid(passwordC) == False:
+            logging.warning(f"passwordC is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        write_text_file(setupFilePath,[
+            f"migrationOS={hddGotMigrationData}",
+            "setPasswordA=1",
+            "setPasswordB=1",
+            "setPasswordC=1",
+            f"passwordA='{passwordA}'",
+            f"passwordB='{passwordB}'",
+            f"passwordC='{passwordC}'"
+        ])
+        
     else:
         logging.warning(f"not handled setupPhase state ({setupPhase})")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)

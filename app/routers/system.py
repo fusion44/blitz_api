@@ -52,7 +52,7 @@ async def login(i: LoginInput):
         # script does not work when called from api yet
         if password_valid(i.password):
             result = await call_script(
-                f"/home/admin/config.scripts/blitz.setpassword.sh check-a {i.password}"
+                f"/home/admin/config.scripts/blitz.passwords.sh check a {i.password}"
             )
             data = parse_key_value_text(result)
             if data["correct"] == "1":
