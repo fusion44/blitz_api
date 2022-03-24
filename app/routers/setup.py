@@ -33,8 +33,23 @@ async def get_status():
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
     message = await redis_get("message")
-    return {"setupPhase": setupPhase, "state": state, "message": message}
-
+    if setupPhase == "done":
+        try:
+            blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
+            if blitz_sync_initial_done == "1":
+                initialsync = "done"
+            else:
+                initialsync = "running"  
+        except:
+            initialsync = ""
+    else:
+        initialsync = ""
+    return {
+        "setupPhase": setupPhase,
+        "state": state,
+        "message": message,
+        "initialsync": initialsync
+    }
 
 # if setupPhase!="done" && state="waitsetup" then
 # 'setup/setup_start_info' should be called
@@ -251,3 +266,35 @@ async def setup_final_done():
 
     await call_script("/home/admin/_cache.sh set state donefinal")
     return {"state": "donefinal"}
+
+# When WebUI displayed seed words & user confirmed write the calls:
+@router.post("/setup-sync-info", dependencies=[Depends(JWTBearer())])
+async def setup_sync_info():
+
+    # first check that node is really in setup state
+    setupPhase = await redis_get("setupPhase")
+    if setupPhase != "done":
+        logging.warning(f"sync info not available yet")
+        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    try:
+        blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
+        if blitz_sync_initial_done == "1":
+            initialsync = "done"
+        else:
+            initialsync = "running"
+        btc_default_ready = await redis_get("btc_default_ready")
+        btc_default_sync_percentage = await redis_get("btc_default_sync_percentage")
+        btc_default_peers = await redis_get("btc_default_peers")
+        system_count_start_blockchain = await redis_get("system_count_start_blockchain")
+
+    except:
+        initialsync = ""
+
+    return {
+        "initialsync": initialsync,
+        "btc_default_ready": btc_default_ready,
+        "btc_default_sync_percentage": btc_default_sync_percentage,
+        "btc_default_peers": btc_default_peers,
+        "system_count_start_blockchain": system_count_start_blockchain
+    }
