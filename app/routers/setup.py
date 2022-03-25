@@ -287,14 +287,31 @@ async def setup_sync_info():
         btc_default_sync_percentage = await redis_get("btc_default_sync_percentage")
         btc_default_peers = await redis_get("btc_default_peers")
         system_count_start_blockchain = await redis_get("system_count_start_blockchain")
-
     except:
-        initialsync = ""
-
+        initialsync=""
+        btc_default_ready=""
+        btc_default_sync_percentage=""
+        btc_default_peers=""
+        system_count_start_blockchain="0"
+    try:
+        ln_default = await redis_get("lightning")
+        ln_default_ready = await redis_get("ln_default_ready")
+        ln_default_locked = await redis_get("ln_default_locked")
+        system_count_start_lightning = await redis_get("system_count_start_lightning")
+    except:
+        ln_default=""
+        ln_default_ready=""
+        ln_default_locked=""
+        system_count_start_lightning="0"
     return {
         "initialsync": initialsync,
+        "btc_default": "bitcoin",
         "btc_default_ready": btc_default_ready,
         "btc_default_sync_percentage": btc_default_sync_percentage,
         "btc_default_peers": btc_default_peers,
-        "system_count_start_blockchain": system_count_start_blockchain
+        "system_count_start_blockchain": system_count_start_blockchain,
+        "ln_default" : ln_default,
+        "ln_default_ready" : ln_default_ready,
+        "ln_default_locked" : ln_default_locked,
+        "system_count_start_lightning": system_count_start_lightning
     }

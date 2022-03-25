@@ -39,7 +39,7 @@ if [ "$?" != "0" ]; then
 fi
 
 local=.
-remote=admin@$localIP:/home/admin/blitz_api
+remote=admin@$localIP:/root/blitz_api
 
 # Needs sshpass installed
 echo "# syncing local code to: ${remote}"
