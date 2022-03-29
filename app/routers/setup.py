@@ -4,6 +4,8 @@ import asyncio
 import logging
 from pickle import FALSE
 import re
+from xmlrpc.client import boolean
+from pydantic import BaseModel
 
 from aioredis import Redis
 from fastapi import APIRouter, HTTPException, status
@@ -13,7 +15,7 @@ from setuptools import setup
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
-from app.repositories.system import call_script, parse_key_value_lines, password_valid, name_valid, parse_key_value_lines
+from app.repositories.system import call_script, parse_key_value_lines, password_valid, name_valid, parse_key_value_lines, shutdown
 from app.utils import redis_get
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
@@ -90,52 +92,55 @@ def write_text_file(filename: str, arrayOfLines):
         f.write("\n".join(arrayOfLines))
 
 
+class StartDoneData(BaseModel):
+    hostname        : str = ""
+    forceFreshSetup : bool = False
+    keepBlockchain  : bool = True
+    lightning       : str = ""
+    passwordA       : str = ""
+    passwordB       : str = ""
+    passwordC       : str = ""
+
 # With all this info the WebUi can run its own runs its dialogs and in the end makes a call to
 @router.post("/setup-start-done")
 async def setup_start_done(
-    hostname        : str = "",
-    forceFreshSetup : bool = FALSE,
-    keepBlockchain  : bool = FALSE,
-    lightning       : str = "",
-    passwordA       : str = "",
-    passwordB       : str = "",
-    passwordC       : str = ""
-):
-    logging.warning(f"START /setup-start-done") 
+    data: StartDoneData ):
+    logging.warning(f"START /setup-start-done")
 
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
     hddGotBlockchain = await redis_get("hddBlocksBitcoin")
+
     if state != "waitsetup":
         logging.warning(f"/setup-start-done can only be called when nodes awaits setup")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # check if a fresh setup is forced
-    if forceFreshSetup:
+    if data.forceFreshSetup:
         logging.warning(f"forcing node to fresh setup")
         setupPhase="setup"
 
     #### SETUP ####
     if setupPhase == "setup": 
-        if name_valid(hostname) == False:
+        if name_valid(data.hostname) == False:
             logging.warning(f"hostname is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if lightning!="lnd" and lightning!="cl" and lightning!="none":
+        if data.lightning!="lnd" and data.lightning!="cl" and data.lightning!="none":
             logging.warning(f"lightning is not valid") 
-        if password_valid(passwordA) == False:
+        if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(passwordB) == False:
+        if password_valid(data.passwordB) == False:
             logging.warning(f"passwordB is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if lightning!="none" and password_valid(passwordC)==False:
+        if data.lightning!="none" and password_valid(data.passwordC)==False:
             logging.warning(f"passwordC is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if hddGotBlockchain!="1" and keepBlockchain:
+        if hddGotBlockchain!="1" and data.keepBlockchain:
             logging.warning(f"cannot keep blockchain that does not exists")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if keepBlockchain:
+        if data.keepBlockchain:
             formatHDD=0
             cleanHDD=1
         else:
@@ -146,26 +151,26 @@ async def setup_start_done(
             f"cleanHDD={cleanHDD}",
             "network=bitcoin",
             "chain=main",
-            f"lightning={lightning}",
-            f"hostname={hostname}",
+            f"lightning={data.lightning}",
+            f"hostname={data.hostname}",
             "setPasswordA=1",
             "setPasswordB=1",
             "setPasswordC=1",
-            f"passwordA='{passwordA}'",
-            f"passwordB='{passwordB}'",
-            f"passwordC='{passwordC}'",
+            f"passwordA='{data.passwordA}'",
+            f"passwordB='{data.passwordB}'",
+            f"passwordC='{data.passwordC}'",
             ""
         ])
 
     #### RECOVERY ####
     elif setupPhase == "recovery": 
         logging.warning(f"check recovery data")
-        if password_valid(passwordA) == False:
+        if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(setupFilePath,[
             "setPasswordA=1",
-            f"passwordA='{passwordA}'"
+            f"passwordA='{data.passwordA}'"
         ])
 
     #### MIGRATION ####
@@ -175,13 +180,13 @@ async def setup_start_done(
         if hddGotMigrationData == "":
             logging.warning(f"hddGotMigrationData is not available")
             return HTTPException(status.HTTP_400_BAD_REQUEST)    
-        if password_valid(passwordA) == False:
+        if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(passwordB) == False:
+        if password_valid(data.passwordB) == False:
             logging.warning(f"passwordB is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(passwordC) == False:
+        if password_valid(data.passwordC) == False:
             logging.warning(f"passwordC is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(setupFilePath,[
@@ -189,9 +194,9 @@ async def setup_start_done(
             "setPasswordA=1",
             "setPasswordB=1",
             "setPasswordC=1",
-            f"passwordA='{passwordA}'",
-            f"passwordB='{passwordB}'",
-            f"passwordC='{passwordC}'"
+            f"passwordA='{data.passwordA}'",
+            f"passwordB='{data.passwordB}'",
+            f"passwordC='{data.passwordC}'"
         ])
         
     else:
@@ -266,6 +271,22 @@ async def setup_final_done():
 
     await call_script("/home/admin/_cache.sh set state donefinal")
     return {"state": "donefinal"}
+
+@router.get("/shutdown")
+async def get_shutdown():
+
+    # only allow unauthorized shutdowns during setup
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    if setupPhase == "done"  :
+        logging.warning(f"can only be called when node is not setuped yet")
+        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+    if state != "waitsetup":
+        logging.warning(f"can only be called when nodes awaits setup")
+        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # do the shutdown
+    return await shutdown(False)
 
 # When WebUI displayed seed words & user confirmed write the calls:
 @router.post("/setup-sync-info", dependencies=[Depends(JWTBearer())])
