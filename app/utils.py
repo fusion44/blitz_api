@@ -185,6 +185,7 @@ class SSE:
     SYSTEM_REBOOT_ERROR = "system_reboot_error"
     HARDWARE_INFO = "hardware_info"
 
+    INSTALL_APP = "install"
     INSTALLED_APP_STATUS = "installed_app_status"
 
     BTC_NETWORK_STATUS = "btc_network_status"
