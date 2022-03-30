@@ -22,7 +22,10 @@ from app.auth.auth_handler import (
     remove_local_cookie,
 )
 from app.external.fastapi_versioning import VersionedFastAPI
-from app.external.sse_startlette import EventSourceResponse
+
+from app.external.sse_starlette import EventSourceResponse
+from app.models.system import APIPlatform
+
 from app.repositories.bitcoin import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,

@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import re
 from os import path
 
 from decouple import config
@@ -13,13 +15,19 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
-    from app.repositories.system_impl.raspiblitz import get_system_info_impl
+    from app.repositories.system_impl.raspiblitz import (
+        get_system_info_impl,
+        shutdown_impl,
+    )
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
-    from app.repositories.system_impl.native_python import get_system_info_impl
+    from app.repositories.system_impl.native_python import (
+        get_system_info_impl,
+        shutdown_impl,
+    )
 else:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
 
@@ -38,6 +46,57 @@ def _check_shell_scripts_status():
 _check_shell_scripts_status()
 
 
+async def call_script(scriptPath) -> str:
+    cmd = f"bash {scriptPath}"
+    logging.warning(f"running script: {cmd}")
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return stdout.decode()
+    if stderr:
+        logging.error(stderr.decode())
+    return ""
+
+
+def parse_key_value_lines(lines: list) -> dict:
+    Dict = {}
+    for line in lines:
+        logging.warning(f"line({line})")
+        if len(line.strip()) == 0:
+            continue
+        if line.strip().startswith("#"):
+            continue
+        if line.find("=") <= 0:
+            continue
+        key, value = line.strip().split("=", 1)
+        Dict[key] = value.strip('"').strip("'")
+    return Dict
+
+
+def parse_key_value_text(text: str) -> dict:
+    return parse_key_value_lines(text.splitlines())
+
+
+def password_valid(password: str):
+    if len(password) < 8:
+        return False
+    if password.find(" ") >= 0:
+        return False
+    return re.match("^[a-zA-Z0-9]*$", password)
+
+
+def name_valid(password: str):
+    if len(password) < 3:
+        return False
+    if password.find(" ") >= 0:
+        return False
+    return re.match("^[\.a-zA-Z0-9-_]*$", password)
+
+
 async def get_system_info() -> SystemInfo:
     try:
         return await get_system_info_impl()
@@ -49,6 +108,15 @@ async def get_system_info() -> SystemInfo:
 
 async def get_hardware_info() -> map:
     return await get_hardware_info_impl()
+
+
+async def shutdown(reboot: bool) -> bool:
+    if reboot:
+        await send_sse_message(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
+    else:
+        await send_sse_message(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
+
+    return await shutdown_impl(reboot=reboot)
 
 
 async def subscribe_hardware_info(request: Request):

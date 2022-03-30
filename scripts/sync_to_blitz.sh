@@ -14,6 +14,7 @@ fi
 # check if sshpass is installed
 sshpassInstalled=$(sshpass -V | grep -c "sshpass")
 if [ ${sshpassInstalled} -eq 0 ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "FAIL: please make sure that sshpass is installed on your system"
     echo "macOS: brew install hudochenkov/sshpass/sshpass"
     echo "Linux(Debian): apt install sshpass"
@@ -21,8 +22,9 @@ if [ ${sshpassInstalled} -eq 0 ]; then
 fi
 
 # check if ping is installed
-pingInstalled=$(ping -V | grep -c "ping")
+pingInstalled=$(ping -c 1 1.1.1.1 | grep -c "PING")
 if [ ${pingInstalled} -eq 0 ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "FAIL: please make sure that ping is installed on your system"
     echo "Linux(Debian): apt install inetutils-ping OR apt install iputils-ping"
     exit
@@ -31,16 +33,25 @@ fi
 # check if localIP is available&responding
 ping -c 1 $localIP
 if [ "$?" != "0" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "FAIL: was not able to ping $localIP"
     exit
 fi
 
 local=.
-remote=admin@$localIP:/home/admin/blitz_api
+remote=admin@$localIP:/root/blitz_api
 
 # Needs sshpass installed
 echo "# syncing local code to: ${remote}"
 sshpass -p "$passwordA" rsync -re ssh $local $remote
+result=$?
+echo "result(${result})"
+if [ "$result" == "255" ] || [ "$result" == "6" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "FAIL: was not able to ssh in: ssh admin@$localIP"
+    echo "SSH in once manually. Then try again."
+    exit 1
+fi
 
 # Restart the blitz service to activate changes
 echo "# restarting blitzapi.service"

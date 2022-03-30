@@ -1,3 +1,5 @@
+import logging
+
 from decouple import config
 
 from app.constants import API_VERSION
@@ -43,3 +45,8 @@ async def get_system_info_impl() -> SystemInfo:
         ssh_address=ssh_address,
         chain=lninfo.chains[0].network,
     )
+
+
+async def shutdown_impl(reboot: bool) -> bool:
+    logging.info("Shutdown / reboot not supported in native_python mode.")
+    return False
