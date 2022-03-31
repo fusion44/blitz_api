@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 
@@ -10,7 +11,6 @@ _PREFIX = "apps"
 
 router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
 
-
 @router.get(
     "/status",
     name=f"{_PREFIX}/status",
@@ -18,9 +18,9 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
     response_description=docs.get_app_status_response_docs,
     dependencies=[Depends(JWTBearer())],
 )
-def get_status():
+async def get_status():
     try:
-        return repo.get_app_status()
+        return await repo.get_app_status()
     except:
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"

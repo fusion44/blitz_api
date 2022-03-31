@@ -46,7 +46,7 @@ echo "# syncing local code to: ${remote}"
 sshpass -p "$passwordA" rsync -re ssh $local $remote
 result=$?
 echo "result(${result})"
-if [ "$result" == "255" ] || [ "$result" == "6" ]; then
+if [ "$result" != "0" ]; then
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "FAIL: was not able to ssh in: ssh admin@$localIP"
     echo "SSH in once manually. Then try again."

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from multiprocessing.dummy import Array
 import random
 
 from decouple import config
@@ -9,37 +10,57 @@ from fastapi.encoders import jsonable_encoder
 
 from app.constants import available_app_ids
 from app.utils import SSE, send_sse_message
+from app.repositories.system import call_script, parse_key_value_text
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
-
-def get_app_status():
-    return [
-        {
-            "id": "specter",
-            "status": "online",
-            "address": "http://192.168.0.1",
-            "hiddenService": "blablablabla.onion",
-        },
-        {
-            "id": "btc-pay",
-            "status": "offline",
-            "address": "http://192.168.0.1",
-            "hiddenService": "blablablabla.onion",
-        },
-        {
-            "id": "rtl",
-            "status": "online",
-            "address": "http://192.168.0.1",
-            "hiddenService": "blablablabla.onion",
-        },
-        {
-            "id": "lnbits",
-            "status": "online",
-            "address": "http://192.168.0.1",
-            "hiddenService": "blablablabla.onion",
-        },
-    ]
+async def get_app_status():
+    appStatusList:Array=[]
+    for appID in available_app_ids:
+        scriptCall=f"/home/admin/config.scripts/bonus.{appID}.sh status"
+        try:
+            result = await call_script(scriptCall)
+            data = parse_key_value_text(result)
+            if data["installed"] == "1":
+                # get basic data
+                status="online"
+                installed=(data["installed"] == "1")
+                localIP=data["localIP"]
+                httpPort=data["httpPort"]
+                httpsPort=data["httpsPort"]
+                address=f"http://{localIP}:{httpPort}"
+                hiddenService=data["toraddress"]
+                details={}
+                # mofify for some apps
+                if appID=="specter" or appID=="lnbits" or appID=="btcpayserver":
+                    address=f"https://{localIP}:{httpsPort}"
+                if appID=="mempool" or appID=="btc-rpc-explorer":
+                    details={
+                        "isIndexed": data["isIndexed"],
+                        "indexInfo": data["indexInfo"]
+                    }
+                appStatusList.append({
+                "id": appID,
+                "installed": installed,
+                "status": status,
+                "address": address,
+                "hiddenService": hiddenService,
+                "details": details
+                })
+            else:
+                appStatusList.append({
+                "id": f"{appID}",
+                "installed": (data["installed"] == "1"),
+                "status": "offline"
+                })
+        except:
+            # script had error or was not able to deliver all requested data fields
+            logging.warning(f"error on calling: {scriptCall}")
+            appStatusList.append({
+                "id": f"{appID}",
+                "error": f"script not working for api: {scriptCall}",
+            })
+    return appStatusList
 
 
 async def get_app_status_sub():
@@ -62,7 +83,7 @@ async def get_app_status_sub():
 async def install_app_sub(app_id: str):
     if not app_id in available_app_ids:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail=app_id + "install script does not exist"
+            status.HTTP_400_BAD_REQUEST, detail=app_id + "install script not exist/supported"
         )
 
     await send_sse_message(SSE.INSTALL_APP, {"id": app_id})
@@ -74,7 +95,7 @@ async def install_app_sub(app_id: str):
 
 async def uninstall_app_sub(app_id: str):
     if not app_id in available_app_ids:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="script does not exist")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="script not exist/supported")
 
     await send_sse_message(SSE.INSTALL_APP, {"id": app_id})
     loop = asyncio.get_event_loop()
