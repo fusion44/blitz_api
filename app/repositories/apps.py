@@ -163,9 +163,9 @@ async def run_bonus_script(app_id: str, params: str):
 
             # check if script was effective
             updatedAppData = await get_app_status_single(app_id)
-            if updatedAppData.installed and params=="on":
+            if updatedAppData["installed"] and params=="on":
                 await send_sse_message(SSE.INSTALL_APP, {"id": app_id, "mode": "on", "result": "win", "details": stdoutData["result"]})
-            elif not updatedAppData.installed and params=="off":
+            elif not updatedAppData["installed"] and params=="off":
                 await send_sse_message(SSE.INSTALL_APP, {"id": app_id, "mode": "off", "result": "win", "details": stdoutData["result"]})
             else:
                 await send_sse_message(SSE.INSTALL_APP, {"id": app_id, "mode": "off", "result": "fail", "details": "script ran thru but was not effective"})
