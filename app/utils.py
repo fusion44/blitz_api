@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from types import coroutine
 from typing import Dict
@@ -9,9 +10,11 @@ import requests
 from decouple import config
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+from starlette import status
 
+import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
 import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
-import app.repositories.ln_impl.protos.rpc_pb2_grpc as lnrpc
+import app.repositories.ln_impl.protos.walletunlocker_pb2_grpc as unlockerrpc
 
 
 class BitcoinConfig:
@@ -49,8 +52,8 @@ class LightningConfig:
             os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
 
             # Uncomment to see full gRPC logs
-            # os.environ["GRPC_TRACE"] = 'all'
-            # os.environ["GRPC_VERBOSITY"] = 'DEBUG'
+            # os.environ["GRPC_TRACE"] = "all"
+            # os.environ["GRPC_VERBOSITY"] = "DEBUG"
 
             self.lnd_macaroon = config("lnd_macaroon")
             self._lnd_cert = bytes.fromhex(config("lnd_cert"))
@@ -66,9 +69,12 @@ class LightningConfig:
             self._channel = grpc.aio.secure_channel(self._lnd_grpc_url, combined_creds)
             self.lnd_stub = lnrpc.LightningStub(self._channel)
             self.router_stub = routerrpc.RouterStub(self._channel)
-
+            self.wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
         elif self.ln_node == "clightning":
             # TODO: implement c-lightning
+            pass
+        elif self.ln_node == "":
+            # its ok to run raspiblitz also without lightning
             pass
         else:
             raise NameError(
@@ -120,7 +126,23 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
 
     async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
         async with session.post(bitcoin_config.rpc_url, data=data) as resp:
-            return await resp.json()
+            if resp.status == status.HTTP_200_OK:
+                return await resp.json()
+            elif resp.status == status.HTTP_401_UNAUTHORIZED:
+                return {
+                    "error": "Access denied to Bitcoin Core RPC. Check if username and password is correct",
+                    "status": status.HTTP_403_FORBIDDEN,
+                }
+            elif resp.status == status.HTTP_403_FORBIDDEN:
+                return {
+                    "error": "Access denied to Bitcoin Core RPC. If this is a remote node, check if 'network.rpcallowip=0.0.0.0/0' is set.",
+                    "status": status.HTTP_403_FORBIDDEN,
+                }
+            else:
+                return {
+                    "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
+                    "status": resp.status,
+                }
 
 
 async def send_sse_message(id: str, json_data: Dict):
@@ -139,8 +161,28 @@ async def send_sse_message(id: str, json_data: Dict):
     )
 
 
+async def redis_get(key: str) -> str:
+    v = await redis_plugin.redis.get(key)
+
+    if not v:
+        logging.warning(f"Key '{key}' not found in Redis DB.")
+        return ""
+
+    return v.decode("utf-8")
+
+
+# TODO
+# idea is to have a second redis channel called system, that the API subscribes to. If for example
+# the 'state' value gets changed by the _cache.sh script, it should publish this to this channel
+# so the API can forward the change to thru the SSE to the WebUI
+
+
 class SSE:
     SYSTEM_INFO = "system_info"
+    SYSTEM_SHUTDOWN_NOTICE = "system_shutdown_initiated"
+    SYSTEM_SHUTDOWN_ERROR = "system_shutdown_error"
+    SYSTEM_REBOOT_NOTICE = "system_reboot_initiated"
+    SYSTEM_REBOOT_ERROR = "system_reboot_error"
     HARDWARE_INFO = "hardware_info"
 
     INSTALLED_APP_STATUS = "installed_app_status"
@@ -155,5 +197,7 @@ class SSE:
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"
     LN_ONCHAIN_PAYMENT_STATUS = "ln_onchain_payment_status"
-
+    LN_FEE_REVENUE = "ln_fee_revenue"
+    LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
+    WALLET_LOCK_STATUS = "wallet_lock_status"

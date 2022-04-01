@@ -3,3 +3,5 @@ __pycache__
 .env
 .coverage
 htmlcov
+scripts/sync_to_blitz.personal.sh
+docker/.env

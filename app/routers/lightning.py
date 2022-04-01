@@ -1,21 +1,28 @@
-from typing import List
+from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
+    FeeRevenue,
     GenericTx,
     Invoice,
     LightningInfoLite,
     LnInfo,
+    NewAddressInput,
     OnChainTransaction,
     Payment,
     PaymentRequest,
     SendCoinsInput,
     SendCoinsResponse,
+    UnlockWalletInput,
     WalletBalance,
 )
 from app.repositories.lightning import (
     add_invoice,
     decode_pay_request,
+    get_fee_revenue,
     get_ln_info,
     get_ln_info_lite,
     get_wallet_balance,
@@ -23,20 +30,25 @@ from app.repositories.lightning import (
     list_invoices,
     list_on_chain_tx,
     list_payments,
+    new_address,
     send_coins,
     send_payment,
+    unlock_wallet,
 )
 from app.routers.lightning_docs import (
     get_balance_response_desc,
+    new_address_desc,
     send_coins_desc,
     send_payment_desc,
 )
-from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.params import Depends
 
 _PREFIX = "lightning"
 
 router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
+
+responses = {
+    423: {"description": "Wallet is locked. Unlock via /lightning/unlock-wallet"}
+}
 
 
 @router.post(
@@ -46,6 +58,7 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
     description="For additional information see [LND docs](https://api.lightning.community/#addinvoice)",
     dependencies=[Depends(JWTBearer())],
     response_model=Invoice,
+    responses=responses,
 )
 async def addinvoice(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
@@ -53,7 +66,7 @@ async def addinvoice(
     try:
         return await add_invoice(memo, value_msat, expiry, is_keysend)
     except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.reason)
+        raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -65,12 +78,34 @@ async def addinvoice(
     response_description=get_balance_response_desc,
     dependencies=[Depends(JWTBearer())],
     response_model=WalletBalance,
+    responses=responses,
 )
 async def getwalletbalance():
     try:
         return await get_wallet_balance()
     except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.reason)
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.get(
+    "/get-fee-revenue",
+    name=f"{_PREFIX}.get-fee-revenue",
+    summary="Returns the daily, weekly and monthly fee revenue earned.",
+    description="""
+Currently, year and total fees are always null. Backends don't return these values by default.
+Implementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64).
+    """,
+    dependencies=[Depends(JWTBearer())],
+    response_model=FeeRevenue,
+    responses=responses,
+)
+async def get_fee_revenue_path() -> FeeRevenue:
+    try:
+        return await get_fee_revenue()
+    except HTTPException as r:
+        raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -79,11 +114,12 @@ async def getwalletbalance():
     "/list-all-tx",
     name=f"{_PREFIX}.list-all-tx",
     summary="Lists all on-chain transactions, payments and invoices in the wallet",
-    description="""Returns a list with all on-chain transaction, payments and invoices combined into one list. 
+    description="""Returns a list with all on-chain transaction, payments and invoices combined into one list.
     The index of each tx is only valid for each identical set of parameters.
     """,
     dependencies=[Depends(JWTBearer())],
     response_model=List[GenericTx],
+    responses=responses,
 )
 async def list_all_tx_path(
     successfull_only: bool = Query(
@@ -103,7 +139,12 @@ async def list_all_tx_path(
         description="If set, the transactions returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards.",
     ),
 ):
-    return await list_all_tx(successfull_only, index_offset, max_tx, reversed)
+    try:
+        return await list_all_tx(successfull_only, index_offset, max_tx, reversed)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.get(
@@ -113,6 +154,7 @@ async def list_all_tx_path(
     response_model=List[Invoice],
     response_description="A list of all invoices created.",
     dependencies=[Depends(JWTBearer())],
+    responses=responses,
 )
 async def list_invoices_path(
     pending_only: bool = Query(
@@ -132,7 +174,17 @@ async def list_invoices_path(
         description="If set, the invoices returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards.",
     ),
 ):
-    return await list_invoices(pending_only, index_offset, num_max_invoices, reversed)
+    try:
+        return await list_invoices(
+            pending_only,
+            index_offset,
+            num_max_invoices,
+            reversed,
+        )
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.get(
@@ -142,9 +194,15 @@ async def list_invoices_path(
     response_model=List[OnChainTransaction],
     response_description="A list of all on-chain transactions made.",
     dependencies=[Depends(JWTBearer())],
+    responses=responses,
 )
 async def list_on_chain_tx_path():
-    return await list_on_chain_tx()
+    try:
+        return await list_on_chain_tx()
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.get(
@@ -154,6 +212,7 @@ async def list_on_chain_tx_path():
     response_model=List[Payment],
     response_description="A list of all payments made.",
     dependencies=[Depends(JWTBearer())],
+    responses=responses,
 )
 async def list_payments_path(
     include_incomplete: bool = Query(
@@ -173,7 +232,33 @@ async def list_payments_path(
         description="If set, the payments returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards. The order of the returned payments is always oldest first (ascending index order).",
     ),
 ):
-    return await list_payments(include_incomplete, index_offset, max_payments, reversed)
+    try:
+        return await list_payments(
+            include_incomplete, index_offset, max_payments, reversed
+        )
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.post(
+    "/new-address",
+    name=f"{_PREFIX}.new-address",
+    summary="Generate a new on-chain address",
+    description=new_address_desc,
+    response_description="The newly generated wallet address",
+    dependencies=[Depends(JWTBearer())],
+    response_model=str,
+    responses=responses,
+)
+async def new_address_path(input: NewAddressInput):
+    try:
+        return await new_address(input)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.post(
@@ -184,12 +269,13 @@ async def list_payments_path(
     response_description="Either an error or a SendCoinsResponse object on success",
     dependencies=[Depends(JWTBearer())],
     response_model=SendCoinsResponse,
+    responses=responses,
 )
 async def send_coins_path(input: SendCoinsInput):
     try:
         return await send_coins(input=input)
     except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.detail)
+        raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -202,14 +288,29 @@ async def send_coins_path(input: SendCoinsInput):
     response_description="Either an error or a Payment object on success",
     dependencies=[Depends(JWTBearer())],
     response_model=Payment,
+    responses={
+        400: {
+            "description": """
+Possible error messages:
+* invalid bech32 string
+* amount must be specified when paying a zero amount invoice
+* amount must not be specified when paying a non-zero amount invoice
+"""
+        },
+        409: {"description": "When attempting to pay an already paid invoice."},
+        423: responses[423],
+    },
 )
 async def sendpayment(
-    pay_req: str, timeout_seconds: int = 5, fee_limit_msat: int = 8000
+    pay_req: str,
+    timeout_seconds: int = 5,
+    fee_limit_msat: int = 8000,
+    amount_msat: Optional[int] = None,
 ):
     try:
-        return await send_payment(pay_req, timeout_seconds, fee_limit_msat)
+        return await send_payment(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
     except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.detail)
+        raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -221,12 +322,13 @@ async def sendpayment(
     response_description="Either an error or a LnInfo object on success",
     dependencies=[Depends(JWTBearer())],
     response_model=LnInfo,
+    responses=responses,
 )
 async def get_info():
     try:
         return await get_ln_info()
     except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.detail)
+        raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -238,12 +340,13 @@ async def get_info():
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
     response_model=LightningInfoLite,
+    responses=responses,
 )
 async def get_ln_info_lite_path():
     try:
         return await get_ln_info_lite()
     except HTTPException as r:
-        raise HTTPException(r.status_code, detail=r.reason)
+        raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -255,8 +358,37 @@ async def get_ln_info_lite_path():
     response_model=PaymentRequest,
     response_description="A fully decoded payment request or a HTTP status 400 if the payment request cannot be decoded.",
     dependencies=[Depends(JWTBearer())],
+    responses=responses,
 )
 async def get_decode_pay_request(
     pay_req: str = Query(..., description="The payment request string to be decoded")
 ):
-    return await decode_pay_request(pay_req)
+    try:
+        return await decode_pay_request(pay_req)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.post(
+    "/unlock-wallet",
+    name=f"{_PREFIX}.unlock-wallet",
+    summary="Unlocks a locked wallet.",
+    response_model=bool,
+    response_description="True if ok, False otherwise",
+    dependencies=[Depends(JWTBearer())],
+    responses={
+        401: {
+            "description": "Either JWT token is not ok OR wallet password is wrong, observe the detail message."
+        },
+        412: {"description": "Wallet already unlocked"},
+    },
+)
+async def unlock_wallet_path(input: UnlockWalletInput) -> bool:
+    try:
+        return await unlock_wallet(input.password)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])

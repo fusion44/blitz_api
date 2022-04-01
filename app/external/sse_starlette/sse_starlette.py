@@ -22,7 +22,7 @@ from starlette.types import Receive, Scope, Send
 
 
 class AppStatus:
-    """ helper for monkeypatching the signal-handler of uvicorn """
+    """helper for monkeypatching the signal-handler of uvicorn"""
 
     should_exit = False
 

@@ -1,0 +1,61 @@
+version: '3'
+
+services:
+  bitcoin-core:
+    image: ruimarinho/bitcoin-core
+    stop_grace_period: 1m
+    command:
+      -printtoconsole
+      -testnet=1
+      -server=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -rpcuser=bitcoin
+      -rpcpassword=bitcoin
+      -zmqpubrawblock=tcp://0.0.0.0:28332
+      -zmqpubrawtx=tcp://0.0.0.0:28333
+    volumes:
+      - ${BITCOIND_DATA_PATH}:/home/bitcoin/.bitcoin
+    ports:
+      - 18332:18332
+      - 18333:18333
+      - 28332:28332
+      - 28333:28333
+  lnd_1:
+    image: lightninglabs/lnd:v0.14.1-beta
+    stop_grace_period: 1m
+    command:
+      --bitcoin.active
+      --bitcoin.testnet
+      --bitcoin.node=bitcoind
+      --bitcoind.rpcuser=bitcoin
+      --bitcoind.rpcpass=bitcoin
+      --bitcoind.zmqpubrawblock=tcp://127.0.0.1:28332
+      --bitcoind.zmqpubrawtx=tcp://127.0.0.1:28333
+      --norest
+    depends_on:
+      - "bitcoin-core"
+    volumes:
+      - ${LND_1_DATA_PATH}:/root/.lnd
+    ports:
+      - 8080:8080
+      - 10009:10009
+  lnd_2:
+    image: lightninglabs/lnd:v0.14.1-beta
+    stop_grace_period: 1m
+    command:
+      --bitcoin.active
+      --bitcoin.testnet
+      --bitcoin.node=bitcoind
+      --bitcoind.rpcuser=bitcoin
+      --bitcoind.rpcpass=bitcoin
+      --bitcoind.zmqpubrawblock=tcp://127.0.0.1:28332
+      --bitcoind.zmqpubrawtx=tcp://127.0.0.1:28333
+      --norest
+    depends_on:
+      - "bitcoin-core"
+    volumes:
+      - ${LND_2_DATA_PATH}:/root/.lnd
+    ports:
+      - 8081:8081
+      - 10010:10009

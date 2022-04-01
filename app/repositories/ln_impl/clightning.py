@@ -1,9 +1,12 @@
-from typing import List
+from typing import List, Optional
 
 from app.models.lightning import (
+    FeeRevenue,
+    ForwardSuccessEvent,
     GenericTx,
     Invoice,
     LnInfo,
+    NewAddressInput,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -52,12 +55,23 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
+async def get_fee_revenue_impl() -> FeeRevenue:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def new_address_impl(input: NewAddressInput) -> str:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
 async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
 async def send_payment_impl(
-    pay_req: str, timeout_seconds: int, fee_limit_msat: int
+    pay_req: str,
+    timeout_seconds: int,
+    fee_limit_msat: int,
+    amount_msat: Optional[int] = None,
 ) -> Payment:
     raise NotImplementedError("c-lightning not yet implemented")
 
@@ -66,5 +80,13 @@ async def get_ln_info_impl() -> LnInfo:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
+async def unlock_wallet_impl(password: str) -> bool:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
 async def listen_invoices() -> Invoice:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def listen_forward_events() -> ForwardSuccessEvent:
     raise NotImplementedError("c-lightning not yet implemented")

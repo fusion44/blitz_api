@@ -1,11 +1,17 @@
 from enum import Enum
 from typing import List, Optional, Union
 
-import app.models.lightning_docs as docs
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
 from pydantic import BaseModel
 from pydantic.types import conint
+
+import app.models.lightning_docs as docs
+
+
+class OnchainAddressType(str, Enum):
+    P2WKH = "p2wkh"
+    NP2WKH = "np2wkh"
 
 
 class InvoiceState(str, Enum):
@@ -43,6 +49,66 @@ class InvoiceHTLCState(str, Enum):
             return InvoiceHTLCState.CANCELED
         else:
             raise NotImplementedError(f"InvoiceHTLCState {id} is not implemented")
+
+
+class FeeRevenue(BaseModel):
+    day: int = Query(..., description="Fee revenue earned in the last 24 hours")
+    week: int = Query(..., description="Fee revenue earned in the last 7days")
+    month: int = Query(..., description="Fee revenue earned in the last month")
+    year: int = Query(
+        None,
+        description="Fee revenue earned in the last year. Might be null if not implemented by backend.",
+    )
+    total: int = Query(
+        None,
+        description="Fee revenue earned in the last year. Might be null if not implemented by backend",
+    )
+
+    @classmethod
+    def from_grpc(cls, fee_report) -> "FeeRevenue":
+        return cls(
+            day=int(fee_report.day_fee_sum),
+            week=int(fee_report.week_fee_sum),
+            month=int(fee_report.month_fee_sum),
+        )
+
+
+class ForwardSuccessEvent(BaseModel):
+    timestamp_ns: int = Query(
+        ...,
+        description="The number of nanoseconds elapsed since January 1, 1970 UTC when this circuit was completed.",
+    )
+    chan_id_in: str = Query(
+        ...,
+        description="The incoming channel ID that carried the HTLC that created the circuit.",
+    )
+    chan_id_out: str = Query(
+        ...,
+        description="The outgoing channel ID that carried the preimage that completed the circuit.",
+    )
+    amt_in_msat: int = Query(
+        ...,
+        description="The total amount (in millisatoshis) of the incoming HTLC that created half the circuit.",
+    )
+    amt_out_msat: str = Query(
+        ...,
+        description="The total amount (in millisatoshis) of the outgoing HTLC that created the second half of the circuit.",
+    )
+    fee_msat: int = Query(
+        ...,
+        description="The total fee (in millisatoshis) that this payment circuit carried.",
+    )
+
+    @classmethod
+    def from_grpc(cls, evt) -> "ForwardSuccessEvent":
+        return cls(
+            timestamp=int(evt.timestamp),
+            chan_id_in=int(evt.chan_id_in),
+            chan_id_out=int(evt.chan_id_out),
+            amt_in_msat=int(evt.amt_in_msat),
+            amt_out_msat=int(evt.amt_out_msat),
+            fee_msat=int(evt.fee_msat),
+        )
 
 
 class Feature(BaseModel):
@@ -172,7 +238,7 @@ class InvoiceHTLC(BaseModel):
         )
 
 
-class RouteHint(BaseModel):
+class HopHint(BaseModel):
     # The public key of the node at the start of the channel.
     node_id: str
 
@@ -190,7 +256,7 @@ class RouteHint(BaseModel):
     cltv_expiry_delta: int
 
     @classmethod
-    def from_grpc(cls, h) -> "RouteHint":
+    def from_grpc(cls, h) -> "HopHint":
         return cls(
             node_id=h.node_id,
             chan_id=h.chan_id,
@@ -198,6 +264,18 @@ class RouteHint(BaseModel):
             fee_proportional_millionths=h.fee_proportional_millionths,
             cltv_expiry_delta=h.cltv_expiry_delta,
         )
+
+
+class RouteHint(BaseModel):
+    hop_hints: List[HopHint] = Query(
+        [],
+        description="A list of hop hints that when chained together can assist in reaching a specific destination.",
+    )
+
+    @classmethod
+    def from_grpc(cls, h) -> "RouteHint":
+        hop_hints = [HopHint.from_grpc(hh) for hh in h.hop_hints]
+        return cls(hop_hints=hop_hints)
 
 
 class Invoice(BaseModel):
@@ -756,6 +834,21 @@ class Payment(BaseModel):
         )
 
 
+class NewAddressInput(BaseModel):
+    type: OnchainAddressType = Query(
+        ...,
+        description="""
+Address-types has to be one of:
+* p2wkh:  Pay to witness key hash (bech32)
+* np2wkh: Pay to nested witness key hash
+    """,
+    )
+
+
+class UnlockWalletInput(BaseModel):
+    password: str = Query(..., description="The wallet password")
+
+
 class SendCoinsInput(BaseModel):
     address: str = Query(
         ...,
@@ -811,6 +904,9 @@ class Chain(BaseModel):
 
 
 class LnInfo(BaseModel):
+    implementation: str = Query(
+        ..., description="Lightning software implementation (LND, c-lightning)"
+    )
     # The version of the LND software that the node is running.
     version: str
 
@@ -874,7 +970,7 @@ class LnInfo(BaseModel):
         return not self.__eq__(other)
 
     @classmethod
-    def from_grpc(cls, i) -> "LnInfo":
+    def from_grpc(cls, implementation, i) -> "LnInfo":
         _chains = []
         for c in i.chains:
             _chains.append(Chain(chain=c.chain, network=c.network))
@@ -886,6 +982,7 @@ class LnInfo(BaseModel):
         _uris = [u for u in i.uris]
 
         return LnInfo(
+            implementation=implementation,
             version=i.version,
             commit_hash=i.commit_hash,
             identity_pubkey=i.identity_pubkey,
@@ -914,6 +1011,7 @@ class LightningInfoLite(BaseModel):
     num_pending_channels: int = Query(..., description="Number of pending channels")
     num_active_channels: int = Query(..., description="Number of active channels")
     num_inactive_channels: int = Query(..., description="Number of inactive channels")
+    num_peers: int = Query(..., description="Number of peers")
     block_height: int = Query(
         ..., description="The node's current view of the height of the best block"
     )
@@ -926,13 +1024,14 @@ class LightningInfoLite(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, name: str, info: LnInfo):
+    def from_grpc(cls, info: LnInfo):
         return cls(
-            implementation=name,
+            implementation=info.implementation,
             version=info.version,
             num_pending_channels=info.num_pending_channels,
             num_active_channels=info.num_active_channels,
             num_inactive_channels=info.num_inactive_channels,
+            num_peers=info.num_peers,
             block_height=info.block_height,
             synced_to_chain=info.synced_to_chain,
             synced_to_graph=info.synced_to_graph,
@@ -995,7 +1094,9 @@ class PaymentRequest(BaseModel):
     description_hash: str
     fallback_addr: Optional[str]
     cltv_expiry: int
-    route_hints: List[RouteHint] = Query([])
+    route_hints: List[RouteHint] = Query(
+        [], description="A list of [HopHint] for the RouteHint"
+    )
     payment_addr: str = Query(..., description="The payment address in hex format")
     num_msat: int
     features: List[FeaturesEntry] = Query([])

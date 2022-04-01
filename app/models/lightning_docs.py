@@ -1,5 +1,5 @@
 tx_id_desc = """
-Unique identifier for this transaction. 
+Unique identifier for this transaction.
 
 Depending on the type of the transaction it will be different:
 #### On-chain

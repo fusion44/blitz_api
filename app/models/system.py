@@ -1,12 +1,13 @@
 from enum import Enum
 from typing import List, Optional
 
-from app.models.lightning import LnInfo
-from app.routers.system_docs import get_debug_data_sample_str
+from decouple import config
 from fastapi import Query
 from fastapi.param_functions import Query
 from pydantic import BaseModel
 from pydantic.types import constr
+
+from app.routers.system_docs import get_debug_data_sample_str
 
 
 class LoginInput(BaseModel):
@@ -28,7 +29,7 @@ class HealthMessage(BaseModel):
     id: int = Query(
         None,
         description="""ID of the message.
-Idea behind the ID is that messages can be replacable on the client. 
+Idea behind the ID is that messages can be replacable on the client.
 To prevent spamming the user with multiple messages, message with ID 25 will be replaced with never data of ID 25
         """,
         example="""
@@ -43,7 +44,7 @@ To prevent spamming the user with multiple messages, message with ID 25 will be 
     level: HealthMessagePriority = Query(
         HealthMessagePriority.INFO,
         description="""Priority level of the message. For more info see `message`.
-        
+
 `INFO`:       FYI, can normally be ignored.\n
 `WARNING`:    Potential problem might occur, user interaction possibly required.\n
 `ERROR`:      Something bad happened. User interaction definitely required.
@@ -64,12 +65,38 @@ class HealthState(str, Enum):
     STOPPED = "stopped"
 
 
+class APIPlatform(str, Enum):
+    RASPIBLITZ = "raspiblitz"
+    NATIVE_PYTHON = "native_python"
+    UNKNOWN = "unknown"
+
+    @staticmethod
+    def get_current():
+        p = config("platform", default="raspiblitz")
+        if p == "raspiblitz":
+            return APIPlatform.RASPIBLITZ
+        elif p == "native_python":
+            return APIPlatform.NATIVE_PYTHON
+        else:
+            return APIPlatform.UNKNOWN
+
+
 class SystemInfo(BaseModel):
     alias: str = Query("", description="Name of the node (same as Lightning alias)")
     color: str = Query(
         ..., description="The color of the current node in hex code format"
     )
-    version: str = Query(..., description="The software version of this RaspiBlitz")
+    platform: APIPlatform = Query(
+        APIPlatform.RASPIBLITZ,
+        description="The platform this API is running on.",
+    )
+    platform_version: str = Query(
+        "",
+        description="The version of this platform",
+    )
+    api_version: str = Query(
+        ..., description="Version of the API software on this system."
+    )
     health: HealthState = Query(
         ..., description="General health state of the Raspiblitz"
     )
@@ -91,29 +118,6 @@ class SystemInfo(BaseModel):
         ...,
         description="The current chain this node is connected to (mainnet, testnet or signet)",
     )
-
-    @classmethod
-    def from_rpc(cls, lninfo: LnInfo):
-        # TODO: implement rest of the calls
-        return cls(
-            alias=lninfo.alias,
-            color=lninfo.color,
-            version="v1.8.0",
-            health=HealthState.ATTENTION_REQUIRED,
-            health_messages=[
-                HealthMessage(
-                    id=25, level=HealthMessagePriority.WARNING, message="HDD 85% full"
-                )
-            ],
-            tor_web_ui="arg6ybal4b7dszmsncsrudcpdfkxadzfdi24ktceodah7tgmdopgpyfd.onion",
-            tor_api="arg6ybal4b7dszmsncsrudcpdfkxadzfdi24ktceodah7tgmdopgpyfd.onion/api",
-            lan_web_ui="http://192.168.1.12/",
-            lan_api="http://192.168.1.12/api",
-            ssh_address="http://192.168.1.12/",
-            chain=lninfo.chains[
-                0
-            ].network,  # for now, assume we are only on bitcoin chain
-        )
 
 
 class RawDebugLogData(BaseModel):

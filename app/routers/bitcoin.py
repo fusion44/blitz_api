@@ -1,16 +1,18 @@
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.params import Depends, Query
+
 from app.auth.auth_bearer import JWTBearer
-from app.models.bitcoind import BlockchainInfo, BtcInfo, NetworkInfo
+from app.external.sse_starlette import EventSourceResponse
+from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
 from app.repositories.bitcoin import (
+    estimate_fee,
     get_blockchain_info,
     get_btc_info,
     get_network_info,
     handle_block_sub,
 )
-from app.routers.bitcoin_docs import blocks_sub_doc
-from app.sse_starlette import EventSourceResponse
+from app.routers.bitcoin_docs import blocks_sub_doc, estimate_fee_mode_desc
 from app.utils import bitcoin_rpc
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.params import Depends
 
 _PREFIX = "bitcoin"
 
@@ -64,6 +66,29 @@ def getblockcount():
 async def getblockchaininfo():
     info = await get_blockchain_info()
     return info
+
+
+@router.get(
+    "/estimate-fee",
+    name=f"{_PREFIX}.estimate-fee",
+    summary="Get current fee estimation from Bitcoin Core",
+    description="""Estimates the fee for the given parameters.
+    See documentation on [bitcoin.org](https://developer.bitcoin.org/reference/rpc/estimatesmartfee.html)
+    """,
+    response_description="The estimated fee in satoshis",
+    dependencies=[Depends(JWTBearer())],
+    response_model=int,
+)
+async def _estimate_fee(
+    target_conf: int = Query(
+        6,
+        description="Confirmation target in blocks.",
+    ),
+    mode: FeeEstimationMode = Query(
+        FeeEstimationMode.CONSERVATIVE, description=estimate_fee_mode_desc
+    ),
+):
+    return await estimate_fee(target_conf, mode)
 
 
 @router.get(

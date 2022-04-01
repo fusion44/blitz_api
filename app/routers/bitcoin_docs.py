@@ -8,6 +8,8 @@ If verbosity is 1, returns an Object with information about block <hash>.<br>
 If verbosity is 2, returns an Object with information about block <hash> and information about each transaction.<br>
 """
 
+estimate_fee_mode_desc = "Whether to return a more conservative estimate which also satisfies a longer history. A conservative estimate potentially returns a higher feerate and is more likely to be sufficient for the desired target, but is not as responsive to short term drops in the prevailing fee market."
+
 get_bitcoin_info_desc = """
 This endpoint returns a combination of various Bitcoin Core calls for easy access.
 """

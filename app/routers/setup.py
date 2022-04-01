@@ -1,224 +1,338 @@
 import asyncio
-from enum import Enum
-from os import stat
+
+# from asyncio.windows_events import NULL
+import logging
+from pickle import FALSE
+import re
+from xmlrpc.client import boolean
+from pydantic import BaseModel
+
+from aioredis import Redis
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
-from aioredis import Redis
-from fastapi_plugins import depends_redis, redis_plugin
+from fastapi_plugins import depends_redis
+from setuptools import setup
+
+from app.auth.auth_bearer import JWTBearer
+from app.auth.auth_handler import sign_jwt
+from app.repositories.system import call_script, parse_key_value_lines, password_valid, name_valid, parse_key_value_lines, shutdown
+from app.utils import redis_get
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 
+setupFilePath = "/var/cache/raspiblitz/temp/raspiblitz.setup"
+configFilePath = "/mnt/hdd/raspiblitz.conf"
 
-class SetupErrors(Enum):
-    NAME_TO_LONG: 1
-    PASSWORD_TO_SHORT: 2
-
-
-async def fake_system_activity(redis: Redis):
-    await redis.publish_json(
-        "default", {"type": "system_busy", "data": "Please hold on the line"}
-    )
-    await asyncio.sleep(1)
-    await redis.publish_json(
-        "default", {"type": "system_busy", "data": "Updating stuff"}
-    )
-    await asyncio.sleep(2)
-    await redis.publish_json(
-        "default", {"type": "system_busy", "data": "Installing stuff"}
-    )
-    await asyncio.sleep(1)
-    await redis.publish_json(
-        "default", {"type": "system_busy", "data": "Ensuring world peace"}
-    )
-    await asyncio.sleep(1)
-    await redis.publish_json(
-        "default", {"type": "system_busy", "data": "Solving world hunger"}
-    )
-    await asyncio.sleep(1)
-    await redis.publish_json(
-        "default", {"type": "system_busy", "data": "Bitcoin fixes this"}
-    )
-
-
-def make_error(
-    error_id: int, endpoint_url: str, err_description: str, description: str
-):
-    return {
-        "error_id": error_id,
-        "endpoint_url": endpoint_url,
-        "error_description": err_description,
-        "description": description,
-    }
-
-
-def set_status(status: int, endpoint_url: str, description: str):
-    return {
-        "status": status,
-        "endpoint_url": endpoint_url,
-        "description": description,
-    }
-
-
-def get_setup_type_options(error: str = ""):
-    return {
-        "data": {
-            "error": error,
-            "type": "ask_setup_type",
-            "endpoint_url": "/setup/type/{id}",
-            "options": [
-                {
-                    "id": 1,
-                    "short_desc": "Bitcoin",
-                    "long_desc": "Setup your RaspiBlitz as a Bitcoin Core node.",
-                },
-                {
-                    "id": 2,
-                    "short_desc": "Litecoin",
-                    "long_desc": "Setup your RaspiBlitz as a Litecoin Core node.",
-                },
-                {
-                    "id": 3,
-                    "short_desc": "Migrate a RaspiBlitz",
-                    "long_desc": "Setup your RaspiBlitz as a Litecoin Core node.",
-                },
-            ],
-        }
-    }
-
-
-setup_status = set_status(2, "/setup/start_setup", "HDD needs setup (2)")
-
-setup_var_type = -1
-setup_var_name = ""
-setup_var_password_a = ""
-setup_var_password_b = ""
-setup_var_password_c = ""
-setup_var_use_tor = True
-setup_var_hdd_formatted = False
-
-
+# can always be called without credentials to check if
+# the system needs or is in setup (setupPhase!="done")
+# for example in the beginning setupPhase can be (see controlSetupDialog.sh)
+# 1) recovery = same version on fresh sd card
+# 2) update = updated version on fresh sd card
+# 3) migration = hdd got data from another node project
+# 4) setup = a fresh blitz to setup
 @router.get("/status")
-def get_status():
-    return setup_status
-
-
-@router.post("/start_setup")
-async def start_setup(redis: Redis = Depends(depends_redis)):
-    await redis.publish_json("default", {"data": "Starting setup"})
-    await asyncio.sleep(1)
-    await redis.publish_json("default", {"data": "Hardware test"})
-    await asyncio.sleep(1)
-    await redis.publish_json(
-        "default", {"data": "Hardware looks good! Ready to proceed - have fun!"}
-    )
-    await asyncio.sleep(1)
-    await redis.publish_json("default", get_setup_type_options())
-
-
-@router.post("/type/{id}", status_code=status.HTTP_200_OK)
-async def start_setup(id: int, redis: Redis = Depends(depends_redis)):
-    setup_var_type = id
-    if id == 1:
-        await redis.publish_json("default", {"data": "Starting Bitcoin Core setup"})
-    elif id == 2:
-        await redis.publish_json("default", {"data": "Starting Litecoin Core setup"})
-    elif id == 3:
-        await redis.publish_json("default", {"data": "Starting migration ..."})
+async def get_status():
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    message = await redis_get("message")
+    if setupPhase == "done":
+        try:
+            blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
+            if blitz_sync_initial_done == "1":
+                initialsync = "done"
+            else:
+                initialsync = "running"  
+        except:
+            initialsync = ""
     else:
-        setup_var_type = -1
-        await redis.publish_json(
-            "default", get_setup_type_options("Unknown setup type")
-        )
-        return
+        initialsync = ""
+    return {
+        "setupPhase": setupPhase,
+        "state": state,
+        "message": message,
+        "initialsync": initialsync
+    }
 
-    setup_status = set_status(
-        3,
-        "setup/set_name/{name}",
-        "Set name, one word, basic characters and not to long",
-    )
-
-    await redis.publish_json("default", setup_status)
-    await fake_system_activity(redis)
+# if setupPhase!="done" && state="waitsetup" then
+# 'setup/setup_start_info' should be called
+# We can do the "MIGRATION" option later - because it would need an additional step after formatting hdd
+# People that need to migrate can do for now by SSH option
 
 
-@router.post("/set_name/{name}", status_code=status.HTTP_200_OK)
-async def set_name(name: str, redis: Redis = Depends(depends_redis)):
-    if len(name) > 80:
-        await redis.publish_json(
-            "default",
-            make_error(
-                SetupErrors.NAME_TO_LONG,
-                "setup/set_name/{name}",
-                "Name can be max. 80 characters",
-                "Set name, one word, basic characters and not to long",
-            ),
-        )
-        raise HTTPException(
-            status.HTTP_406_NOT_ACCEPTABLE, detail="Name can be max. 80 characters"
-        )
-    elif setup_var_type == -1:
-        await redis.publish_json(
-            "default", get_setup_type_options("Setup type must be set first")
-        )
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail="Setup type must be set first"
-        )
+@router.get("/setup-start-info")
+async def setup_start_info():
+
+    # first check that node is really in setup state
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    if state != "waitsetup":
+        logging.warning(f"/setup-start-info can only be called when nodes awaits setup")
+        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # get all the additional info needed to do setup dialog
+    hddGotMigrationData = await redis_get("hddGotMigrationData")
+    hddGotBlockchain = await redis_get("hddBlocksBitcoin")
+    migrationMode = await redis_get("migrationMode")
+    lan = await redis_get("internet_localip")
+    tor = await redis_get("tor_web_addr")
+    # return info as JSON
+    return {
+        "setupPhase": setupPhase,
+        "migrationMode": migrationMode,  # 'normal', 'outdatedLightning'
+        "hddGotMigrationData": hddGotMigrationData,  # 'umbrel', 'mynode', 'citadel'
+        "hddGotBlockchain": hddGotBlockchain,
+        "ssh_login": f"ssh admin@{lan}",
+        "tor_web_ui": tor,
+    }
+
+
+def write_text_file(filename: str, arrayOfLines):
+    logging.warning(f"writing {filename}")
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write("\n".join(arrayOfLines))
+
+
+class StartDoneData(BaseModel):
+    hostname        : str = ""
+    forceFreshSetup : bool = False
+    keepBlockchain  : bool = True
+    lightning       : str = ""
+    passwordA       : str = ""
+    passwordB       : str = ""
+    passwordC       : str = ""
+
+# With all this info the WebUi can run its own runs its dialogs and in the end makes a call to
+@router.post("/setup-start-done")
+async def setup_start_done(
+    data: StartDoneData ):
+    logging.warning(f"START /setup-start-done")
+
+    # first check that node is really in setup state
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    hddGotBlockchain = await redis_get("hddBlocksBitcoin")
+
+    if state != "waitsetup":
+        logging.warning(f"/setup-start-done can only be called when nodes awaits setup")
+        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # check if a fresh setup is forced
+    if data.forceFreshSetup:
+        logging.warning(f"forcing node to fresh setup")
+        setupPhase="setup"
+
+    #### SETUP ####
+    if setupPhase == "setup": 
+        if name_valid(data.hostname) == False:
+            logging.warning(f"hostname is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if data.lightning!="lnd" and data.lightning!="cl" and data.lightning!="none":
+            logging.warning(f"lightning is not valid") 
+        if password_valid(data.passwordA) == False:
+            logging.warning(f"passwordA is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if password_valid(data.passwordB) == False:
+            logging.warning(f"passwordB is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if data.lightning!="none" and password_valid(data.passwordC)==False:
+            logging.warning(f"passwordC is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if hddGotBlockchain!="1" and data.keepBlockchain:
+            logging.warning(f"cannot keep blockchain that does not exists")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if data.keepBlockchain:
+            formatHDD=0
+            cleanHDD=1
+        else:
+            formatHDD=1
+            cleanHDD=0
+        write_text_file(setupFilePath,[
+            f"formatHDD={formatHDD}",
+            f"cleanHDD={cleanHDD}",
+            "network=bitcoin",
+            "chain=main",
+            f"lightning={data.lightning}",
+            f"hostname={data.hostname}",
+            "setPasswordA=1",
+            "setPasswordB=1",
+            "setPasswordC=1",
+            f"passwordA='{data.passwordA}'",
+            f"passwordB='{data.passwordB}'",
+            f"passwordC='{data.passwordC}'",
+            ""
+        ])
+
+    #### RECOVERY ####
+    elif setupPhase == "recovery": 
+        logging.warning(f"check recovery data")
+        if password_valid(data.passwordA) == False:
+            logging.warning(f"passwordA is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        write_text_file(setupFilePath,[
+            "setPasswordA=1",
+            f"passwordA='{data.passwordA}'"
+        ])
+
+    #### MIGRATION ####
+    elif setupPhase == "migration": 
+        logging.warning(f"check migration data")
+        hddGotMigrationData = await redis_get("hddGotMigrationData")
+        if hddGotMigrationData == "":
+            logging.warning(f"hddGotMigrationData is not available")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)    
+        if password_valid(data.passwordA) == False:
+            logging.warning(f"passwordA is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if password_valid(data.passwordB) == False:
+            logging.warning(f"passwordB is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        if password_valid(data.passwordC) == False:
+            logging.warning(f"passwordC is not valid")
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
+        write_text_file(setupFilePath,[
+            f"migrationOS={hddGotMigrationData}",
+            "setPasswordA=1",
+            "setPasswordB=1",
+            "setPasswordC=1",
+            f"passwordA='{data.passwordA}'",
+            f"passwordB='{data.passwordB}'",
+            f"passwordC='{data.passwordC}'"
+        ])
+        
     else:
-        setup_var_name = name
-        setup_status = set_status(3, "/set_password/a/{password}", "Set password A")
-        await redis.publish_json("default", setup_status)
-    await fake_system_activity(redis)
+        logging.warning(f"not handled setupPhase state ({setupPhase})")
+        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    logging.warning(f"kicking off recovery")
+    await call_script("/home/admin/_cache.sh set state waitprovision")
+
+    # TODO: Following input parameters:
+    # lightning='lnd', 'cl' or 'none'
+    # network=bitcoin
+    # chain=main
+    # hostname=[string]
+    # passwordA=[string]
+    # passwordB=[string]
+    # passwordC=[string] (might be empty of no lightning was choosen)
+    # lndrescue=[path] (might be used later if lnd rescue file upload is offered)
+    # clrescue=[path] (might be used later if c-lightning rescue file upload is offered)
+    # seedWords= (might be used later if we offer recover from seed words)
+    # seedPassword= (might be used later if we offer recover from seed words)
+    # migrationFile=[path] (might be used later if we offer raspiblitz migration)
+    # those values get stored in: /var/cache/raspiblitz/temp/raspiblitz.setup
+    # also a skeleton raspiblitz.conf gets created (see controlSetupDialog.sh Line 318)
+    # and then API sets state to `waitprovision` to kick-off provision
+    
+    return sign_jwt()
 
 
-@router.post("/set_password/{type}/{password}", status_code=status.HTTP_200_OK)
-async def start_setup(type: str, password: str, redis: Redis = Depends(depends_redis)):
-    if len(password) < 8:
-        await redis.publish_json(
-            "default",
-            make_error(
-                SetupErrors.PASSWORD_TO_SHORT,
-                "setup/set_password/{type}/{password}",
-                "Password must be min. 8 characters",
-                "Set password, min 8 characters",
-            ),
+# WebUI now loops getting status until state=`waitfinal` then calls:
+@router.get("/setup-final-info", dependencies=[Depends(JWTBearer())])
+async def setup_final_info():
+    # TODO: return info on setup final
+    # during the process some data might be written to /var/cache/raspiblitz/temp/raspiblitz.setup
+    # seedwordsNEW='${seedwords}
+    # seedwords6x4NEW='${seedwords6x4}
+    # syncProgressFull=[percent] = (later WebUi can offer sync from another RaspiBlitz)
+
+    # first check that node is really in setup state
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    if state != "waitfinal":
+        logging.warning(
+            f"/setup-final-info can only be called when nodes awaits final ({state})"
         )
-        raise HTTPException(
-            status.HTTP_406_NOT_ACCEPTABLE, detail="Password must be min. 8 characters"
-        )
-    else:
-        if type == "a":
-            setup_var_password_a = password
-            setup_status = set_status(
-                4, "setup/set_password/b/{password}", "Set password B"
-            )
-            await redis.publish_json("default", setup_status)
-        elif type == "b":
-            setup_var_password_b = password
-            setup_status = set_status(
-                4, "setup/set_tor/{enabled}", "Set TOR true or false"
-            )
-            await redis.publish_json("default", setup_status)
-        elif type == "c":
-            setup_var_password_c = password
-            setup_status = set_status(
-                5, "setup/set_password/c/{password}", "Set password C"
-            )
-            await redis.publish_json("default", setup_status)
-        await fake_system_activity()
+        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
+    resultlines = []
+    with open(setupFilePath, "r") as setupfile:
+        resultlines = setupfile.readlines()
+    data = parse_key_value_lines(resultlines)
+    logging.warning(f"data({data})")
+    try:
+        seedwordsNEW = data["seedwordsNEW"]
+    except:
+        seedwordsNEW=""
 
-@router.post("setup/set_tor/{enabled}", status_code=status.HTTP_200_OK)
-async def set_tor(enabled: bool, redis: Redis = Depends(depends_redis)):
-    setup_var_use_tor = enabled
-    await fake_system_activity(redis)
-    setup_status = set_status(5, "setup/format_hdd", "HDD needs to be formatted")
+    return {
+        "seedwordsNEW": seedwordsNEW
+    }
 
-    await redis.publish_json("default", setup_status)
+# When WebUI displayed seed words & user confirmed write the calls:
+@router.post("/setup-final-done", dependencies=[Depends(JWTBearer())])
+async def setup_final_done():
 
+    # first check that node is really in setup state
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    if state != "waitfinal":
+        logging.warning(f"/setup-final-done can only be called when nodes awaits final")
+        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-@router.post("format_hdd", status_code=status.HTTP_200_OK)
-async def format_hdd(redis: Redis = Depends(depends_redis)):
-    setup_var_hdd_formatted = True
-    await fake_system_activity(redis)
-    setup_status = set_status(7, "setup/set_password/c/{password}", "Set password C")
-    await redis.publish_json("default", setup_status)
+    await call_script("/home/admin/_cache.sh set state donefinal")
+    return {"state": "donefinal"}
+
+@router.get("/shutdown")
+async def get_shutdown():
+
+    # only allow unauthorized shutdowns during setup
+    setupPhase = await redis_get("setupPhase")
+    state = await redis_get("state")
+    if setupPhase == "done"  :
+        logging.warning(f"can only be called when node is not setuped yet")
+        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+    if state != "waitsetup":
+        logging.warning(f"can only be called when nodes awaits setup")
+        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    # do the shutdown
+    return await shutdown(False)
+
+# When WebUI displayed seed words & user confirmed write the calls:
+@router.post("/setup-sync-info", dependencies=[Depends(JWTBearer())])
+async def setup_sync_info():
+
+    # first check that node is really in setup state
+    setupPhase = await redis_get("setupPhase")
+    if setupPhase != "done":
+        logging.warning(f"sync info not available yet")
+        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    try:
+        blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
+        if blitz_sync_initial_done == "1":
+            initialsync = "done"
+        else:
+            initialsync = "running"
+        btc_default_ready = await redis_get("btc_default_ready")
+        btc_default_sync_percentage = await redis_get("btc_default_sync_percentage")
+        btc_default_peers = await redis_get("btc_default_peers")
+        system_count_start_blockchain = await redis_get("system_count_start_blockchain")
+    except:
+        initialsync=""
+        btc_default_ready=""
+        btc_default_sync_percentage=""
+        btc_default_peers=""
+        system_count_start_blockchain="0"
+    try:
+        ln_default = await redis_get("lightning")
+        ln_default_ready = await redis_get("ln_default_ready")
+        ln_default_locked = await redis_get("ln_default_locked")
+        system_count_start_lightning = await redis_get("system_count_start_lightning")
+    except:
+        ln_default=""
+        ln_default_ready=""
+        ln_default_locked=""
+        system_count_start_lightning="0"
+    return {
+        "initialsync": initialsync,
+        "btc_default": "bitcoin",
+        "btc_default_ready": btc_default_ready,
+        "btc_default_sync_percentage": btc_default_sync_percentage,
+        "btc_default_peers": btc_default_peers,
+        "system_count_start_blockchain": system_count_start_blockchain,
+        "ln_default" : ln_default,
+        "ln_default_ready" : ln_default_ready,
+        "ln_default_locked" : ln_default_locked,
+        "system_count_start_lightning": system_count_start_lightning
+    }
