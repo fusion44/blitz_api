@@ -48,7 +48,7 @@ _check_shell_scripts_status()
 
 async def call_script(scriptPath) -> str:
     cmd = f"bash {scriptPath}"
-    logging.warning(f"running script: {cmd}")
+    logging.debug(f"running script: {cmd}")
     proc = await asyncio.create_subprocess_shell(
         cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -65,12 +65,10 @@ async def call_script(scriptPath) -> str:
 def parse_key_value_lines(lines: list) -> dict:
     Dict = {}
     for line in lines:
-        logging.warning(f"line({line})")
-        if len(line.strip()) == 0:
+        line=line.strip()
+        if len(line) == 0:
             continue
-        if line.strip().startswith("#"):
-            continue
-        if line.find("=") <= 0:
+        if not re.match("^[a-zA-Z0-9]*=", line):
             continue
         key, value = line.strip().split("=", 1)
         Dict[key] = value.strip('"').strip("'")

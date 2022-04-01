@@ -109,6 +109,8 @@ wallet_locked = True
 
 @app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
 async def stream(request: Request):
+
+    logging.warning("/sse/subscribe")
     global wallet_locked
     global num_connections
     q = asyncio.Queue()
@@ -116,12 +118,14 @@ async def stream(request: Request):
     num_connections += 1
     new_connections.append(q)
 
+    logging.warning(f"wallet_locked({wallet_locked})")
     if wallet_locked:
         # send the the wallet locked event to the new connection
         await q.put(_make_evt_data(SSE.WALLET_LOCK_STATUS, {"locked": True}))
     else:
         await q.put(_make_evt_data(SSE.WALLET_LOCK_STATUS, {"locked": False}))
 
+    logging.warning(f"len:new_connections({len(new_connections)})")
     if not wallet_locked and len(new_connections) == 1:
         # if the wallet is locked, we'll handle the warmup in _handle_ln_wallet_locked()
         loop = asyncio.get_event_loop()
@@ -133,6 +137,7 @@ async def stream(request: Request):
 async def warmup_new_connections():
     global new_connections
 
+    logging.warning(f"warmup_new_connections")
     res = await get_client_warmup_data()
 
     for c in new_connections:
@@ -148,6 +153,7 @@ async def warmup_new_connections():
             ]
         )
 
+    logging.warning(f"new_connections.clear")
     new_connections.clear()
 
 
