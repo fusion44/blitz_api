@@ -2,6 +2,7 @@
 # create the following file: scripts/sync_to_blitz.personal.sh (it will be ignored by git and not commited)
 # add the following two lines to that files and fill with personal data of your development blitz:
 localIP=""
+sshPort="1022"
 passwordA=""
 
 # get personal blitz info
@@ -43,24 +44,24 @@ remote=admin@$localIP:/root/blitz_api
 
 # Needs sshpass installed
 echo "# syncing local code to: ${remote}"
-sshpass -p "$passwordA" rsync -re ssh $local $remote
+sshpass -p "$passwordA" rsync -rvz -e "ssh -p ${sshPort}" $local $remote
 result=$?
 echo "result(${result})"
 if [ "$result" != "0" ]; then
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "FAIL: was not able to ssh in: ssh admin@$localIP"
+    echo "FAIL: was not able to ssh in: ssh -p ${sshPort} admin@$localIP"
     echo "SSH in once manually. Then try again."
     exit 1
 fi
 
 # Restart the blitz service to activate changes
 echo "# restarting blitzapi.service"
-sshpass -p "$passwordA" ssh admin@$localIP 'sudo systemctl restart blitzapi.service'
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo systemctl restart blitzapi.service'
 
 # Get latest logs entries
 echo "# latest log entries"
-sshpass -p "$passwordA" ssh admin@$localIP 'sudo journalctl -u blitzapi.service -n 10 --no-pager --no-hostname'
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo journalctl -u blitzapi.service -n 10 --no-pager --no-hostname'
 
 # Watch the logs
 echo "# watching logs - CTRL+C to exit"
-sshpass -p "$passwordA" ssh admin@$localIP 'sudo journalctl -u blitzapi.service -f --no-hostname'
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo journalctl -u blitzapi.service -f --no-hostname'
