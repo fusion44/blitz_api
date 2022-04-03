@@ -2,7 +2,7 @@
 # create the following file: scripts/sync_to_blitz.personal.sh (it will be ignored by git and not commited)
 # add the following two lines to that files and fill with personal data of your development blitz:
 localIP=""
-sshPort="1022"
+sshPort="22"
 passwordA=""
 
 # get personal blitz info
