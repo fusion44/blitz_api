@@ -15,20 +15,22 @@ from starlette import status
 import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
 import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
 import app.repositories.ln_impl.protos.walletunlocker_pb2_grpc as unlockerrpc
+from app.models.bitcoind import BlockRpcFunc
 
 
 class BitcoinConfig:
     def __init__(self) -> None:
         self.network = config("network")
+        self.zmq_block_rpc = BlockRpcFunc.from_string(config("bitcoind_zmq_block_rpc"))
 
         if self.network == "testnet":
             self.ip = config("bitcoind_ip_testnet")
             self.rpc_port = config("bitcoind_port_rpc_testnet")
-            self.zmq_port = config("bitcoind_port_zmq_hashblock_testnet")
+            self.zmq_port = config("bitcoind_zmq_block_port_testnet")
         else:
             self.ip = config("bitcoind_ip_mainnet")
             self.rpc_port = config("bitcoind_port_rpc_mainnet")
-            self.zmq_port = config("bitcoind_port_zmq_hashblock_mainnet")
+            self.zmq_port = config("bitcoind_zmq_block_port_mainnet")
 
         self.rpc_url = f"http://{self.ip}:{self.rpc_port}"
         self.zmq_url = f"tcp://{self.ip}:{self.zmq_port}"
