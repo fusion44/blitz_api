@@ -35,10 +35,11 @@ def get_implementation_name() -> str:
 
 async def get_wallet_balance_impl() -> WalletBalance:
     try:
-        req = ln.WalletBalanceRequest()
-        req = ln.ChannelBalanceRequest()
-        onchain = await lncfg.lnd_stub.WalletBalance(req)
-        channel = await lncfg.lnd_stub.ChannelBalance(req)
+        w_req = ln.WalletBalanceRequest()
+        onchain = await lncfg.lnd_stub.WalletBalance(w_req)
+
+        c_req = ln.ChannelBalanceRequest()
+        channel = await lncfg.lnd_stub.ChannelBalance(c_req)
 
         return WalletBalance.from_grpc(onchain, channel)
     except grpc.aio._call.AioRpcError as error:
