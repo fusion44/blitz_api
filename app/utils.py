@@ -10,6 +10,7 @@ import requests
 from decouple import config
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+from pyln.client import LightningRpc
 from starlette import status
 
 import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
@@ -46,6 +47,7 @@ class LightningConfig:
     def __init__(self) -> None:
         self.network = config("network")
         self.ln_node = config("ln_node")
+        self.cln: LightningRpc = None
 
         if self.ln_node == "lnd":
             # Due to updated ECDSA generated tls.cert we need to let gprc know that
@@ -72,8 +74,9 @@ class LightningConfig:
             self.lnd_stub = lnrpc.LightningStub(self._channel)
             self.router_stub = routerrpc.RouterStub(self._channel)
             self.wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
-        elif self.ln_node == "clightning":
-            # TODO: implement c-lightning
+        elif self.ln_node == "cln_unix_socket":
+            self.cln_socket_path = config("cln_socket_path")
+            self.cln = LightningRpc(self.cln_socket_path)  # type: LightningRpc
             pass
         elif self.ln_node == "":
             # its ok to run raspiblitz also without lightning

@@ -72,6 +72,14 @@ class FeeRevenue(BaseModel):
             month=int(fee_report.month_fee_sum),
         )
 
+    @classmethod
+    def from_cln_json(cls, fee_report) -> "FeeRevenue":
+        return cls(
+            day=int(fee_report["day_fee_sum"]),
+            week=int(fee_report["week_fee_sum"]),
+            month=int(fee_report["month_fee_sum"]),
+        )
+
 
 class ForwardSuccessEvent(BaseModel):
     timestamp_ns: int = Query(
@@ -110,11 +118,22 @@ class ForwardSuccessEvent(BaseModel):
             fee_msat=int(evt.fee_msat),
         )
 
+    @classmethod
+    def from_cln_json(cls, fwd) -> "ForwardSuccessEvent":
+        return cls(
+            timestamp_ns=fwd["resolved_time"],
+            chan_id_in=fwd["in_channel"],
+            chan_id_out=fwd["out_channel"],
+            amt_in_msat=fwd["in_msatoshi"],
+            amt_out_msat=fwd["out_msatoshi"],
+            fee_msat=fwd["fee"],
+        )
+
 
 class Feature(BaseModel):
     name: str
-    is_required: bool
-    is_known: bool
+    is_required: Optional[bool]
+    is_known: Optional[bool]
 
     @classmethod
     def from_grpc(cls, f) -> "Feature":
@@ -123,6 +142,10 @@ class Feature(BaseModel):
             is_required=f.is_required,
             is_known=f.is_known,
         )
+
+    @classmethod
+    def from_cln_json(cls, f) -> "Feature":
+        return cls(name=f)
 
 
 class FeaturesEntry(BaseModel):
@@ -134,6 +157,13 @@ class FeaturesEntry(BaseModel):
         return cls(
             key=entry_key,
             value=Feature.from_grpc(feature),
+        )
+
+    @classmethod
+    def from_cln_json(self, entry_key, feature):
+        return self(
+            key=entry_key,
+            value=Feature.from_cln_json(feature),
         )
 
 
@@ -265,6 +295,16 @@ class HopHint(BaseModel):
             cltv_expiry_delta=h.cltv_expiry_delta,
         )
 
+    @classmethod
+    def from_cln_json(cls, h) -> "HopHint":
+        return cls(
+            node_id=h["pubkey"],
+            chan_id=h["short_channel_id"],
+            fee_base_msat=h["fee_base_msat"],
+            fee_proportional_millionths=h["fee_proportional_millionths"],
+            cltv_expiry_delta=h["cltv_expiry_delta"],
+        )
+
 
 class RouteHint(BaseModel):
     hop_hints: List[HopHint] = Query(
@@ -275,6 +315,11 @@ class RouteHint(BaseModel):
     @classmethod
     def from_grpc(cls, h) -> "RouteHint":
         hop_hints = [HopHint.from_grpc(hh) for hh in h.hop_hints]
+        return cls(hop_hints=hop_hints)
+
+    @classmethod
+    def from_cln_json(cls, h) -> "RouteHint":
+        hop_hints = [HopHint.from_cln_json(hh) for hh in h.hop_hints]
         return cls(hop_hints=hop_hints)
 
 
@@ -905,59 +950,70 @@ class Chain(BaseModel):
 
 class LnInfo(BaseModel):
     implementation: str = Query(
-        ..., description="Lightning software implementation (LND, c-lightning)"
+        ..., description="Lightning software implementation (LND, CLN)"
     )
-    # The version of the LND software that the node is running.
-    version: str
 
-    # The SHA1 commit hash that the daemon is compiled with.
-    commit_hash: str
+    version: str = Query(
+        ..., description="The version of the software that the node is running."
+    )
 
-    # The identity pubkey of the current node.
-    identity_pubkey: str
+    commit_hash: str = Query(
+        ..., description="The SHA1 commit hash that the daemon is compiled with."
+    )
 
-    # If applicable, the alias of the current node, e.g. "bob"
-    alias: str
+    identity_pubkey: str = Query(
+        ..., description="The identity pubkey of the current node."
+    )
 
-    # The color of the current node in hex code format
-    color: str
+    alias: str = Query(..., description="The alias of the node.")
 
-    # Number of pending channels
-    num_pending_channels: int
+    color: str = Query(
+        ..., description="The color of the current node in hex code format."
+    )
 
-    # Number of active channels
-    num_active_channels: int
+    num_pending_channels: int = Query(..., description="Number of pending channels.")
 
-    # Number of inactive channels
-    num_inactive_channels: int
+    num_active_channels: int = Query(..., description="Number of active channels.")
 
-    # Number of peers
-    num_peers: int
+    num_inactive_channels: int = Query(..., description="Number of inactive channels.")
 
-    # The node's current view of the height of the best block
-    block_height: int
+    num_peers: int = Query(..., description="Number of peers.")
 
-    # The node's current view of the hash of the best block
-    block_hash: str
+    block_height: int = Query(
+        ...,
+        description="The node's current view of the height of the best block. Only available with LND.",
+    )
 
-    # Timestamp of the block best known to the wallet
-    best_header_timestamp: int
+    block_hash: str = Query(
+        "",
+        description="The node's current view of the hash of the best block. Only available with LND.",
+    )
 
-    # Whether the wallet's view is synced to the main chain
-    synced_to_chain: bool
+    best_header_timestamp: int = Query(
+        None,
+        description="Timestamp of the block best known to the wallet. Only available with LND.",
+    )
 
-    # Whether we consider ourselves synced with the public channel graph.
-    synced_to_graph: bool
+    synced_to_chain: bool = Query(
+        None,
+        description="Whether the wallet's view is synced to the main chain. Only available with LND.",
+    )
 
-    # A list of active chains the node is connected to
-    chains: List[Chain]
+    synced_to_graph: bool = Query(
+        None,
+        description="Whether we consider ourselves synced with the public channel graph. Only available with LND.",
+    )
 
-    # The URIs of the current node.
-    uris: List[str]
+    chains: List[Chain] = Query(
+        [], description="A list of active chains the node is connected to"
+    )
 
-    # Features that our node has advertised in our init message,
-    # node announcements and invoices.
-    features: List[FeaturesEntry]
+    uris: List[str] = Query([], description="The URIs of the current node.")
+
+    features: List[FeaturesEntry] = Query(
+        [],
+        description="Features that our node has advertised in our init message node announcements and invoices. Not yet implemented with CLN",
+    )
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -1002,6 +1058,36 @@ class LnInfo(BaseModel):
             features=_features,
         )
 
+    @classmethod
+    def from_cln_json(cls, implementation, i) -> "LnInfo":
+        _chains = [Chain(chain="bitcoin", network=i["network"])]
+
+        _features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # for k in i["our_features"].keys():
+        #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
+
+        _uris = []
+        for b in i["binding"]:
+            _uris.append(f"{b['address']}:{b['port']}")
+
+        return LnInfo(
+            implementation=implementation,
+            version=i["version"],
+            commit_hash=i["version"].split("-")[-1],
+            identity_pubkey=i["id"],
+            alias=i["alias"],
+            color=i["color"],
+            num_pending_channels=i["num_pending_channels"],
+            num_active_channels=i["num_active_channels"],
+            num_inactive_channels=i["num_inactive_channels"],
+            num_peers=i["num_peers"],
+            block_height=i["blockheight"],
+            chains=_chains,
+            uris=_uris,
+            features=_features,
+        )
+
 
 class LightningInfoLite(BaseModel):
     implementation: str = Query(
@@ -1016,10 +1102,10 @@ class LightningInfoLite(BaseModel):
         ..., description="The node's current view of the height of the best block"
     )
     synced_to_chain: bool = Query(
-        ..., description="Whether the wallet's view is synced to the main chain"
+        None, description="Whether the wallet's view is synced to the main chain"
     )
     synced_to_graph: bool = Query(
-        ...,
+        None,
         description="Whether we consider ourselves synced with the public channel graph.",
     )
 
@@ -1087,18 +1173,20 @@ class WalletBalance(BaseModel):
 class PaymentRequest(BaseModel):
     destination: str
     payment_hash: str
-    num_satoshis: int
+    num_satoshis: int = Query(
+        None, description="Deprecated. User num_msat instead", deprecated=True
+    )
     timestamp: int
     expiry: int
     description: str
-    description_hash: str
+    description_hash: Optional[str]
     fallback_addr: Optional[str]
     cltv_expiry: int
     route_hints: List[RouteHint] = Query(
         [], description="A list of [HopHint] for the RouteHint"
     )
-    payment_addr: str = Query(..., description="The payment address in hex format")
-    num_msat: int
+    payment_addr: str = Query("", description="The payment address in hex format")
+    num_msat: Optional[int]
     features: List[FeaturesEntry] = Query([])
 
     @classmethod
@@ -1117,6 +1205,39 @@ class PaymentRequest(BaseModel):
             payment_addr=r.payment_addr.hex(),
             num_msat=r.num_msat,
             features=[FeaturesEntry.from_grpc(k, r.features[k]) for k in r.features],
+        )
+
+    @classmethod
+    def from_cln_json(cls, r):
+        routes = []
+        if "routes" in r.keys():
+            routes = [RouteHint.from_cln_json(rh) for rh in r["routes"]]
+
+        msat = 0
+        if "amount_msat" in r:
+            msat = r["amount_msat"]
+
+        features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # if "features" in r:
+        #     features = [
+        #         FeaturesEntry.from_cln_json(k, r["features"][k]) for k in r["features"]
+        #     ]
+
+        return cls(
+            destination=r["payee"],
+            payment_hash=r["payment_hash"],
+            num_satoshis=msat / 1000,
+            timestamp=r["created_at"],
+            expiry=r["expiry"],
+            description=r["description"],
+            description_hash="" if "payment_hash" not in r else r["payment_hash"],
+            fallback_addr="" if "fallbacks" not in r else r["fallbacks"][0],
+            cltv_expiry=r["min_final_cltv_expiry"],
+            route_hints=routes,
+            num_msat=msat,
+            payment_addr=r["payment_secret"],
+            features=features,
         )
 
 
@@ -1197,7 +1318,7 @@ class GenericTx(BaseModel):
     total_fees: int = Query(None, description="Total fees paid for this transaction")
 
     @classmethod
-    def from_grpc_invoice(cls, i):
+    def from_grpc_invoice(cls, i) -> "GenericTx":
         status = TxStatus.UNKNOWN
         time_stamp = i.creation_date
         amount = i.value_msat
@@ -1221,7 +1342,7 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_grpc_onchain_tx(cls, tx):
+    def from_grpc_onchain_tx(cls, tx) -> "GenericTx":
         s = TxStatus.SUCCEEDED if tx.num_confirmations > 0 else TxStatus.IN_FLIGHT
 
         t = TxType.UNKNOWN
@@ -1244,7 +1365,7 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_grpc_payment(cls, payment, comment: str = ""):
+    def from_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
         status = TxStatus.UNKNOWN
         if payment.status == 1:
             status = TxStatus.IN_FLIGHT
@@ -1261,5 +1382,84 @@ class GenericTx(BaseModel):
             amount=-payment.value_msat,
             status=status,
             total_fees=payment.fee_msat,
+            comment=comment,
+        )
+
+    @classmethod
+    def from_cln_json_invoice(cls, i) -> "GenericTx":
+        status = TxStatus.UNKNOWN
+        time_stamp = i["expires_at"]
+        amount = i["msatoshi"]
+        if i["status"] == "paid":
+            status = TxStatus.SUCCEEDED
+            time_stamp = i["paid_at"]
+            amount = i["amount_received_msat"]
+        elif i["status"] == "unpaid":
+            status = TxStatus.IN_FLIGHT
+        elif ["status"] == "expired":
+            status = TxStatus.FAILED
+
+        return cls(
+            id=i["bolt11"],
+            category=TxCategory.LIGHTNING,
+            type=TxType.RECEIVE,
+            amount=amount,
+            time_stamp=time_stamp,
+            comment=i["description"],
+            status=status,
+        )
+
+    @classmethod
+    def from_cln_json_onchain_tx(cls, tx, current_block_height: int) -> "GenericTx":
+        confs = current_block_height - tx["blockheight"]
+        s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
+
+        print(tx["hash"])
+
+        for ins in tx["inputs"]:
+            print(f"i:  {ins['index']}")
+
+        amount = 0
+        for out in tx["outputs"]:
+            print(f"o: {out['index']} {out['msat'].millisatoshis}")
+            # amount += out["msat"].millisatoshis
+
+        t = TxType.UNKNOWN
+        if amount > 0:
+            t = TxType.RECEIVE
+        elif amount < 0:
+            t = TxType.SEND
+
+        return cls(
+            id=tx["hash"],
+            category=TxCategory.ONCHAIN,
+            type=t,
+            amount=amount,
+            time_stamp=0,
+            status=s,
+            comment="",
+            block_height=tx["blockheight"],
+            num_confs=confs,
+        )
+
+    @classmethod
+    def from_cln_json_payment(cls, payment, comment: str = "") -> "GenericTx":
+        status = TxStatus.UNKNOWN  #  “pending”, “failed”, “complete”
+        if payment["status"] == "pending":
+            status = TxStatus.IN_FLIGHT
+        elif payment["status"] == "complete":
+            status = TxStatus.SUCCEEDED
+        elif payment["status"] == "failed":
+            status = TxStatus.FAILED
+
+        return cls(
+            id=payment["bolt11"],
+            category=TxCategory.LIGHTNING,
+            type=TxType.SEND,
+            time_stamp=payment["created_at"],
+            amount=-payment["amount_msat"].millisatoshis,
+            status=status,
+            total_fees=payment["amount_sent_msat"].millisatoshis
+            - payment["amount_msat"].millisatoshis,
             comment=comment,
         )
