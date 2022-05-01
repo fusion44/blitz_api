@@ -16,6 +16,7 @@ from app.models.lightning import (
     ForwardSuccessEvent,
     GenericTx,
     Invoice,
+    InvoiceState,
     LnInfo,
     NewAddressInput,
     OnChainTransaction,
@@ -260,8 +261,32 @@ async def list_all_tx_impl(
 
 async def list_invoices_impl(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
-):
-    raise NotImplementedError("c-lightning not yet implemented")
+) -> List[Invoice]:
+    # TODO: Core Lightning returns way less information about
+    # the invoice compared to LND. Only way to extract the data is to
+    # decode the pay request... seems inefficient.
+    # TODO: Core Lightning does not yet allow for proper paging. Cache this?
+    @force_async
+    def _list_invoices():
+        return lncfg.cln.listinvoices()
+
+    res = await _list_invoices()
+
+    tx = []
+    for i in res["invoices"]:
+        if pending_only:
+            if i["status"] == "unpaid":
+                tx.append(Invoice.from_cln_json(i))
+        else:
+            tx.append(Invoice.from_cln_json(i))
+
+    if reversed:
+        tx.reverse()
+
+    if num_max_invoices == 0 or num_max_invoices == None:
+        return tx
+
+    return tx[index_offset : index_offset + num_max_invoices]
 
 
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
@@ -356,15 +381,31 @@ async def unlock_wallet_impl(password: str) -> bool:
     raise NotImplementedError("c-lightning not yet implemented")
 
 
-async def listen_invoices() -> Invoice:
-    async def _listen_invoices() -> AsyncGenerator[Invoice, None]:
-        while True:
-            res = lncfg.cln.waitanyinvoice(lastpay_index=0)
-            yield res
+async def listen_invoices() -> AsyncGenerator[Invoice, None]:
+    @force_async
+    def _wrapper(ln, last_pay_index):
+        "async wrapper for waitanyinvoice"
+        return ln.waitanyinvoice(last_pay_index)
 
+    lastpay_index = 0
+    invoices = await list_invoices_impl(
+        pending_only=False,
+        index_offset=0,
+        num_max_invoices=9999999999999,
+        reversed=False,
+    )
+
+    for i in invoices:  # type Invoice
+        if i.state == InvoiceState.SETTLED and i.settle_index > lastpay_index:
+            lastpay_index = i.settle_index
+
+    # wait for the invoices
     try:
-        async for r in _listen_invoices():
-            yield Invoice.from_grpc(r)
+        while True:
+            r = await _wrapper(lncfg.cln, last_pay_index=lastpay_index)
+            r = Invoice.from_cln_json(r)
+            lastpay_index = r.settle_index
+            yield r
     except TypeError as e:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e)
     except AttributeError as ae:

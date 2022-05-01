@@ -33,6 +33,17 @@ class InvoiceState(str, Enum):
         else:
             raise NotImplementedError(f"InvoiceState {id} is not implemented")
 
+    @classmethod
+    def from_cln_json(cls, id) -> "InvoiceState":
+        if id == "unpaid":
+            return InvoiceState.OPEN
+        elif id == "paid":
+            return InvoiceState.SETTLED
+        elif id == "expired":
+            return InvoiceState.CANCELED
+        else:
+            raise NotImplementedError(f"InvoiceState {id} is not implemented")
+
 
 class InvoiceHTLCState(str, Enum):
     ACCEPTED = "accepted"
@@ -324,112 +335,140 @@ class RouteHint(BaseModel):
 
 
 class Invoice(BaseModel):
-    # optional memo to attach along with the invoice.
-    # Used for record keeping purposes for the invoice's
-    # creator, and will also be set in the description
-    # field of the encoded payment request if the
-    # description_hash field is not being used.
-    memo: Optional[str]
+    memo: str = Query(
+        None,
+        description="""Optional memo to attach along with the invoice. Used for record keeping purposes for the invoice's creator,
+        and will also be set in the description field of the encoded payment request if the description_hash field is not being used.""",
+    )
 
-    # The hex-encoded preimage(32 byte) which will allow
-    # settling an incoming HTLC payable to this preimage.
-    r_preimage: Optional[str]
+    r_preimage: str = Query(
+        None,
+        description="""The hex-encoded preimage(32 byte) which will allow settling an incoming HTLC payable to this preimage.""",
+    )
 
-    # The hash of the preimage.
-    r_hash: Optional[str]
+    r_hash: str = Query(None, description="The hash of the preimage.")
 
-    # The value of this invoice in satoshis
-    # The fields value and value_msat are mutually exclusive.
-    value: Optional[int]
-    # The value of this invoice in millisatoshis The
-    # fields value and value_msat are mutually exclusive.
-    value_msat: Optional[int]
+    value: int = Query(..., description="The value of this invoice in satoshis.")
 
-    # Whether this invoice has been fulfilled
-    settled: Optional[bool]
+    value_msat: int = Query(
+        ..., description="The value of this invoice in milli satoshis."
+    )
 
-    # When this invoice was created
-    creation_date: Optional[int]
+    settled: bool = Query(False, description="Whether this invoice has been fulfilled")
 
-    # When this invoice was settled
-    settle_date: Optional[int]
+    creation_date: int = Query(
+        None,
+        description="When this invoice was created. Not available with CLN.",
+    )
 
-    # A bare-bones invoice for a payment within the
-    # Lightning Network. With the details of the invoice,
-    # the sender has all the data necessary to send a
-    # payment to the recipient.
-    payment_request: Optional[str]
+    settle_date: int = Query(
+        None,
+        description="When this invoice was settled. Not available with pending invoices.",
+    )
 
-    # Hash(SHA-256) of a description of the payment.
-    # Used if the description of payment(memo) is too
-    # long to naturally fit within the description field of
-    # an encoded payment request.
-    description_hash: Optional[str]
+    expiry_date: int = Query(None, description="The time at which this invoice expires")
 
-    # Payment request expiry time in seconds. Default is 3600 (1 hour).
-    expiry: Optional[int]
+    payment_request: str = Query(
+        None,
+        description="""A bare-bones invoice for a payment within the
+    Lightning Network. With the details of the invoice, the sender has all the data necessary to
+    send a payment to the recipient.
+    """,
+    )
 
-    # Fallback on-chain address.
-    fallback_addr: Optional[str]
+    description_hash: str = Query(
+        None,
+        description="""
+    Hash(SHA-256) of a description of the payment. Used if the description of payment(memo) is too
+    long to naturally fit within the description field of an encoded payment request.
+    """,
+    )
 
-    # Delta to use for the time-lock of the CLTV extended to the final hop.
-    cltv_expiry: Optional[int]
+    expiry: int = Query(
+        None,
+        description="Payment request expiry time in seconds. Default is 3600 (1 hour).",
+    )
 
-    # Route hints that can each be individually used
-    # to assist in reaching the invoice's destination.
-    route_hints: Optional[List[RouteHint]]
+    fallback_addr: str = Query(None, description="Fallback on-chain address.")
 
-    # Whether this invoice should include routing hints for private channels.
-    private: Optional[bool]
+    cltv_expiry: int = Query(
+        None,
+        description="Delta to use for the time-lock of the CLTV extended to the final hop.",
+    )
 
-    # The "add" index of this invoice. Each newly created invoice
-    # will increment this index making it monotonically increasing.
-    # Callers to the SubscribeInvoices call can use this to instantly
-    # get notified of all added invoices with an add_index greater than this one.
-    add_index: Optional[int]
+    route_hints: List[RouteHint] = Query(
+        None,
+        description="""
+    Route hints that can each be individually used to assist in reaching the invoice's destination.
+    """,
+    )
 
-    # The "settle" index of this invoice. Each newly settled invoice will
-    # increment this index making it monotonically increasing. Callers to
-    # the SubscribeInvoices call can use this to instantly get notified of
-    # all settled invoices with an settle_index greater than this one.
-    settle_index: Optional[int]
+    private: bool = Query(
+        None,
+        description="Whether this invoice should include routing hints for private channels.",
+    )
 
-    # The amount that was accepted for this invoice, in satoshis. This
-    # will ONLY be set if this invoice has been settled. We provide
-    # this field as if the invoice was created with a zero value,
-    # then we need to record what amount was ultimately accepted.
-    # Additionally, it's possible that the sender paid MORE that
-    # was specified in the original invoice. So we'll record that here as well.
-    amt_paid_sat: Optional[int]
+    add_index: int = Query(
+        None,
+        description="""
+    The "add" index of this invoice. Each newly created invoice will increment this index making it monotonically increasing. Not available with CLN.""",
+    )
 
-    # The amount that was accepted for this invoice, in millisatoshis.
-    # This will ONLY be set if this invoice has been settled. We
-    # provide this field as if the invoice was created with a zero value,
-    # then we need to record what amount was ultimately accepted. Additionally,
-    # it's possible that the sender paid MORE that was specified in the
-    # original invoice. So we'll record that here as well.
-    amt_paid_msat: Optional[int]
+    settle_index: int = Query(
+        None,
+        description="""
+        The "settle" index of this invoice. Each newly settled invoice will  increment this index making it monotonically increasing.
+    """,
+    )
 
-    # The state the invoice is in.
-    state: Optional[InvoiceState]
+    amt_paid_sat: int = Query(
+        None,
+        description="""
+    The amount that was accepted for this invoice, in satoshis. This
+    will ONLY be set if this invoice has been settled. We provide
+    this field as if the invoice was created with a zero value,
+    then we need to record what amount was ultimately accepted.
+    Additionally, it's possible that the sender paid MORE that
+    was specified in the original invoice. So we'll record that here as well.
+    """,
+    )
 
-    # List of HTLCs paying to this invoice[EXPERIMENTAL].
-    htlcs: Optional[List[InvoiceHTLC]]
+    amt_paid_msat: int = Query(
+        None,
+        description="""
+    The amount that was accepted for this invoice, in millisatoshis.
+    This will ONLY be set if this invoice has been settled. We
+    provide this field as if the invoice was created with a zero value,
+    then we need to record what amount was ultimately accepted. Additionally,
+    it's possible that the sender paid MORE that was specified in the
+    original invoice. So we'll record that here as well.
+    """,
+    )
 
-    # List of features advertised on the invoice.
-    features: Optional[List[FeaturesEntry]]
+    state: InvoiceState = Query(..., description="The state the invoice is in.")
 
-    # Indicates if this invoice was a spontaneous payment
-    # that arrived via keysend[EXPERIMENTAL].
-    is_keysend: Optional[bool]
+    htlcs: List[InvoiceHTLC] = Query(
+        None, description="List of HTLCs paying to this invoice[EXPERIMENTAL]."
+    )
 
-    # The payment address of this invoice. This value will
-    # be used in MPP payments, and also for newer invoices
-    # that always require the MPP payload for added end-to-end security.
-    payment_addr: Optional[str]
+    features: List[FeaturesEntry] = Query(
+        None, description="List of features advertised on the invoice."
+    )
 
-    # Signals whether or not this is an AMP invoice.
-    is_amp: Optional[bool]
+    is_keysend: bool = Query(
+        None,
+        description="Indicates if this invoice was a spontaneous payment that arrived via keysend[EXPERIMENTAL].",
+    )
+
+    payment_addr: str = Query(
+        None,
+        description=""" The payment address of this invoice. This value will be used in MPP payments,
+    and also for newer invoices that always require the MPP payload for added end-to-end security.""",
+    )
+
+    is_amp: bool = Query(
+        None, description="Signals whether or not this is an AMP invoice."
+    )
 
     @classmethod
     def from_grpc(cls, i) -> "Invoice":
@@ -459,6 +498,7 @@ class Invoice(BaseModel):
             value_msat=i.value_msat,
             settled=i.settled,
             creation_date=i.creation_date,
+            expiry_date=i.creation_date + i.expiry,
             settle_date=i.settle_date,
             payment_request=i.payment_request,
             description_hash=i.description_hash,
@@ -477,6 +517,28 @@ class Invoice(BaseModel):
             is_keysend=i.is_keysend,
             payment_addr=i.payment_addr.hex(),
             is_amp=i.is_amp,
+        )
+
+    @classmethod
+    def from_cln_json(cls, i) -> "Invoice":
+        return cls(
+            memo=i["description"],
+            r_preimage=i["payment_preimage"] if "payment_preimage" in i else None,
+            r_hash=i["payment_hash"],
+            value=i["msatoshi"] / 1000,
+            value_msat=i["msatoshi"],
+            settled=True if i["status"] == "paid" else False,
+            expiry_date=i["expires_at"],
+            settle_date=i["paid_at"] if "paid_at" in i else None,
+            payment_request=i["bolt11"],
+            settle_index=i["pay_index"] if "pay_index" in i else None,
+            amt_paid_sat=i["amount_received_msat"] / 1000
+            if "amount_received_msat" in i
+            else None,
+            amt_paid_msat=i["amount_received_msat"]
+            if "amount_received_msat" in i
+            else None,
+            state=InvoiceState.from_cln_json(i["status"]),
         )
 
 
