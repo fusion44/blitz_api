@@ -37,8 +37,8 @@ async def get_status():
     message = await redis_get("message")
     if setupPhase == "done":
         try:
-            blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
-            if blitz_sync_initial_done == "1":
+            btc_default_sync_initial_done = await redis_get("btc_default_sync_initial_done")
+            if btc_default_sync_initial_done == "1":
                 initialsync = "done"
             else:
                 initialsync = "running"  
