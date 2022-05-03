@@ -58,13 +58,15 @@ async def get_app_status_single(app_iD):
                 "httpsForced": httpsForced,
                 "httpsSelfsigned": httpsSelfsigned,
                 "hiddenService": hiddenService,
-                "details": details
+                "details": details,
+                "error": ""
             }
         else:
             return {
                 "id": f"{app_iD}",
                 "installed": (data["installed"] == "1"),
                 "status": "offline",
+                "error": ""
             }
     except:
         # script had error or was not able to deliver all requested data fields
@@ -151,6 +153,9 @@ async def run_bonus_script(app_id: str, params: str):
     )
     stdout, stderr = await proc.communicate()
 
+    # extracting mode from params
+    mode = params.split()[0]
+
     # logging to console
     logging.warning(f"INSTALL RESULT ({proc.returncode}): {cmd}")
     if stdout:
@@ -186,7 +191,7 @@ async def run_bonus_script(app_id: str, params: str):
                 SSE.INSTALL_APP,
                 {
                     "id": app_id,
-                    "mode": params,
+                    "mode": mode,
                     "result": "fail",
                     "details": stdoutData["error"],
                 },
@@ -198,7 +203,7 @@ async def run_bonus_script(app_id: str, params: str):
                 SSE.INSTALL_APP,
                 {
                     "id": app_id,
-                    "mode": params,
+                    "mode": mode,
                     "result": "fail",
                     "details": "install script did not ran thru",
                 },
@@ -209,8 +214,22 @@ async def run_bonus_script(app_id: str, params: str):
             # check if script was effective
             updatedAppData = await get_app_status_single(app_id)
 
+            # in case of script error
+            if updatedAppData["error"] != "" :
+                logging.warning(f"Error Detected ...")
+                logging.warning(f"updatedAppData: {updatedAppData}")
+                await send_sse_message(
+                    SSE.INSTALL_APP,
+                    {
+                        "id": app_id,
+                        "mode": mode,
+                        "result": "fail",
+                        "details": updatedAppData["error"],
+                    },
+                )
+
             # if install was running
-            if params.startswith("on"):
+            elif mode == "on" :
                 logging.warning(f"Checking if INSTALL worked ...")
                 logging.warning(f"updatedAppData: {updatedAppData}")
                 if updatedAppData["installed"]:
@@ -219,7 +238,7 @@ async def run_bonus_script(app_id: str, params: str):
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
-                            "mode": "on",
+                            "mode": mode,
                             "result": "win",
                             "httpsForced": updatedAppData["httpsForced"],
                             "httpsSelfsigned": updatedAppData["httpsSelfsigned"],
@@ -234,13 +253,14 @@ async def run_bonus_script(app_id: str, params: str):
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
-                            "mode": "on",
+                            "mode": mode,
                             "result": "fail",
-                            "details": "install was not effective",
+                            "details": "install was not effective"
                         },
                     )
 
-            if params.startswith("off"):
+            # if uninstall was running
+            elif mode == "off":
                 logging.warning(f"Checking if UNINSTALL worked ...")
                 if updatedAppData["installed"]:
                     logging.error(f"FAIL - is still installed")
@@ -250,7 +270,7 @@ async def run_bonus_script(app_id: str, params: str):
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
-                            "mode": "off",
+                            "mode": mode,
                             "result": "fail",
                             "details": "uninstall was not effective",
                         },
@@ -261,7 +281,7 @@ async def run_bonus_script(app_id: str, params: str):
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
-                            "mode": "off",
+                            "mode": mode,
                             "result": "win",
                             "details": stdoutData["result"],
                         },
