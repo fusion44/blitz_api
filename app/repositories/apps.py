@@ -68,6 +68,9 @@ async def get_app_status_single(app_iD):
             if httpsForced == "1":
                 address = f"https://{localIP}:{httpsPort}"
             hiddenService = data["toraddress"]
+            authMethod="none"
+            if "authMethod" in data.keys():
+                authMethod = data["authMethod"]
             details = {}
 
             # set details for certain apps
@@ -84,6 +87,7 @@ async def get_app_status_single(app_iD):
                 "httpsForced": httpsForced,
                 "httpsSelfsigned": httpsSelfsigned,
                 "hiddenService": hiddenService,
+                "authMethod": authMethod,
                 "details": details,
                 "error": error
             }
