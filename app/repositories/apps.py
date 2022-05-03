@@ -144,10 +144,9 @@ async def run_bonus_script(app_id: str, params: str):
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
-    logging.info(f"[{cmd!r} exited with {proc.returncode}]")
 
     # logging to console
-    logging.warning(f"INSTALL RESULT: cmd({id}) params:{params}")
+    logging.warning(f"INSTALL RESULT ({proc.returncode}): {cmd}")
     if stdout:
         logging.info(f"[stdout]\n{stdout.decode()}")
     else:
@@ -159,6 +158,7 @@ async def run_bonus_script(app_id: str, params: str):
 
     # create log file
     logFileName = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
+    logging.info(f"WRITING LONG FILE: {logFileName}")
     with open(logFileName, "w", encoding="utf-8") as f:
         f.write(f"API triggred script: {cmd}\n")
         f.write(f"###### STDOUT #######\n")
@@ -169,10 +169,13 @@ async def run_bonus_script(app_id: str, params: str):
             f.write(stderr.decode())
 
     # sending final feedback event
+    logging.info(f"SENDING RESULT EVENT ...")
     if stdout:
         stdoutData = parse_key_value_text(stdout.decode())
+        logging.info(f"PARSED STDOUT DATA: {stdoutData}")
         # when there is a defined error message (if multiple it wil lbe the last one)
         if "error" in stdoutData:
+            logging.error(f"FOUND `error=` returned by script: {stdoutData['error']}")
             await send_sse_message(
                 SSE.INSTALL_APP,
                 {
@@ -184,6 +187,7 @@ async def run_bonus_script(app_id: str, params: str):
             )
         # when there is no result (e.g. result="OK") at the end of install script stdout - consider also script had error
         elif not "result" in stdoutData:
+            logging.error(f"NO `result=` returned by script:")
             await send_sse_message(
                 SSE.INSTALL_APP,
                 {
@@ -198,36 +202,61 @@ async def run_bonus_script(app_id: str, params: str):
 
             # check if script was effective
             updatedAppData = await get_app_status_single(app_id)
-            if updatedAppData["installed"] and params == "on":
-                await send_sse_message(
-                    SSE.INSTALL_APP,
-                    {
-                        "id": app_id,
-                        "mode": "on",
-                        "result": "win",
-                        "details": stdoutData["result"],
-                    },
-                )
-            elif not updatedAppData["installed"] and params == "off":
-                await send_sse_message(
-                    SSE.INSTALL_APP,
-                    {
-                        "id": app_id,
-                        "mode": "off",
-                        "result": "win",
-                        "details": stdoutData["result"],
-                    },
-                )
-            else:
-                await send_sse_message(
-                    SSE.INSTALL_APP,
-                    {
-                        "id": app_id,
-                        "mode": "off",
-                        "result": "fail",
-                        "details": "script ran thru but was not effective",
-                    },
-                )
+
+            # if install was running
+            if params.startswith("on"):
+                logging.warning(f"Checking if INSTALL worked ...")
+                if updatedAppData["installed"]:
+                    logging.info(f"WIN - install was effective")
+                    await send_sse_message(
+                        SSE.INSTALL_APP,
+                        {
+                            "id": app_id,
+                            "mode": "on",
+                            "result": "win",
+                            "details": stdoutData["result"],
+                        },
+                    )
+                else:
+                    logging.error(f"FAIL - was not installed")
+                    logging.warning(f"updatedAppData: {updatedAppData}")            
+                    logging.warning(f"params: {params}")
+                    await send_sse_message(
+                        SSE.INSTALL_APP,
+                        {
+                            "id": app_id,
+                            "mode": "on",
+                            "result": "fail",
+                            "details": "install was not effective",
+                        },
+                    ) 
+
+            if params.startswith("off"):
+                logging.warning(f"Checking if UNINSTALL worked ...")
+                if updatedAppData["installed"]:
+                    logging.error(f"FAIL - is still installed")
+                    logging.warning(f"updatedAppData: {updatedAppData}")            
+                    logging.warning(f"params: {params}")
+                    await send_sse_message(
+                        SSE.INSTALL_APP,
+                        {
+                            "id": app_id,
+                            "mode": "off",
+                            "result": "fail",
+                            "details": "uninstall was not effective",
+                        },
+                    ) 
+                else:
+                    logging.info(f"WIN - uninstall was effective")
+                    await send_sse_message(
+                        SSE.INSTALL_APP,
+                        {
+                            "id": app_id,
+                            "mode": "off",
+                            "result": "win",
+                            "details": stdoutData["result"],
+                        },
+                    )
 
             # send an updated state if that app
             await send_sse_message(SSE.INSTALLED_APP_STATUS, [updatedAppData])
