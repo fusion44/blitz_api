@@ -18,6 +18,8 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 
 
 async def get_app_status_single(app_iD):
+
+    logging.warning(f"get_app_status_single: {app_iD}")
     if app_iD not in available_app_ids:
         return {
             "id": f"{app_iD}",
@@ -27,9 +29,32 @@ async def get_app_status_single(app_iD):
         os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_iD}.sh")
         + " status"
     )
+
     try:
         result = await call_script(script_call)
+    except:
+        # script had error or was not able to deliver all requested data fields
+        logging.warning(f"error on calling: {script_call}")
+        return {
+            "id": f"{app_iD}",
+            "error": f"script not working for api: {script_call}",
+        }
+
+    try:
         data = parse_key_value_text(result)
+    except:
+        logging.warning(f"error on parsing: {result}")
+        return {
+            "id": f"{app_iD}",
+            "error": f"script result parsing error: {script_call}",
+        }
+
+    try:
+        logging.warning(f"get_app_status_single: Repackaging data: {app_iD}")
+        error=""
+        if "error" in data.keys():
+            error = data["error"]
+
         if data["installed"] == "1":
             # get basic data
             status = "online"
@@ -44,6 +69,7 @@ async def get_app_status_single(app_iD):
                 address = f"https://{localIP}:{httpsPort}"
             hiddenService = data["toraddress"]
             details = {}
+
             # set details for certain apps
             if app_iD == "mempool" or app_iD == "btc-rpc-explorer":
                 details = {
@@ -59,23 +85,21 @@ async def get_app_status_single(app_iD):
                 "httpsSelfsigned": httpsSelfsigned,
                 "hiddenService": hiddenService,
                 "details": details,
-                "error": ""
+                "error": error
             }
         else:
             return {
-                "id": f"{app_iD}",
-                "installed": (data["installed"] == "1"),
+                "id": app_iD,
+                "installed": False,
                 "status": "offline",
-                "error": ""
+                "error": error
             }
-    except:
-        # script had error or was not able to deliver all requested data fields
-        logging.warning(f"error on calling: {script_call}")
+    except: 
+        logging.warning(f"error on repackage data: {result}")
         return {
             "id": f"{app_iD}",
-            "error": f"script not working for api: {script_call}",
+            "error": f"script result processing error: {script_call}",
         }
-
 
 async def get_app_status():
     appStatusList: Array = []
