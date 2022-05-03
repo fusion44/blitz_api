@@ -37,12 +37,14 @@ async def get_app_status_single(app_iD):
             localIP = data["localIP"]
             httpPort = data["httpPort"]
             httpsPort = data["httpsPort"]
+            httpsForced = data["httpsForced"]
+            httpsSelfsigned = data["httpsSelfsigned"]
             address = f"http://{localIP}:{httpPort}"
+            if httpsForced == "1":
+                address = f"https://{localIP}:{httpsPort}"
             hiddenService = data["toraddress"]
             details = {}
-            # mofify for some apps
-            if app_iD == "specter" or app_iD == "lnbits" or app_iD == "btcpayserver":
-                address = f"https://{localIP}:{httpsPort}"
+            # set details for certain apps
             if app_iD == "mempool" or app_iD == "btc-rpc-explorer":
                 details = {
                     "isIndexed": data["isIndexed"],
@@ -53,8 +55,10 @@ async def get_app_status_single(app_iD):
                 "installed": installed,
                 "status": status,
                 "address": address,
+                "httpsForced": httpsForced,
+                "httpsSelfsigned": httpsSelfsigned,
                 "hiddenService": hiddenService,
-                "details": details,
+                "details": details
             }
         else:
             return {
@@ -83,7 +87,9 @@ async def get_app_status_sub():
     while True:
         status = "online" if switch else "offline"
         app_list = [
-            {"id": "specter", "name": "Specter Desktop", "status": status},
+            # Specter is deactivated for now because it uses its own selfsigned HTTPS cert that makes trouble in chome on last test
+            # also see: app/constants.py where specter is deactivated
+            # {"id": "specter", "name": "Specter Desktop", "status": status},
             {"id": "sphinx", "name": "Sphinx Chat", "status": status},
             {"id": "btc-pay", "name": "BTCPay Server", "status": status},
             {"id": "rtl", "name": "Ride the Lightning", "status": status},
@@ -206,6 +212,7 @@ async def run_bonus_script(app_id: str, params: str):
             # if install was running
             if params.startswith("on"):
                 logging.warning(f"Checking if INSTALL worked ...")
+                logging.warning(f"updatedAppData: {updatedAppData}")
                 if updatedAppData["installed"]:
                     logging.info(f"WIN - install was effective")
                     await send_sse_message(
@@ -214,6 +221,8 @@ async def run_bonus_script(app_id: str, params: str):
                             "id": app_id,
                             "mode": "on",
                             "result": "win",
+                            "httpsForced": updatedAppData["httpsForced"],
+                            "httpsSelfsigned": updatedAppData["httpsSelfsigned"],
                             "details": stdoutData["result"],
                         },
                     )
