@@ -1,4 +1,5 @@
 import logging
+
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from pydantic import BaseModel

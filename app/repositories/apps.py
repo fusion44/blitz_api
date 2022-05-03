@@ -219,7 +219,7 @@ async def run_bonus_script(app_id: str, params: str):
                     )
                 else:
                     logging.error(f"FAIL - was not installed")
-                    logging.warning(f"updatedAppData: {updatedAppData}")            
+                    logging.warning(f"updatedAppData: {updatedAppData}")
                     logging.warning(f"params: {params}")
                     await send_sse_message(
                         SSE.INSTALL_APP,
@@ -229,13 +229,13 @@ async def run_bonus_script(app_id: str, params: str):
                             "result": "fail",
                             "details": "install was not effective",
                         },
-                    ) 
+                    )
 
             if params.startswith("off"):
                 logging.warning(f"Checking if UNINSTALL worked ...")
                 if updatedAppData["installed"]:
                     logging.error(f"FAIL - is still installed")
-                    logging.warning(f"updatedAppData: {updatedAppData}")            
+                    logging.warning(f"updatedAppData: {updatedAppData}")
                     logging.warning(f"params: {params}")
                     await send_sse_message(
                         SSE.INSTALL_APP,
@@ -245,7 +245,7 @@ async def run_bonus_script(app_id: str, params: str):
                             "result": "fail",
                             "details": "uninstall was not effective",
                         },
-                    ) 
+                    )
                 else:
                     logging.info(f"WIN - uninstall was effective")
                     await send_sse_message(

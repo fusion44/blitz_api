@@ -69,7 +69,7 @@ poetry shell
 
 ## Development (RaspiBlitz Remote)
 
-Create a file `/script/sync_to_blitz.personal.sh` (will be ignored by github) the SSH connection data to your RaspiBlitz. 
+Create a file `/script/sync_to_blitz.personal.sh` (will be ignored by github) the SSH connection data to your RaspiBlitz.
 
 localIP="192.168.178.61"
 sshPort="22"
