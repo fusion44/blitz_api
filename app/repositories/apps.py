@@ -169,8 +169,14 @@ async def uninstall_app_sub(app_id: str, delete_data: bool):
 
 async def run_bonus_script(app_id: str, params: str):
 
+    # to satisfy CodeQL: test again against pedefined array and dont use 'user value'
+    tested_app_id = ""
+    for id in available_app_ids:
+        if id == app_id:
+            tested_app_id=id 
+        
     # run script and get results
-    script_path = f"{SHELL_SCRIPT_PATH}/config.scripts/bonus.{app_id}.sh"
+    script_path = f"{SHELL_SCRIPT_PATH}/config.scripts/bonus.{tested_app_id}.sh"
     cmd = f"bash {script_path} {params}"
     proc = await asyncio.create_subprocess_shell(
         cmd,

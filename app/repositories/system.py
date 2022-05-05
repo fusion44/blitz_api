@@ -48,7 +48,6 @@ _check_shell_scripts_status()
 
 async def call_script(scriptPath) -> str:
     cmd = f"bash {scriptPath}"
-    logging.debug(f"running script: {cmd}")
     proc = await asyncio.create_subprocess_shell(
         cmd,
         stdout=asyncio.subprocess.PIPE,
