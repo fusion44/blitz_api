@@ -4,7 +4,6 @@ import logging
 import os
 import random
 from multiprocessing.dummy import Array
-from sqlite3 import paramstyle
 
 from decouple import config
 from fastapi import HTTPException, status
