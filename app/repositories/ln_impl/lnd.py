@@ -5,9 +5,9 @@ import grpc
 from fastapi.exceptions import HTTPException
 from starlette import status
 
-import app.repositories.ln_impl.protos.lightning_pb2 as ln
-import app.repositories.ln_impl.protos.router_pb2 as router
-import app.repositories.ln_impl.protos.walletunlocker_pb2 as unlocker
+import app.repositories.ln_impl.protos.lnd.lightning_pb2 as ln
+import app.repositories.ln_impl.protos.lnd.router_pb2 as router
+import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2 as unlocker
 from app.models.lightning import (
     FeeRevenue,
     ForwardSuccessEvent,
