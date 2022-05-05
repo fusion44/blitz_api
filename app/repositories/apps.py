@@ -19,7 +19,6 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 
 async def get_app_status_single(app_iD):
 
-    logging.warning(f"get_app_status_single: {app_iD}")
     if app_iD not in available_app_ids:
         return {
             "id": f"{app_iD}",
@@ -50,7 +49,6 @@ async def get_app_status_single(app_iD):
         }
 
     try:
-        logging.warning(f"get_app_status_single: Repackaging data: {app_iD}")
         error=""
         if "error" in data.keys():
             error = data["error"]
@@ -98,7 +96,7 @@ async def get_app_status_single(app_iD):
                 "status": "offline",
                 "error": error
             }
-    except: 
+    except:
         logging.warning(f"error on repackage data: {result}")
         return {
             "id": f"{app_iD}",
@@ -185,7 +183,6 @@ async def run_bonus_script(app_id: str, params: str):
     mode = params.split()[0]
 
     # logging to console
-    logging.warning(f"INSTALL RESULT ({proc.returncode}): {cmd}")
     if stdout:
         logging.info(f"[stdout]\n{stdout.decode()}")
     else:
@@ -258,8 +255,6 @@ async def run_bonus_script(app_id: str, params: str):
 
             # if install was running
             elif mode == "on" :
-                logging.warning(f"Checking if INSTALL worked ...")
-                logging.warning(f"updatedAppData: {updatedAppData}")
                 if updatedAppData["installed"]:
                     logging.info(f"WIN - install was effective")
                     await send_sse_message(
@@ -275,8 +270,8 @@ async def run_bonus_script(app_id: str, params: str):
                     )
                 else:
                     logging.error(f"FAIL - was not installed")
-                    logging.warning(f"updatedAppData: {updatedAppData}")
-                    logging.warning(f"params: {params}")
+                    logging.warning(f"DEBUG - updatedAppData: {updatedAppData}")
+                    logging.warning(f"DEBUG - params: {params}")
                     await send_sse_message(
                         SSE.INSTALL_APP,
                         {
@@ -292,8 +287,8 @@ async def run_bonus_script(app_id: str, params: str):
                 logging.warning(f"Checking if UNINSTALL worked ...")
                 if updatedAppData["installed"]:
                     logging.error(f"FAIL - is still installed")
-                    logging.warning(f"updatedAppData: {updatedAppData}")
-                    logging.warning(f"params: {params}")
+                    logging.warning(f"DEBUG - updatedAppData: {updatedAppData}")
+                    logging.warning(f"DEBUG - params: {params}")
                     await send_sse_message(
                         SSE.INSTALL_APP,
                         {

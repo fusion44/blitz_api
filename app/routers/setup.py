@@ -93,7 +93,6 @@ async def setup_start_info():
 
 
 def write_text_file(filename: str, arrayOfLines):
-    logging.warning(f"writing {filename}")
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(arrayOfLines))
 
@@ -111,7 +110,6 @@ class StartDoneData(BaseModel):
 @router.post("/setup-start-done")
 async def setup_start_done(
     data: StartDoneData ):
-    logging.warning(f"START /setup-start-done")
 
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
@@ -209,7 +207,6 @@ async def setup_start_done(
         logging.warning(f"not handled setupPhase state ({setupPhase})")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    logging.warning(f"kicking off recovery")
     await call_script("/home/admin/_cache.sh set state waitprovision")
 
     # TODO: Following input parameters:
@@ -254,7 +251,6 @@ async def setup_final_info():
     with open(setupFilePath, "r") as setupfile:
         resultlines = setupfile.readlines()
     data = parse_key_value_lines(resultlines)
-    logging.warning(f"data({data})")
     try:
         seedwordsNEW = data["seedwordsNEW"]
     except:
