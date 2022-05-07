@@ -54,13 +54,13 @@ def force_async(fn):
 
 
 def get_implementation_name() -> str:
-    return "CLN"
+    return "CLN_UNIX_SOCKET"
 
 
 async def get_wallet_balance_impl():
     @force_async
     def _list_funds() -> WalletBalance:
-        res = lncfg.cln.listfunds()
+        res = lncfg.cln_sock.listfunds()
         onchain_confirmed = onchain_unconfirmed = onchain_total = 0
 
         for o in res["outputs"]:
@@ -147,11 +147,11 @@ async def list_all_tx_impl(
 ) -> List[GenericTx]:
     @force_async
     def _list_invoices():
-        return lncfg.cln.listinvoices()
+        return lncfg.cln_sock.listinvoices()
 
     @force_async
     def _list_payments():
-        return lncfg.cln.listpays()
+        return lncfg.cln_sock.listpays()
 
     @force_async
     def _list_transactions(current_block_height: int):
@@ -268,7 +268,7 @@ async def list_invoices_impl(
     # TODO: Core Lightning does not yet allow for proper paging. Cache this?
     @force_async
     def _list_invoices():
-        return lncfg.cln.listinvoices()
+        return lncfg.cln_sock.listinvoices()
 
     res = await _list_invoices()
 
@@ -308,7 +308,7 @@ async def add_invoice_impl(
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
     @force_async
     def _decode() -> PaymentRequest:
-        return PaymentRequest.from_cln_json(lncfg.cln.decodepay(pay_req))
+        return PaymentRequest.from_cln_json(lncfg.cln_sock.decodepay(pay_req))
 
     return await _decode()
 
@@ -316,7 +316,7 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
 async def get_fee_revenue_impl() -> FeeRevenue:
     @force_async
     def _get_fee_revenue() -> FeeRevenue:
-        res = lncfg.cln.listforwards(status="settled")
+        res = lncfg.cln_sock.listforwards(status="settled")
         day = week = month = year = total = 0
 
         now = time.time()
@@ -371,7 +371,7 @@ async def send_payment_impl(
 async def get_ln_info_impl() -> LnInfo:
     @force_async
     def _get_info() -> LnInfo:
-        res = lncfg.cln.getinfo()
+        res = lncfg.cln_sock.getinfo()
         return LnInfo.from_cln_json(get_implementation_name(), res)
 
     return await _get_info()
@@ -402,7 +402,7 @@ async def listen_invoices() -> AsyncGenerator[Invoice, None]:
     # wait for the invoices
     try:
         while True:
-            r = await _wrapper(lncfg.cln, last_pay_index=lastpay_index)
+            r = await _wrapper(lncfg.cln_sock, last_pay_index=lastpay_index)
             r = Invoice.from_cln_json(r)
             lastpay_index = r.settle_index
             yield r
@@ -426,10 +426,10 @@ async def listen_forward_events() -> ForwardSuccessEvent:
 
     # make sure we know how many forewards we have
     # we need to calculate the difference between each iteration
-    res = lncfg.cln.listforwards(status="settled")
+    res = lncfg.cln_sock.listforwards(status="settled")
     num_fwd_last_poll = len(res["forwards"])
     while True:
-        res = lncfg.cln.listforwards(status="settled")
+        res = lncfg.cln_sock.listforwards(status="settled")
         if len(res["forwards"]) > num_fwd_last_poll:
             fwds = res["forwards"][num_fwd_last_poll:]
             for fwd in fwds:

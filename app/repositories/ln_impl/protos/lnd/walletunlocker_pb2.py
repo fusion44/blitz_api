@@ -12,7 +12,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-import app.repositories.ln_impl.protos.lightning_pb2 as lightning__pb2
+import app.repositories.ln_impl.protos.lnd.lightning_pb2 as lightning__pb2
 
 DESCRIPTOR = _descriptor.FileDescriptor(
     name="walletunlocker.proto",

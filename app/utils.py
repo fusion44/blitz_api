@@ -10,12 +10,21 @@ import requests
 from decouple import config
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
-from pyln.client import LightningRpc
 from starlette import status
 
-import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
-import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
-import app.repositories.ln_impl.protos.walletunlocker_pb2_grpc as unlockerrpc
+node_type = config("ln_node")
+if node_type == "lnd":
+    import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
+    import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
+    import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
+elif node_type == "cln_grpc":
+    import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
+elif node_type == "cln_unix_socket":
+    from pyln.client import LightningRpc
+else:
+    raise ValueError(f"Unknown node type: {node_type}")
+
+
 from app.models.bitcoind import BlockRpcFunc
 
 
@@ -47,9 +56,9 @@ class LightningConfig:
     def __init__(self) -> None:
         self.network = config("network")
         self.ln_node = config("ln_node")
-        self.cln: LightningRpc = None
+        self.cln_sock: "LightningRpc" = None
 
-        if self.ln_node == "lnd":
+        if self.ln_node == "lnd_grpc":
             # Due to updated ECDSA generated tls.cert we need to let gprc know that
             # we need to use that cipher suite otherwise there will be a handshake
             # error when we communicate with the lnd rpc server.
@@ -75,8 +84,10 @@ class LightningConfig:
             self.router_stub = routerrpc.RouterStub(self._channel)
             self.wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
         elif self.ln_node == "cln_unix_socket":
-            self.cln_socket_path = config("cln_socket_path")
-            self.cln = LightningRpc(self.cln_socket_path)  # type: LightningRpc
+            self._cln_socket_path = config("cln_socket_path")
+            self.cln_sock = LightningRpc(self._cln_socket_path)  # type: LightningRpc
+            pass
+        elif self.ln_node == "cln_grpc":
             pass
         elif self.ln_node == "":
             # its ok to run raspiblitz also without lightning

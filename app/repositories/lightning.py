@@ -22,41 +22,11 @@ from app.models.lightning import (
 from app.utils import SSE, lightning_config, send_sse_message
 
 if lightning_config.ln_node == "lnd":
-    from app.repositories.ln_impl.lnd import (
-        add_invoice_impl,
-        decode_pay_request_impl,
-        get_fee_revenue_impl,
-        get_ln_info_impl,
-        get_wallet_balance_impl,
-        list_all_tx_impl,
-        list_invoices_impl,
-        list_on_chain_tx_impl,
-        list_payments_impl,
-        listen_forward_events,
-        listen_invoices,
-        new_address_impl,
-        send_coins_impl,
-        send_payment_impl,
-        unlock_wallet_impl,
-    )
-else:
-    from app.repositories.ln_impl.clightning import (
-        add_invoice_impl,
-        decode_pay_request_impl,
-        get_fee_revenue_impl,
-        get_ln_info_impl,
-        get_wallet_balance_impl,
-        list_all_tx_impl,
-        list_invoices_impl,
-        list_on_chain_tx_impl,
-        list_payments_impl,
-        listen_forward_events,
-        listen_invoices,
-        new_address_impl,
-        send_coins_impl,
-        send_payment_impl,
-        unlock_wallet_impl,
-    )
+    import app.repositories.ln_impl.lnd_grpc as ln
+elif lightning_config.ln_node == "cln_grpc":
+    import app.repositories.ln_impl.cln_grpc as ln
+elif lightning_config.ln_node == "cln_unix_socket":
+    import app.repositories.ln_impl.cln_unix_socket as ln
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
 
@@ -74,24 +44,24 @@ if FWD_GATHER_INTERVAL < 0.3:
 
 
 async def get_ln_info_lite() -> LightningInfoLite:
-    ln_info = await get_ln_info_impl()
+    ln_info = await ln.get_ln_info_impl()
     return LightningInfoLite.from_grpc(ln_info)
 
 
 async def get_wallet_balance():
-    return await get_wallet_balance_impl()
+    return await ln.get_wallet_balance_impl()
 
 
 async def list_all_tx(
     successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
-    return await list_all_tx_impl(successfull_only, index_offset, max_tx, reversed)
+    return await ln.list_all_tx_impl(successfull_only, index_offset, max_tx, reversed)
 
 
 async def list_invoices(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
 ) -> List[Invoice]:
-    return await list_invoices_impl(
+    return await ln.list_invoices_impl(
         pending_only,
         index_offset,
         num_max_invoices,
@@ -100,13 +70,13 @@ async def list_invoices(
 
 
 async def list_on_chain_tx() -> List[OnChainTransaction]:
-    return await list_on_chain_tx_impl()
+    return await ln.list_on_chain_tx_impl()
 
 
 async def list_payments(
     include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
 ) -> List[Payment]:
-    return await list_payments_impl(
+    return await ln.list_payments_impl(
         include_incomplete, index_offset, max_payments, reversed
     )
 
@@ -114,19 +84,19 @@ async def list_payments(
 async def add_invoice(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
-    return await add_invoice_impl(memo, value_msat, expiry, is_keysend)
+    return await ln.add_invoice_impl(memo, value_msat, expiry, is_keysend)
 
 
 async def decode_pay_request(pay_req: str) -> PaymentRequest:
-    return await decode_pay_request_impl(pay_req)
+    return await ln.decode_pay_request_impl(pay_req)
 
 
 async def new_address(input: NewAddressInput) -> str:
-    return await new_address_impl(input)
+    return await ln.new_address_impl(input)
 
 
 async def send_coins(input: SendCoinsInput) -> SendCoinsResponse:
-    res = await send_coins_impl(input)
+    res = await ln.send_coins_impl(input)
     _schedule_wallet_balance_update()
     return res
 
@@ -137,17 +107,19 @@ async def send_payment(
     fee_limit_msat: int,
     amount_msat: Optional[int] = None,
 ) -> Payment:
-    res = await send_payment_impl(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
+    res = await ln.send_payment_impl(
+        pay_req, timeout_seconds, fee_limit_msat, amount_msat
+    )
     _schedule_wallet_balance_update()
     return res
 
 
 async def get_ln_info() -> LnInfo:
-    return await get_ln_info_impl()
+    return await ln.get_ln_info_impl()
 
 
 async def unlock_wallet(password: str) -> bool:
-    res = await unlock_wallet_impl(password)
+    res = await ln.unlock_wallet_impl(password)
     if res:
         for l in _WALLET_UNLOCK_LISTENERS:
             await l.put("unlocked")
@@ -155,7 +127,7 @@ async def unlock_wallet(password: str) -> bool:
 
 
 async def get_fee_revenue() -> FeeRevenue:
-    return await get_fee_revenue_impl()
+    return await ln.get_fee_revenue_impl()
 
 
 async def register_lightning_listener():
@@ -168,7 +140,7 @@ async def register_lightning_listener():
     """
 
     try:
-        await get_ln_info_impl()
+        await ln.get_ln_info_impl()
 
         loop = asyncio.get_event_loop()
         loop.create_task(_handle_info_listener())
@@ -202,7 +174,7 @@ async def _handle_info_listener():
     last_info = None
     last_info_lite = None
     while True:
-        info = await get_ln_info_impl()
+        info = await ln.get_ln_info_impl()
 
         if last_info != info:
             await send_sse_message(SSE.LN_INFO, info.dict())
@@ -218,7 +190,7 @@ async def _handle_info_listener():
 
 
 async def _handle_invoice_listener():
-    async for i in listen_invoices():
+    async for i in ln.listen_invoices():
         await send_sse_message(SSE.LN_INVOICE_STATUS, i.dict())
         _schedule_wallet_balance_update()
 
@@ -247,7 +219,7 @@ async def _handle_forward_event_listener():
 
         _fwd_update_scheduled = False
 
-    async for i in listen_forward_events():
+    async for i in ln.listen_forward_events():
         if ENABLE_FWD_NOTIFICATIONS:
             _fwd_successes.append(i.dict())
 
@@ -264,7 +236,7 @@ def _schedule_wallet_balance_update():
         global _wallet_balance_update_scheduled
         _wallet_balance_update_scheduled = True
         await asyncio.sleep(1.1)
-        wb = await get_wallet_balance_impl()
+        wb = await ln.get_wallet_balance_impl()
         if _CACHE["wallet_balance"] != wb:
             await send_sse_message(SSE.WALLET_BALANCE, wb.dict())
             _CACHE["wallet_balance"] = wb
@@ -296,7 +268,7 @@ def listen_for_ssh_unlock():
     async def _do_check_unlock():
         while True:
             try:
-                _ = await get_ln_info_impl()
+                _ = await ln.get_ln_info_impl()
                 for l in _WALLET_UNLOCK_LISTENERS:
                     await l.put("unlocked")
                 break
