@@ -278,6 +278,43 @@ class RouteHint(BaseModel):
         return cls(hop_hints=hop_hints)
 
 
+class Channel(BaseModel):
+
+    channelID: Optional[str]
+    active: Optional[bool]
+
+    peerPublicKey: Optional[str]
+    peerAlias: Optional[str]
+
+    balanceLocal: Optional[int]
+    balanceRemote: Optional[int]
+    balanceCapacity: Optional[int]
+
+    @classmethod
+    def from_grpc(cls, c) -> "Channel":
+        return cls(
+            active=c.active,
+            channelID=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            peerPublicKey=c.remote_pubkey,
+            peerAlias="n/a",
+            balanceLocal=c.local_balance,
+            balanceRemote=c.remote_balance,
+            balanceCapacity=c.capacity
+        )
+
+    @classmethod
+    def from_grpc_pending(cls, c) -> "Channel":
+        print(str(c))
+        return cls(
+            active=False,
+            channelID=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            peerPublicKey=c.remote_node_pub,
+            peerAlias="n/a",
+            balanceLocal=-1,
+            balanceRemote=-1,
+            balanceCapacity=c.capacity
+        )
+
 class Invoice(BaseModel):
     # optional memo to attach along with the invoice.
     # Used for record keeping purposes for the invoice's
