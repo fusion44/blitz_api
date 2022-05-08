@@ -45,7 +45,7 @@ if FWD_GATHER_INTERVAL < 0.3:
 
 async def get_ln_info_lite() -> LightningInfoLite:
     ln_info = await ln.get_ln_info_impl()
-    return LightningInfoLite.from_grpc(ln_info)
+    return LightningInfoLite.from_lninfo(ln_info)
 
 
 async def get_wallet_balance():
@@ -180,7 +180,7 @@ async def _handle_info_listener():
             await send_sse_message(SSE.LN_INFO, info.dict())
             last_info = info
 
-        info_lite = LightningInfoLite.from_grpc(info)
+        info_lite = LightningInfoLite.from_lninfo(info)
 
         if last_info_lite != info_lite:
             await send_sse_message(SSE.LN_INFO_LITE, info_lite.dict())

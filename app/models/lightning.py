@@ -21,7 +21,7 @@ class InvoiceState(str, Enum):
     ACCEPTED = "accepted"
 
     @classmethod
-    def from_grpc(cls, id) -> "InvoiceState":
+    def from_lnd_grpc(cls, id) -> "InvoiceState":
         if id == 0:
             return InvoiceState.OPEN
         elif id == 1:
@@ -51,7 +51,7 @@ class InvoiceHTLCState(str, Enum):
     CANCELED = "canceled"
 
     @classmethod
-    def from_grpc(cls, id) -> "InvoiceHTLCState":
+    def from_lnd_grpc(cls, id) -> "InvoiceHTLCState":
         if id == 0:
             return InvoiceHTLCState.ACCEPTED
         elif id == 1:
@@ -76,7 +76,7 @@ class FeeRevenue(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, fee_report) -> "FeeRevenue":
+    def from_lnd_grpc(cls, fee_report) -> "FeeRevenue":
         return cls(
             day=int(fee_report.day_fee_sum),
             week=int(fee_report.week_fee_sum),
@@ -119,7 +119,7 @@ class ForwardSuccessEvent(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, evt) -> "ForwardSuccessEvent":
+    def from_lnd_grpc(cls, evt) -> "ForwardSuccessEvent":
         return cls(
             timestamp=int(evt.timestamp),
             chan_id_in=int(evt.chan_id_in),
@@ -147,7 +147,7 @@ class Feature(BaseModel):
     is_known: Optional[bool]
 
     @classmethod
-    def from_grpc(cls, f) -> "Feature":
+    def from_lnd_grpc(cls, f) -> "Feature":
         return cls(
             name=f.name,
             is_required=f.is_required,
@@ -164,10 +164,10 @@ class FeaturesEntry(BaseModel):
     value: Feature
 
     @classmethod
-    def from_grpc(cls, entry_key, feature) -> "FeaturesEntry":
+    def from_lnd_grpc(cls, entry_key, feature) -> "FeaturesEntry":
         return cls(
             key=entry_key,
-            value=Feature.from_grpc(feature),
+            value=Feature.from_lnd_grpc(feature),
         )
 
     @classmethod
@@ -199,7 +199,7 @@ class AMP(BaseModel):
     preimage: str
 
     @classmethod
-    def from_grpc(cls, a) -> "AMP":
+    def from_lnd_grpc(cls, a) -> "AMP":
         return cls(
             root_share=a.root_share.hex(),
             set_id=a.set_id.hex(),
@@ -214,7 +214,7 @@ class CustomRecordsEntry(BaseModel):
     value: str
 
     @classmethod
-    def from_grpc(cls, e) -> "CustomRecordsEntry":
+    def from_lnd_grpc(cls, e) -> "CustomRecordsEntry":
         return cls(
             key=e.key,
             value=e.value,
@@ -222,46 +222,51 @@ class CustomRecordsEntry(BaseModel):
 
 
 class InvoiceHTLC(BaseModel):
-    # Short channel id over which the htlc was received.
-    chan_id: int
+    chan_id: int = Query(
+        ..., description="The channel ID over which the HTLC was received."
+    )
 
-    # Index identifying the htlc on the channel.
-    htlc_index: int
+    htlc_index: int = Query(..., description="The index of the HTLC on the channel.")
 
-    # The amount of the htlc in msat.
-    amt_msat: int
+    amt_msat: int = Query(..., description="The amount of the HTLC in msat.")
 
-    # Block height at which this htlc was accepted.
-    accept_height: int
+    accept_height: int = Query(
+        ..., description="The block height at which this HTLC was accepted."
+    )
 
-    # Time at which this htlc was accepted.
-    accept_time: int
+    accept_time: int = Query(
+        ..., description="The time at which this HTLC was accepted."
+    )
 
-    # Time at which this htlc was settled or canceled.
-    resolve_time: int
+    resolve_time: int = Query(
+        ..., description="The time at which this HTLC was resolved."
+    )
 
-    # Block height at which this htlc expires.
-    expiry_height: int
+    expiry_height: int = Query(
+        ..., description="The block height at which this HTLC expires."
+    )
 
-    # Current state the htlc is in.
-    state: InvoiceHTLCState
+    state: InvoiceHTLCState = Query(..., description="The state of the HTLC.")
 
-    # Custom tlv records.
-    custom_records: List[CustomRecordsEntry]
+    custom_records: List[CustomRecordsEntry] = Query(
+        [], description="Custom tlv records."
+    )
 
-    # The total amount of the mpp payment in msat.
-    mpp_total_amt_msat: int
+    mpp_total_amt_msat: int = Query(
+        ..., description="The total amount of the mpp payment in msat."
+    )
 
-    # Details relevant to AMP HTLCs, only populated
-    # if this is an AMP HTLC.
-    amp: AMP
+    amp: AMP = Query(
+        None,
+        description="Details relevant to AMP HTLCs, only populated if this is an AMP HTLC.",
+    )
 
     @classmethod
-    def from_grpc(cls, h) -> "InvoiceHTLC":
+    def from_lnd_grpc(cls, h) -> "InvoiceHTLC":
         def _crecords(recs):
             l = []
             for r in recs:
-                l.append(CustomRecordsEntry.from_grpc(r))
+                l.append(CustomRecordsEntry.from_lnd_grpc(r))
             return l
 
         return cls(
@@ -272,32 +277,35 @@ class InvoiceHTLC(BaseModel):
             accept_time=h.accept_time,
             resolve_time=h.resolve_time,
             expiry_height=h.expiry_height,
-            state=InvoiceHTLCState.from_grpc(h.state),
+            state=InvoiceHTLCState.from_lnd_grpc(h.state),
             custom_records=_crecords(h.custom_records),
             mpp_total_amt_msat=h.mpp_total_amt_msat,
-            amp=AMP.from_grpc(h.amp),
+            amp=AMP.from_lnd_grpc(h.amp),
         )
 
 
 class HopHint(BaseModel):
-    # The public key of the node at the start of the channel.
-    node_id: str
+    node_id: str = Query(
+        ..., description="The public key of the node at the start of the channel."
+    )
 
-    # The unique identifier of the channel.
-    chan_id: int
+    chan_id: int = Query(..., description="The unique identifier of the channel.")
 
-    # The base fee of the channel denominated in millisatoshis.
-    fee_base_msat: int
+    fee_base_msat: int = Query(
+        ..., description="The base fee of the channel denominated in msat."
+    )
 
-    # The fee rate of the channel for sending one satoshi
-    # across it denominated in millionths of a satoshi.
-    fee_proportional_millionths: int
+    fee_proportional_millionths: int = Query(
+        ...,
+        description="The fee rate of the channel for sending one satoshi across it denominated in msat",
+    )
 
-    # The time-lock delta of the channel.
-    cltv_expiry_delta: int
+    cltv_expiry_delta: int = Query(
+        ..., description="The time-lock delta of the channel."
+    )
 
     @classmethod
-    def from_grpc(cls, h) -> "HopHint":
+    def from_lnd_grpc(cls, h) -> "HopHint":
         return cls(
             node_id=h.node_id,
             chan_id=h.chan_id,
@@ -324,8 +332,8 @@ class RouteHint(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, h) -> "RouteHint":
-        hop_hints = [HopHint.from_grpc(hh) for hh in h.hop_hints]
+    def from_lnd_grpc(cls, h) -> "RouteHint":
+        hop_hints = [HopHint.from_lnd_grpc(hh) for hh in h.hop_hints]
         return cls(hop_hints=hop_hints)
 
     @classmethod
@@ -471,23 +479,23 @@ class Invoice(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, i) -> "Invoice":
+    def from_lnd_grpc(cls, i) -> "Invoice":
         def _route_hints(hints):
             l = []
             for h in hints:
-                l.append(RouteHint.from_grpc((h)))
+                l.append(RouteHint.from_lnd_grpc((h)))
             return l
 
         def _htlcs(htlcs):
             l = []
             for h in htlcs:
-                l.append(InvoiceHTLC.from_grpc(h))
+                l.append(InvoiceHTLC.from_lnd_grpc(h))
             return l
 
         def _features(features):
             l = []
             for k in features:
-                l.append(FeaturesEntry.from_grpc(k, features[k]))
+                l.append(FeaturesEntry.from_lnd_grpc(k, features[k]))
             return l
 
         return cls(
@@ -511,7 +519,7 @@ class Invoice(BaseModel):
             settle_index=i.settle_index,
             amt_paid_sat=i.amt_paid_sat,
             amt_paid_msat=i.amt_paid_msat,
-            state=InvoiceState.from_grpc(i.state),
+            state=InvoiceState.from_lnd_grpc(i.state),
             htlcs=_htlcs(i.htlcs),
             features=_features(i.features),
             is_keysend=i.is_keysend,
@@ -549,7 +557,7 @@ class PaymentStatus(str, Enum):
     FAILED = "failed"
 
     @classmethod
-    def from_grpc(cls, id) -> "PaymentStatus":
+    def from_lnd_grpc(cls, id) -> "PaymentStatus":
         if id == 0:
             return PaymentStatus.UNKNOWN
         elif id == 1:
@@ -585,7 +593,7 @@ class PaymentFailureReason(str, Enum):
     FAILURE_REASON_INSUFFICIENT_BALANCE = "FAILURE_REASON_INSUFFICIENT_BALANCE"
 
     @classmethod
-    def from_grpc(cls, f) -> "PaymentFailureReason":
+    def from_lnd_grpc(cls, f) -> "PaymentFailureReason":
         if f == 0:
             return PaymentFailureReason.FAILURE_REASON_NONE
         elif f == 1:
@@ -654,7 +662,7 @@ class ChannelUpdate(BaseModel):
     extra_opaque_data: str
 
     @classmethod
-    def from_grpc(cls, u) -> "ChannelUpdate":
+    def from_lnd_grpc(cls, u) -> "ChannelUpdate":
         return cls(
             signature=u.signature,
             chain_hash=u.chain_hash,
@@ -694,7 +702,7 @@ class Hop(BaseModel):
     tlv_payload: bool
 
     @classmethod
-    def from_grpc(cls, h) -> "Hop":
+    def from_lnd_grpc(cls, h) -> "Hop":
         return cls(
             chan_id=h.chan_id,
             chan_capacity=h.chan_capacity,
@@ -713,7 +721,7 @@ class MPPRecord(BaseModel):
     total_amt_msat: int
 
     @classmethod
-    def from_grpc(cls, r) -> "MPPRecord":
+    def from_lnd_grpc(cls, r) -> "MPPRecord":
         return cls(
             payment_addr=r.payment_addr,
             total_amt_msat=r.total_amt_msat,
@@ -726,7 +734,7 @@ class AMPRecord(BaseModel):
     child_index: int
 
     @classmethod
-    def from_grpc(cls, r) -> "AMPRecord":
+    def from_lnd_grpc(cls, r) -> "AMPRecord":
         return cls(
             root_share=r.root_share,
             set_id=r.set_id,
@@ -746,7 +754,7 @@ class Route(BaseModel):
     custom_records: List[CustomRecordsEntry]
 
     @classmethod
-    def from_grpc(cls, r):
+    def from_lnd_grpc(cls, r):
         def _crecords(recs):
             l = []
             for r in recs:
@@ -756,16 +764,16 @@ class Route(BaseModel):
         def _get_hops(hops) -> List[Hop]:
             l = []
             for h in hops:
-                l.append(Hop.from_grpc(h))
+                l.append(Hop.from_lnd_grpc(h))
             return l
 
         mpp = None
         if hasattr(r, "mpp_record"):
-            mpp = MPPRecord.from_grpc(r.mpp_record)
+            mpp = MPPRecord.from_lnd_grpc(r.mpp_record)
 
         amp = None
         if hasattr(r, "amp_record"):
-            amp = AMPRecord.from_grpc(r.amp_record)
+            amp = AMPRecord.from_lnd_grpc(r.amp_record)
 
         crecords = []
         if hasattr(r, "custom_records"):
@@ -812,7 +820,7 @@ class HTLCAttemptFailure(BaseModel):
     height: int
 
     @classmethod
-    def from_grpc(cls, f) -> "HTLCAttemptFailure":
+    def from_lnd_grpc(cls, f) -> "HTLCAttemptFailure":
         code = None
         if hasattr(f, "code"):
             code = f.code
@@ -823,7 +831,7 @@ class HTLCAttemptFailure(BaseModel):
 
         return cls(
             code=code,
-            channel_update=ChannelUpdate.from_grpc(f.channel_update),
+            channel_update=ChannelUpdate.from_lnd_grpc(f.channel_update),
             htlc_msat=htlc_msat,
             onion_sha_256=f.onion_sha_256,
             cltv_expiry=f.cltv_expiry,
@@ -839,7 +847,7 @@ class HTLCStatus(str, Enum):
     FAILED = "failed"
 
     @classmethod
-    def from_grpc(cls, s) -> "HTLCStatus":
+    def from_lnd_grpc(cls, s) -> "HTLCStatus":
         if s == 0:
             return HTLCStatus.IN_FLIGHT
         elif s == 1:
@@ -874,57 +882,58 @@ class HTLCAttempt(BaseModel):
     preimage: str
 
     @classmethod
-    def from_grpc(cls, a) -> "HTLCAttempt":
+    def from_lnd_grpc(cls, a) -> "HTLCAttempt":
         return cls(
             attempt_id=a.attempt_id,
-            status=HTLCStatus.from_grpc(a.status),
-            route=Route.from_grpc(a.route),
+            status=HTLCStatus.from_lnd_grpc(a.status),
+            route=Route.from_lnd_grpc(a.route),
             attempt_time_ns=a.attempt_time_ns,
             resolve_time_ns=a.resolve_time_ns,
-            failure=HTLCAttemptFailure.from_grpc(a.failure),
+            failure=HTLCAttemptFailure.from_lnd_grpc(a.failure),
             preimage=a.preimage.hex(),
         )
 
 
 class Payment(BaseModel):
-    # The payment hash
-    payment_hash: str
+    payment_hash: str = Query(..., description="The payment hash")
 
-    # The payment preimage
-    payment_preimage: Optional[str]
+    payment_preimage: Optional[str] = Query(None, description="The payment preimage")
 
-    # The value of the payment in milli-satoshis
-    value_msat: int
+    value_msat: int = Query(
+        ..., description="The value of the payment in milli-satoshis"
+    )
 
-    # The optional payment request being fulfilled.
-    payment_request: Optional[str]
+    payment_request: str = Query(
+        None, description="The optional payment request being fulfilled."
+    )
 
-    # The status of the payment.
-    status: PaymentStatus = PaymentStatus.UNKNOWN
+    status: PaymentStatus = Query(
+        PaymentStatus.UNKNOWN, description="The status of the payment."
+    )
 
-    # The fee paid for this payment in milli-satoshis
-    fee_msat: int
+    fee_msat: int = Query(..., description="The fee paid for this payment in msat")
 
-    # The time in UNIX nanoseconds at which the payment was created.
-    creation_time_ns: int
+    creation_time_ns: int = Query(
+        ...,
+        description="The time in UNIX nanoseconds at which the payment was created.",
+    )
 
-    # The HTLCs made in attempt to settle the payment.
-    htlcs: List[HTLCAttempt] = []
+    htlcs: List[HTLCAttempt] = Query(
+        [], description="The HTLCs made in attempt to settle the payment."
+    )
 
-    # The creation index of this payment. Each payment can be uniquely
-    # identified by this index, which may not strictly increment by 1
-    # for payments made in older versions of lnd.
-    payment_index: int
+    payment_index: int = Query(..., description="The payment index")
 
-    # The failure reason
-    failure_reason: PaymentFailureReason
+    failure_reason: PaymentFailureReason = Query(
+        PaymentFailureReason.FAILURE_REASON_NONE, description="The failure reason"
+    )
 
     @classmethod
-    def from_grpc(cls, p) -> "Payment":
+    def from_lnd_grpc(cls, p) -> "Payment":
         def _get_attempts(attempts):
             l = []
             for a in attempts:
-                l.append(HTLCAttempt.from_grpc(a))
+                l.append(HTLCAttempt.from_lnd_grpc(a))
             return l
 
         return cls(
@@ -932,12 +941,12 @@ class Payment(BaseModel):
             payment_preimage=p.payment_preimage,
             value_msat=p.value_msat,
             payment_request=p.payment_request,
-            status=PaymentStatus.from_grpc(p.status),
+            status=PaymentStatus.from_lnd_grpc(p.status),
             fee_msat=p.fee_msat,
             creation_time_ns=p.creation_time_ns,
             htlcs=_get_attempts(p.htlcs),
             payment_index=p.payment_index,
-            failure_reason=PaymentFailureReason.from_grpc(p.failure_reason),
+            failure_reason=PaymentFailureReason.from_lnd_grpc(p.failure_reason),
         )
 
 
@@ -993,7 +1002,7 @@ class SendCoinsResponse(BaseModel):
     label: str = Query("", description="The label used for the transaction")
 
     @classmethod
-    def from_grpc(cls, r, input: SendCoinsInput):
+    def from_lnd_grpc(cls, r, input: SendCoinsInput):
         return cls(
             txid=r.txid,
             address=input.address,
@@ -1088,14 +1097,14 @@ class LnInfo(BaseModel):
         return not self.__eq__(other)
 
     @classmethod
-    def from_grpc(cls, implementation, i) -> "LnInfo":
+    def from_lnd_grpc(cls, implementation, i) -> "LnInfo":
         _chains = []
         for c in i.chains:
             _chains.append(Chain(chain=c.chain, network=c.network))
 
         _features = []
         for f in i.features:
-            _features.append(FeaturesEntry.from_grpc(f, i.features[f]))
+            _features.append(FeaturesEntry.from_lnd_grpc(f, i.features[f]))
 
         _uris = [u for u in i.uris]
 
@@ -1172,7 +1181,7 @@ class LightningInfoLite(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, info: LnInfo):
+    def from_lninfo(cls, info: LnInfo):
         return cls(
             implementation=info.implementation,
             version=info.version,
@@ -1218,7 +1227,7 @@ class WalletBalance(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, onchain, channel) -> "WalletBalance":
+    def from_lnd_grpc(cls, onchain, channel) -> "WalletBalance":
         return cls(
             onchain_confirmed_balance=onchain.confirmed_balance,
             onchain_total_balance=onchain.total_balance,
@@ -1252,7 +1261,7 @@ class PaymentRequest(BaseModel):
     features: List[FeaturesEntry] = Query([])
 
     @classmethod
-    def from_grpc(cls, r):
+    def from_lnd_grpc(cls, r):
         return cls(
             destination=r.destination,
             payment_hash=r.payment_hash,
@@ -1263,10 +1272,12 @@ class PaymentRequest(BaseModel):
             description_hash=r.description_hash,
             fallback_addr=r.fallback_addr,
             cltv_expiry=r.cltv_expiry,
-            route_hints=[RouteHint.from_grpc(rh) for rh in r.route_hints],
+            route_hints=[RouteHint.from_lnd_grpc(rh) for rh in r.route_hints],
             payment_addr=r.payment_addr.hex(),
             num_msat=r.num_msat,
-            features=[FeaturesEntry.from_grpc(k, r.features[k]) for k in r.features],
+            features=[
+                FeaturesEntry.from_lnd_grpc(k, r.features[k]) for k in r.features
+            ],
         )
 
     @classmethod
@@ -1322,7 +1333,7 @@ class OnChainTransaction(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, t):
+    def from_lnd_grpc(cls, t):
         addrs = [a for a in t.dest_addresses]
         return cls(
             tx_hash=t.tx_hash,
@@ -1380,7 +1391,7 @@ class GenericTx(BaseModel):
     total_fees: int = Query(None, description="Total fees paid for this transaction")
 
     @classmethod
-    def from_grpc_invoice(cls, i) -> "GenericTx":
+    def from_lnd_grpc_invoice(cls, i) -> "GenericTx":
         status = TxStatus.UNKNOWN
         time_stamp = i.creation_date
         amount = i.value_msat
@@ -1404,7 +1415,7 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_grpc_onchain_tx(cls, tx) -> "GenericTx":
+    def from_lnd_grpc_onchain_tx(cls, tx) -> "GenericTx":
         s = TxStatus.SUCCEEDED if tx.num_confirmations > 0 else TxStatus.IN_FLIGHT
 
         t = TxType.UNKNOWN
@@ -1427,7 +1438,7 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
+    def from_lnd_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
         status = TxStatus.UNKNOWN
         if payment.status == 1:
             status = TxStatus.IN_FLIGHT
