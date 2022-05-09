@@ -1,6 +1,5 @@
 import asyncio
 from typing import List, Optional
-from xmlrpc.client import Boolean
 
 import grpc
 from fastapi.exceptions import HTTPException
@@ -487,9 +486,6 @@ async def peer_resolve_alias(nodepub: str) -> str:
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
         )
-
-    # return not kown
-    return "n/a"
 
 async def channel_list_impl() -> List[Channel]:
 

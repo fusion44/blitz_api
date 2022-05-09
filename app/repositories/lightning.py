@@ -154,7 +154,7 @@ async def channel_open(local_funding_amount: int, node_URI: str, target_confs: i
     if local_funding_amount < 1:
         raise ValueError("funding amount needs to be positive")
         
-    if local_funding_amount < 1:
+    if target_confs < 1:
         raise ValueError("target confs needs to be positive")
 
     if len(node_URI) == 0:
