@@ -280,26 +280,26 @@ class RouteHint(BaseModel):
 
 class Channel(BaseModel):
 
-    channelID: Optional[str]
+    channel_id: Optional[str]
     active: Optional[bool]
 
-    peerPublicKey: Optional[str]
-    peerAlias: Optional[str]
+    peer_publickey: Optional[str]
+    peer_alias: Optional[str]
 
-    balanceLocal: Optional[int]
-    balanceRemote: Optional[int]
-    balanceCapacity: Optional[int]
+    balance_local: Optional[int]
+    balance_remote: Optional[int]
+    balance_capacity: Optional[int]
 
     @classmethod
     def from_grpc(cls, c) -> "Channel":
         return cls(
             active=c.active,
-            channelID=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
-            peerPublicKey=c.remote_pubkey,
-            peerAlias="n/a",
-            balanceLocal=c.local_balance,
-            balanceRemote=c.remote_balance,
-            balanceCapacity=c.capacity
+            channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            peer_publickey=c.remote_pubkey,
+            peer_alias="n/a",
+            balance_local=c.local_balance,
+            balance_remote=c.remote_balance,
+            balance_capacity=c.capacity
         )
 
     @classmethod
@@ -307,12 +307,12 @@ class Channel(BaseModel):
         print(str(c))
         return cls(
             active=False,
-            channelID=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
-            peerPublicKey=c.remote_node_pub,
-            peerAlias="n/a",
-            balanceLocal=-1,
-            balanceRemote=-1,
-            balanceCapacity=c.capacity
+            channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            peer_publickey=c.remote_node_pub,
+            peer_alias="n/a",
+            balance_local=-1,
+            balance_remote=-1,
+            balance_capacity=c.capacity
         )
 
 class Invoice(BaseModel):
