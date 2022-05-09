@@ -17,6 +17,7 @@ from app.repositories.system import (
     get_system_info,
     parse_key_value_text,
     password_valid,
+    password_change,
     shutdown,
     subscribe_hardware_info,
 )
@@ -52,7 +53,7 @@ async def login(i: LoginInput):
         # script does not work when called from api yet
         if password_valid(i.password):
             result = await call_script(
-                f"/home/admin/config.scripts/blitz.passwords.sh check a {i.password}"
+                f"/home/admin/config.scripts/blitz.passwords.sh check a \"{i.password}\""
             )
             data = parse_key_value_text(result)
             if data["correct"] == "1":
@@ -75,6 +76,16 @@ async def login(i: LoginInput):
 def refresh_token():
     return sign_jwt()
 
+
+@router.post(
+    "/change-password",
+    name=f"{_PREFIX}.change-password",
+    summary="Endpoint to change your password a, b or c",
+    response_description="if 200 OK - password change worked",
+    dependencies=[Depends(JWTBearer())],
+)
+async def change_password(type: str, old_password: str, new_password: str):
+    return await password_change(type, old_password, new_password)
 
 @router.get(
     "/get-system-info",
