@@ -260,16 +260,13 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
         details = error.details()
         if details and details.find("invalid bech32 string") > -1:
             raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+                status.HTTP_400_BAD_REQUEST,
+                detail="Could not parse destination address, destination should be a valid address.",
             )
         elif details and details.find("insufficient funds available") > -1:
-            raise HTTPException(
-                status.HTTP_412_PRECONDITION_FAILED, detail=error.details()
-            )
+            raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
         else:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
-            )
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
 
 
 async def send_payment_impl(

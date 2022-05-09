@@ -86,9 +86,19 @@ class LightningConfig:
         elif self.ln_node == "cln_unix_socket":
             self._cln_socket_path = config("cln_socket_path")
             self.cln_sock = LightningRpc(self._cln_socket_path)  # type: LightningRpc
-            pass
         elif self.ln_node == "cln_grpc":
-            pass
+            cln_grpc_cert = bytes.fromhex(config("cln_grpc_cert"))
+            cln_grpc_key = bytes.fromhex(config("cln_grpc_key"))
+            cln_grpc_ca = bytes.fromhex(config("cln_grpc_ca"))
+            cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
+            creds = grpc.ssl_channel_credentials(
+                root_certificates=cln_grpc_ca,
+                private_key=cln_grpc_key,
+                certificate_chain=cln_grpc_cert,
+            )
+            opts = (("grpc.ssl_target_name_override", "cln"),)
+            self._channel = grpc.aio.secure_channel(cln_grpc_url, creds, options=opts)
+            self.cln_stub = clnrpc.NodeStub(self._channel)
         elif self.ln_node == "":
             # its ok to run raspiblitz also without lightning
             pass

@@ -269,7 +269,10 @@ async def new_address_path(input: NewAddressInput):
     response_description="Either an error or a SendCoinsResponse object on success",
     dependencies=[Depends(JWTBearer())],
     response_model=SendCoinsResponse,
-    responses=responses,
+    responses={
+        412: {"description": "When not enough funds are available."},
+        423: responses[423],
+    },
 )
 async def send_coins_path(input: SendCoinsInput):
     try:

@@ -44,6 +44,17 @@ class InvoiceState(str, Enum):
         else:
             raise NotImplementedError(f"InvoiceState {id} is not implemented")
 
+    @classmethod
+    def from_cln_grpc(cls, i) -> "InvoiceState":
+        if i.status == 0:
+            return InvoiceState.OPEN
+        elif i.status == 1:
+            return InvoiceState.SETTLED
+        elif i.status == 2:
+            return InvoiceState.CANCELED
+        else:
+            raise NotImplementedError(f"InvoiceState {id} is not implemented")
+
 
 class InvoiceHTLCState(str, Enum):
     ACCEPTED = "accepted"
@@ -138,6 +149,17 @@ class ForwardSuccessEvent(BaseModel):
             amt_in_msat=fwd["in_msatoshi"],
             amt_out_msat=fwd["out_msatoshi"],
             fee_msat=fwd["fee"],
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, fwd) -> "ForwardSuccessEvent":
+        return cls(
+            timestamp_ns=fwd.received_time,
+            chan_id_in=fwd.in_channel,
+            chan_id_out=fwd.out_channel,
+            amt_in_msat=fwd.in_msat.msat,
+            amt_out_msat=fwd.out_msat.msat,
+            fee_msat=fwd.fee_msat.msat,
         )
 
 
@@ -549,6 +571,25 @@ class Invoice(BaseModel):
             state=InvoiceState.from_cln_json(i["status"]),
         )
 
+    @classmethod
+    def from_cln_grpc(cls, i) -> "Invoice":
+        state = InvoiceState.from_cln_grpc(i)
+        return cls(
+            memo=i.description,
+            r_preimage=i.payment_preimage.hex(),
+            r_hash=i.payment_hash.hex(),
+            value=i.amount_msat.msat / 1000,
+            value_msat=i.amount_msat.msat,
+            settled=True if state == InvoiceState.SETTLED else False,
+            expiry_date=i.expires_at,
+            settle_date=i.paid_at,
+            payment_request=i.bolt11,
+            settle_index=i.pay_index,
+            amt_paid_sat=i.amount_received_msat.msat / 1000,
+            amt_paid_msat=i.amount_received_msat.msat,
+            state=state,
+        )
+
 
 class PaymentStatus(str, Enum):
     UNKNOWN = "unknown"
@@ -949,6 +990,27 @@ class Payment(BaseModel):
             failure_reason=PaymentFailureReason.from_lnd_grpc(p.failure_reason),
         )
 
+    @classmethod
+    def from_cln_grpc(cls, p) -> "Payment":
+        def _get_attempts(attempts):
+            l = []
+            for a in attempts:
+                l.append(HTLCAttempt.from_lnd_grpc(a))
+            return l
+
+        return cls(
+            payment_hash=p.payment_hash,
+            payment_preimage=p.payment_preimage,
+            value_msat=p.value_msat,
+            payment_request=p.payment_request,
+            status=PaymentStatus.from_lnd_grpc(p.status),
+            fee_msat=p.fee_msat,
+            creation_time_ns=p.creation_time_ns,
+            htlcs=_get_attempts(p.htlcs),
+            payment_index=p.payment_index,
+            failure_reason=PaymentFailureReason.from_lnd_grpc(p.failure_reason),
+        )
+
 
 class NewAddressInput(BaseModel):
     type: OnchainAddressType = Query(
@@ -975,18 +1037,20 @@ class SendCoinsInput(BaseModel):
         description="The number of bitcoin denominated in satoshis to send",
     )
     target_conf: int = Query(
-        0,
+        None,
         description="The number of blocks that the transaction *should* confirm in, will be used for fee estimation",
     )
     sat_per_vbyte: int = Query(
-        0,
+        None,
         description="A manual fee expressed in sat/vbyte that should be used when crafting the transaction (default: 0)",
     )
     min_confs: int = Query(
         1,
         description="The minimum number of confirmations each one of your outputs used for the transaction must satisfy",
     )
-    label: str = Query("", description="A label for the transaction")
+    label: str = Query(
+        "", description="A label for the transaction. Ignored by CLN backend."
+    )
 
 
 class SendCoinsResponse(BaseModel):
@@ -999,10 +1063,21 @@ class SendCoinsResponse(BaseModel):
         ...,
         description="The number of bitcoin denominated in satoshis which where sent",
     )
-    label: str = Query("", description="The label used for the transaction")
+    label: str = Query(
+        "", description="The label used for the transaction. Ignored by CLN backend."
+    )
 
     @classmethod
     def from_lnd_grpc(cls, r, input: SendCoinsInput):
+        return cls(
+            txid=r.txid,
+            address=input.address,
+            amount=input.amount,
+            label=input.label,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, r, input: SendCoinsInput):
         return cls(
             txid=r.txid,
             address=input.address,
@@ -1154,6 +1229,36 @@ class LnInfo(BaseModel):
             num_inactive_channels=i["num_inactive_channels"],
             num_peers=i["num_peers"],
             block_height=i["blockheight"],
+            chains=_chains,
+            uris=_uris,
+            features=_features,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, implementation, i) -> "LnInfo":
+        _chains = [Chain(chain="bitcoin", network=i.network)]
+
+        _features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # for k in i["our_features"].keys():
+        #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
+
+        _uris = []
+        for b in i.binding:
+            _uris.append(f"{b.address}:{b.port}")
+
+        return LnInfo(
+            implementation=implementation,
+            version=i.version,
+            commit_hash=i.version.split("-")[-1],
+            identity_pubkey=i.id.hex(),
+            alias=i.alias,
+            color=i.color.hex(),
+            num_pending_channels=i.num_pending_channels,
+            num_active_channels=i.num_active_channels,
+            num_inactive_channels=i.num_inactive_channels,
+            num_peers=i.num_peers,
+            block_height=i.blockheight,
             chains=_chains,
             uris=_uris,
             features=_features,
