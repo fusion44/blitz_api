@@ -304,7 +304,6 @@ class Channel(BaseModel):
 
     @classmethod
     def from_grpc_pending(cls, c) -> "Channel":
-        print(str(c))
         return cls(
             active=False,
             channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
