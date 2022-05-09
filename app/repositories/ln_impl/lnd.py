@@ -440,8 +440,6 @@ async def channel_open_impl(local_funding_amount: int, node_URI: str, target_con
         )
         try:
             await lncfg.lnd_stub.ConnectPeer(r)
-            #print("CONNECTED TO PEER")
-            #print(str(pubkey))
         except grpc.aio._call.AioRpcError as error:
             if (
             error.details() != None
@@ -459,9 +457,7 @@ async def channel_open_impl(local_funding_amount: int, node_URI: str, target_con
         local_funding_amount=local_funding_amount,
         target_conf=target_confs
         )
-        #print("OPENCHANNEL - RESULT:")
         async for response in lncfg.lnd_stub.OpenChannel(r):
-            #print(str(response))
             # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
             return str(response.chan_pending.txid)
 
@@ -502,13 +498,11 @@ async def channel_list_impl() -> List[Channel]:
             
         request = ln.PendingChannelsRequest()
         response = await lncfg.lnd_stub.PendingChannels(request)
-        #print(str(response))
         for channel_grpc in response.pending_open_channels:
             channel = Channel.from_grpc_pending(channel_grpc.channel)
             channel.peer_alias= await peer_resolve_alias(channel.peer_publickey)
             channels.append(channel) 
 
-        #print(str(channels))
         return channels
 
     except grpc.aio._call.AioRpcError as error:
@@ -532,7 +526,6 @@ async def channel_close_impl(channel_id: int, force_close: bool) -> str:
         target_conf=6
         )
         async for response in lncfg.lnd_stub.CloseChannel(request):
-            #print(str(response))
             # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
             return str(response.close_pending.txid)
 
