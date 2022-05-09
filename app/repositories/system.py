@@ -115,12 +115,15 @@ async def password_change(type: str, old_password: str, new_password: str):
             raise HTTPException(status.HTTP_406_NOT_ACCEPTABLE, detail="old password not correct")
 
         # second set new password
-        scriptcall=f"/home/admin/config.scripts/blitz.passwords.sh set {type} \"{old_password}\""
+        scriptcall=f"/home/admin/config.scripts/blitz.passwords.sh set {type} \"{new_password}\""
         if type == "c":
-           scriptcall=f"/home/admin/config.scripts/blitz.passwords.sh set lnd \"{old_password}\" \"{new_password}\"" 
+           # will set password c of both lnd & core lightning if installed/activated
+           scriptcall=f"/home/admin/config.scripts/blitz.passwords.sh set c \"{old_password}\" \"{new_password}\"" 
         result = await call_script(scriptcall)
         data = parse_key_value_text(result)
         print(str(data))
+        if "error" in data.keys() and len(data["error"])>0:
+            raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=data["error"])
         return
 
     else:
