@@ -18,6 +18,7 @@ from app.models.lightning import (
     PaymentRequest,
     SendCoinsInput,
     SendCoinsResponse,
+    Channel,
 )
 from app.utils import SSE, lightning_config, send_sse_message
 
@@ -111,6 +112,34 @@ async def send_payment(
         pay_req, timeout_seconds, fee_limit_msat, amount_msat
     )
     _schedule_wallet_balance_update()
+    return res
+
+
+async def channel_open(local_funding_amount: int, node_URI: str, target_confs: int) -> str:
+
+    if local_funding_amount < 1:
+        raise ValueError("funding amount needs to be positive")
+        
+    if target_confs < 1:
+        raise ValueError("target confs needs to be positive")
+
+    if len(node_URI) == 0:
+        raise ValueError("node_URI cant be empty")
+
+    if not '@' in node_URI:
+        raise ValueError("node_URI must contain @ with node physical address")
+
+    res =  await ln.channel_open_impl(local_funding_amount, node_URI, target_confs)
+    return res
+
+
+async def channel_list() -> List[Channel]:
+    res = await ln.channel_list_impl()
+    return res
+
+
+async def channel_close(channel_id: int, force_close: bool) -> str:
+    res = await ln.channel_close_impl(channel_id, force_close)
     return res
 
 
@@ -287,3 +316,4 @@ def listen_for_ssh_unlock():
 
     loop = asyncio.get_event_loop()
     loop.create_task(_do_check_unlock())
+

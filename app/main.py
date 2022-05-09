@@ -107,6 +107,7 @@ wallet_locked = True
 
 @app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
 async def stream(request: Request):
+
     global wallet_locked
     global num_connections
     q = asyncio.Queue()

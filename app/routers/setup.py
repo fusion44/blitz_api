@@ -1,21 +1,23 @@
-import asyncio
-
-# from asyncio.windows_events import NULL
 import logging
 from pickle import FALSE
-import re
 from xmlrpc.client import boolean
-from pydantic import BaseModel
 
 from aioredis import Redis
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from fastapi_plugins import depends_redis
+from pydantic import BaseModel
 from setuptools import setup
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
-from app.repositories.system import call_script, parse_key_value_lines, password_valid, name_valid, parse_key_value_lines, shutdown
+from app.repositories.system import (
+    call_script,
+    name_valid,
+    parse_key_value_lines,
+    password_valid,
+    shutdown,
+)
 from app.utils import redis_get
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
@@ -37,11 +39,11 @@ async def get_status():
     message = await redis_get("message")
     if setupPhase == "done":
         try:
-            blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
-            if blitz_sync_initial_done == "1":
+            btc_default_sync_initial_done = await redis_get("btc_default_sync_initial_done")
+            if btc_default_sync_initial_done == "1":
                 initialsync = "done"
             else:
-                initialsync = "running"  
+                initialsync = "running"
         except:
             initialsync = ""
     else:
@@ -87,7 +89,6 @@ async def setup_start_info():
 
 
 def write_text_file(filename: str, arrayOfLines):
-    logging.warning(f"writing {filename}")
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(arrayOfLines))
 
@@ -105,7 +106,6 @@ class StartDoneData(BaseModel):
 @router.post("/setup-start-done")
 async def setup_start_done(
     data: StartDoneData ):
-    logging.warning(f"START /setup-start-done")
 
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
@@ -122,12 +122,12 @@ async def setup_start_done(
         setupPhase="setup"
 
     #### SETUP ####
-    if setupPhase == "setup": 
+    if setupPhase == "setup":
         if name_valid(data.hostname) == False:
             logging.warning(f"hostname is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         if data.lightning!="lnd" and data.lightning!="cl" and data.lightning!="none":
-            logging.warning(f"lightning is not valid") 
+            logging.warning(f"lightning is not valid")
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
@@ -163,7 +163,7 @@ async def setup_start_done(
         ])
 
     #### RECOVERY ####
-    elif setupPhase == "recovery": 
+    elif setupPhase == "recovery":
         logging.warning(f"check recovery data")
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
@@ -174,12 +174,12 @@ async def setup_start_done(
         ])
 
     #### MIGRATION ####
-    elif setupPhase == "migration": 
+    elif setupPhase == "migration":
         logging.warning(f"check migration data")
         hddGotMigrationData = await redis_get("hddGotMigrationData")
         if hddGotMigrationData == "":
             logging.warning(f"hddGotMigrationData is not available")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)    
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
@@ -198,12 +198,11 @@ async def setup_start_done(
             f"passwordB='{data.passwordB}'",
             f"passwordC='{data.passwordC}'"
         ])
-        
+
     else:
         logging.warning(f"not handled setupPhase state ({setupPhase})")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    logging.warning(f"kicking off recovery")
     await call_script("/home/admin/_cache.sh set state waitprovision")
 
     # TODO: Following input parameters:
@@ -222,7 +221,7 @@ async def setup_start_done(
     # those values get stored in: /var/cache/raspiblitz/temp/raspiblitz.setup
     # also a skeleton raspiblitz.conf gets created (see controlSetupDialog.sh Line 318)
     # and then API sets state to `waitprovision` to kick-off provision
-    
+
     return sign_jwt()
 
 
@@ -248,7 +247,6 @@ async def setup_final_info():
     with open(setupFilePath, "r") as setupfile:
         resultlines = setupfile.readlines()
     data = parse_key_value_lines(resultlines)
-    logging.warning(f"data({data})")
     try:
         seedwordsNEW = data["seedwordsNEW"]
     except:

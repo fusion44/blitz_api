@@ -67,6 +67,26 @@ poetry shell
 
 (To exit the poetry shell use: `exit`)
 
+## Development (RaspiBlitz Remote)
+
+Create a file `/script/sync_to_blitz.personal.sh` (will be ignored by github) the SSH connection data to your RaspiBlitz.
+
+localIP="192.168.178.61"
+sshPort="22"
+passwordA=""
+
+Then you can run always `make sync_to_blitz` to copy your latest code over to your RaspiBlitz. The script automatically restarts the backend API with the new code on your RaspiBlitz and shows you the logs.
+
+To test the backend API then call the SwaggerUI: `http://[LOCALIP]/api/v1/docs` - to call protected endpoints run the `/system/login` endpoint first with HTTP POST body:
+```
+{
+  "password": "[PASSWORDA]"
+}
+```
+and then copy the JWT Auth string returned to `Authorize` in the top section of the SwaggerUI.
+
+*You can also now test the RaspiBlitz WebUI against the API by running it locally on your dev laptop when you configute it to use the backend AOPI of your RaspiBlitz.*
+
 ### Installation
 
 ```
