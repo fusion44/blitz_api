@@ -459,7 +459,7 @@ async def channel_open_impl(local_funding_amount: int, node_URI: str, target_con
         )
         async for response in lncfg.lnd_stub.OpenChannel(r):
             # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
-            return str(response.chan_pending.txid)
+            return str(response.chan_pending.txid.hex())
 
     except grpc.aio._call.AioRpcError as error:
         raise HTTPException(
@@ -527,7 +527,7 @@ async def channel_close_impl(channel_id: int, force_close: bool) -> str:
         )
         async for response in lncfg.lnd_stub.CloseChannel(request):
             # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
-            return str(response.close_pending.txid)
+            return str(response.close_pending.txid.hex())
 
     except grpc.aio._call.AioRpcError as error:
         raise HTTPException(
