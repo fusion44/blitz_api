@@ -10,8 +10,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 
 from app.constants import available_app_ids
-from app.repositories.system import call_script, parse_key_value_text
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, send_sse_message, call_script, parse_key_value_text
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 

@@ -1,5 +1,7 @@
 import json
 import logging
+import asyncio
+import re
 import os
 from types import coroutine
 from typing import Dict
@@ -204,3 +206,35 @@ class SSE:
     LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
     WALLET_LOCK_STATUS = "wallet_lock_status"
+
+
+async def call_script(scriptPath) -> str:
+    cmd = f"bash {scriptPath}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return stdout.decode()
+    if stderr:
+        logging.error(stderr.decode())
+    return ""
+
+
+def parse_key_value_lines(lines: list) -> dict:
+    Dict = {}
+    for line in lines:
+        line=line.strip()
+        if len(line) == 0:
+            continue
+        if not re.match("^[a-zA-Z0-9]*=", line):
+            continue
+        key, value = line.strip().split("=", 1)
+        Dict[key] = value.strip('"').strip("'")
+    return Dict
+
+
+def parse_key_value_text(text: str) -> dict:
+    return parse_key_value_lines(text.splitlines())

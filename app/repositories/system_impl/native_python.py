@@ -9,6 +9,7 @@ from app.models.system import (
     HealthMessagePriority,
     HealthState,
     SystemInfo,
+    ConnectionInfo,
 )
 from app.repositories.lightning import get_ln_info
 
@@ -50,3 +51,8 @@ async def get_system_info_impl() -> SystemInfo:
 async def shutdown_impl(reboot: bool) -> bool:
     logging.info("Shutdown / reboot not supported in native_python mode.")
     return False
+
+async def get_connection_info_impl() -> ConnectionInfo:
+
+    # return an empty connection info object for now
+    return ConnectionInfo()
