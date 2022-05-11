@@ -135,6 +135,7 @@ class ConnectionInfo(BaseModel):
     lnd_invoice_macaroon: str = Query("", description="lnd macaroon that only creates invoices in hexstring format")
     lnd_readonly_macaroon: str = Query("", description="lnd macaroon with only read-only rights in hexstring format")
     lnd_tls_cert: str = Query("", description="lnd tls cert in hexstring format")
+    lnd_rest_onion: str = Query("", description="lnd rest api onion address")
 
     lnd_btcpay_connection_string: str = Query("", description="connect btcpay server locally to your lnd lighthing node")
     lnd_zeus_connection_string: str = Query("", description="connect zeus app to your lnd lighthing node")

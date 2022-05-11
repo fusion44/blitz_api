@@ -87,10 +87,12 @@ async def get_connection_info_impl() -> ConnectionInfo:
     # or tor that needs hidden service    
 
     # LND MACAROONS & TLS
+    data_lnd_rest_onion=""
     data_lnd_admin_macaroon=""
     data_lnd_invoice_macaroon=""
     data_lnd_readonly_macaroon=""
     data_lnd_tls_cert=""
+
     if lightning == "lnd":
         key_value_text = await call_script("/home/admin/config.scripts/lnd.export.sh hexstring key-value")
         key_value = parse_key_value_text(key_value_text)
@@ -102,6 +104,8 @@ async def get_connection_info_impl() -> ConnectionInfo:
             data_lnd_readonly_macaroon=key_value["readonlyMacaroon"]
         if "tlsCert" in key_value.keys():
             data_lnd_tls_cert=key_value["tlsCert"]
+        if "restTor" in key_value.keys():
+            data_lnd_rest_onion=key_value["restTor"]
         if "error" in key_value.keys():
             logging.warning(f"Error from script call: {key_value['error']}")
 
@@ -145,6 +149,7 @@ async def get_connection_info_impl() -> ConnectionInfo:
         lnd_admin_macaroon=data_lnd_admin_macaroon,
         lnd_invoice_macaroon=data_lnd_invoice_macaroon,
         lnd_readonly_macaroon=data_lnd_readonly_macaroon,
+        lnd_rest_onion=data_lnd_rest_onion,
         lnd_tls_cert=data_lnd_tls_cert,
         lnd_zeus_connection_string=data_lnd_zeus_connection_string,
         lnd_btcpay_connection_string=data_lnd_btcpay_connection_string,
