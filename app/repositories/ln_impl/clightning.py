@@ -5,6 +5,7 @@ from app.models.lightning import (
     ForwardSuccessEvent,
     GenericTx,
     Invoice,
+    Channel,
     LnInfo,
     NewAddressInput,
     OnChainTransaction,
@@ -90,3 +91,13 @@ async def listen_invoices() -> Invoice:
 
 async def listen_forward_events() -> ForwardSuccessEvent:
     raise NotImplementedError("c-lightning not yet implemented")
+
+async def channel_open_impl(local_funding_amount: int, node_URI: str, target_confs: int) -> str:
+    raise NotImplementedError("not yet implemented")
+
+
+async def channel_list_impl() -> List[Channel]:
+    raise NotImplementedError("not yet implemented")
+
+async def channel_close_impl(channel_id: int, force_close: bool) -> str:
+    raise NotImplementedError("not yet implemented")

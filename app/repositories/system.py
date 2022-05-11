@@ -6,7 +6,7 @@ from decouple import config
 from fastapi import HTTPException, Request, status
 
 from app.models.system import APIPlatform, RawDebugLogData, SystemInfo, ConnectionInfo
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, send_sse_message, call_script, parse_key_value_text
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
@@ -46,14 +46,12 @@ def _check_shell_scripts_status():
 
 _check_shell_scripts_status()
 
-
 def password_valid(password: str):
     if len(password) < 8:
         return False
     if password.find(" ") >= 0:
         return False
     return re.match("^[a-zA-Z0-9]*$", password)
-
 
 def name_valid(password: str):
     if len(password) < 3:
@@ -62,6 +60,43 @@ def name_valid(password: str):
         return False
     return re.match("^[\.a-zA-Z0-9-_]*$", password)
 
+async def password_change(type: str, old_password: str, new_password: str):
+
+    # check just allowed type values
+    type = type.lower()
+    if not type in ["a","b","c"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="unkown password type")
+
+    # check password formattings
+    if not password_valid(old_password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="old password format unvalid")
+    if not password_valid(new_password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="new password format unvalid")
+
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+
+        # first check if old password is correct
+        result = await call_script(
+            f"/home/admin/config.scripts/blitz.passwords.sh check {type} \"{old_password}\""
+        )
+        data = parse_key_value_text(result)
+        if not data["correct"] == "1":
+            raise HTTPException(status.HTTP_406_NOT_ACCEPTABLE, detail="old password not correct")
+
+        # second set new password
+        scriptcall=f"/home/admin/config.scripts/blitz.passwords.sh set {type} \"{new_password}\""
+        if type == "c":
+           # will set password c of both lnd & core lightning if installed/activated
+           scriptcall=f"/home/admin/config.scripts/blitz.passwords.sh set c \"{old_password}\" \"{new_password}\"" 
+        result = await call_script(scriptcall)
+        data = parse_key_value_text(result)
+        print(str(data))
+        if "error" in data.keys() and len(data["error"])>0:
+            raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=data["error"])
+        return
+
+    else:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail="endpoint just works on raspiblitz so far")
 
 async def get_system_info() -> SystemInfo:
     try:
@@ -70,7 +105,6 @@ async def get_system_info() -> SystemInfo:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
-
 
 async def get_hardware_info() -> map:
     return await get_hardware_info_impl()
