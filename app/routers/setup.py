@@ -12,13 +12,11 @@ from setuptools import setup
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.repositories.system import (
-    call_script,
     name_valid,
-    parse_key_value_lines,
     password_valid,
     shutdown,
 )
-from app.utils import redis_get
+from app.utils import redis_get, call_script, parse_key_value_lines
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 

@@ -128,3 +128,18 @@ class RawDebugLogData(BaseModel):
         "https://www.github.com/rootzoll/raspiblitz/issues",
         description="Link to the Raspiblitz issue tracker",
     )
+
+class ConnectionInfo(BaseModel):
+
+    lnd_admin_macaroon: str = Query("", description="lnd macaroon with admin rights in hexstring format")
+    lnd_invoice_macaroon: str = Query("", description="lnd macaroon that only creates invoices in hexstring format")
+    lnd_readonly_macaroon: str = Query("", description="lnd macaroon with only read-only rights in hexstring format")
+    lnd_tls_cert: str = Query("", description="lnd tls cert in hexstring format")
+    lnd_rest_onion: str = Query("", description="lnd rest api onion address")
+
+    lnd_btcpay_connection_string: str = Query("", description="connect btcpay server locally to your lnd lighthing node")
+    lnd_zeus_connection_string: str = Query("", description="connect zeus app to your lnd lighthing node")
+
+    cl_rest_zeus_connection_string: str = Query("", description="connect zeus app to your core lighthing node over rest")
+    cl_rest_macaroon: str = Query("", description="core lightning rest macaroon")
+    cl_rest_onion: str = Query("", description="core lightning rest onion address")

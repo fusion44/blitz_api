@@ -1,13 +1,12 @@
 import asyncio
-import logging
 import re
 from os import path
 
 from decouple import config
 from fastapi import HTTPException, Request, status
 
-from app.models.system import APIPlatform, RawDebugLogData, SystemInfo
-from app.utils import SSE, send_sse_message
+from app.models.system import APIPlatform, RawDebugLogData, SystemInfo, ConnectionInfo
+from app.utils import SSE, send_sse_message, call_script, parse_key_value_text
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
@@ -18,6 +17,7 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
     from app.repositories.system_impl.raspiblitz import (
         get_system_info_impl,
         shutdown_impl,
+        get_connection_info_impl,
     )
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
@@ -27,6 +27,7 @@ elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.system_impl.native_python import (
         get_system_info_impl,
         shutdown_impl,
+        get_connection_info_impl,
     )
 else:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
@@ -44,38 +45,6 @@ def _check_shell_scripts_status():
 
 
 _check_shell_scripts_status()
-
-
-async def call_script(scriptPath) -> str:
-    cmd = f"bash {scriptPath}"
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return stdout.decode()
-    if stderr:
-        logging.error(stderr.decode())
-    return ""
-
-
-def parse_key_value_lines(lines: list) -> dict:
-    Dict = {}
-    for line in lines:
-        line=line.strip()
-        if len(line) == 0:
-            continue
-        if not re.match("^[a-zA-Z0-9]*=", line):
-            continue
-        key, value = line.strip().split("=", 1)
-        Dict[key] = value.strip('"').strip("'")
-    return Dict
-
-
-def parse_key_value_text(text: str) -> dict:
-    return parse_key_value_lines(text.splitlines())
 
 def password_valid(password: str):
     if len(password) < 8:
@@ -140,6 +109,8 @@ async def get_system_info() -> SystemInfo:
 async def get_hardware_info() -> map:
     return await get_hardware_info_impl()
 
+async def get_connection_info() -> ConnectionInfo:
+    return await get_connection_info_impl()
 
 async def shutdown(reboot: bool) -> bool:
     if reboot:
