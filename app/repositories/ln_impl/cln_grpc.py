@@ -1,8 +1,9 @@
 import asyncio
+import shutil
+import sqlite3
 import time
 from argparse import ArgumentError
 from typing import AsyncGenerator, List, Optional
-from unicodedata import category
 
 import grpc
 from decouple import config
@@ -30,6 +31,7 @@ from app.models.lightning import (
     TxType,
     WalletBalance,
 )
+from app.utils import bitcoin_rpc_async
 from app.utils import lightning_config as lncfg
 
 
@@ -84,6 +86,20 @@ memo_cache = {}
 block_cache = {}
 
 
+async def _get_block_time(block_height: int) -> tuple:
+    if block_height is None or block_height < 0:
+        raise ArgumentError("block_height cannot be None or negative")
+
+    if block_height in block_cache:
+        return block_cache[block_height]
+
+    res = await bitcoin_rpc_async("getblockstats", params=[block_height])
+    hash = res["result"]["blockhash"]
+    block = await bitcoin_rpc_async("getblock", params=[hash])
+    block_cache[block_height] = (block["result"]["time"], block["result"]["mediantime"])
+    return block_cache[block_height]
+
+
 async def list_all_tx_impl(
     successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
@@ -114,7 +130,52 @@ async def list_invoices_impl(
 
 
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
-    raise NotImplementedError("c-lightning not yet implemented")
+    # Make a temporary copy of the file to avoid locking the db.
+    # CLN might want to write while we read.
+    info = await get_ln_info_impl()
+
+    # FIXME(#87): Once Core Lightnings accountability plugin is available
+    src = "/home/admin/.lightning/testnet/lightningd.sqlite3"
+    dest = "/tmp/lightningd.sqlite3"
+    shutil.copyfile(src, dest)
+
+    conn = sqlite3.connect(dest, uri=True)
+    cur = conn.execute("select * from outputs")
+    res = cur.fetchall()
+    conn.close()
+
+    txs = []
+    for o in res:
+        prev_out_tx = o[0].hex()
+        amount = o[2]
+        conf_block = o[9]
+        spent_block = o[10]
+        conf_time = (await _get_block_time(conf_block))[0]
+        txs.append(
+            OnChainTransaction(
+                tx_hash=f"prev_out_tx {prev_out_tx}",
+                amount=amount,
+                num_confirmations=info.block_height - conf_block,
+                block_height=conf_block,
+                time_stamp=conf_time,
+                total_fees=0,
+            )
+        )
+
+        if spent_block is not None:
+            spent_time = (await _get_block_time(spent_block))[0]
+            txs.append(
+                OnChainTransaction(
+                    tx_hash=f"prev_out_tx {prev_out_tx}",
+                    amount=-amount,
+                    num_confirmations=info.block_height - spent_block,
+                    block_height=spent_block,
+                    time_stamp=spent_time,
+                    total_fees=0,
+                ),
+            )
+
+    return txs
 
 
 async def list_payments_impl(
