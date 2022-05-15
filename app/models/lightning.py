@@ -646,6 +646,17 @@ class PaymentStatus(str, Enum):
         else:
             raise NotImplementedError(f"PaymentStatus {id} is not implemented")
 
+    @classmethod
+    def from_cln_grpc(cls, id) -> "PaymentStatus":
+        if id == 0:
+            return PaymentStatus.IN_FLIGHT
+        elif id == 1:
+            return PaymentStatus.FAILED
+        elif id == 2:
+            return PaymentStatus.SUCCEEDED
+        else:
+            raise NotImplementedError(f"PaymentStatus {id} is not implemented")
+
 
 class PaymentFailureReason(str, Enum):
     # Payment isn't failed(yet).
@@ -685,6 +696,16 @@ class PaymentFailureReason(str, Enum):
             return PaymentFailureReason.FAILURE_REASON_INSUFFICIENT_BALANCE
         else:
             raise NotImplementedError(f"PaymentFailureReason {id} is not implemented")
+
+    @classmethod
+    def from_cln_grpc(cls, p) -> "PaymentFailureReason":
+        if p.status == 0 or p.status == 2:
+            return PaymentFailureReason.FAILURE_REASON_NONE
+
+        # TODO: find a way to describe the failure reason. CLN currently doesn't
+        # seem to provide an API for this.
+
+        return PaymentFailureReason.FAILURE_REASON_ERROR
 
 
 class ChannelUpdate(BaseModel):
@@ -999,7 +1020,13 @@ class Payment(BaseModel):
         [], description="The HTLCs made in attempt to settle the payment."
     )
 
-    payment_index: int = Query(..., description="The payment index")
+    payment_index: int = Query(
+        0, description="The payment index. Only set with LND, 0 otherwise."
+    )
+
+    label: str = Query(
+        "", description="The payment label. Only set with CLN, empty otherwise."
+    )
 
     failure_reason: PaymentFailureReason = Query(
         PaymentFailureReason.FAILURE_REASON_NONE, description="The failure reason"
@@ -1028,23 +1055,16 @@ class Payment(BaseModel):
 
     @classmethod
     def from_cln_grpc(cls, p) -> "Payment":
-        def _get_attempts(attempts):
-            l = []
-            for a in attempts:
-                l.append(HTLCAttempt.from_lnd_grpc(a))
-            return l
-
         return cls(
-            payment_hash=p.payment_hash,
-            payment_preimage=p.payment_preimage,
-            value_msat=p.value_msat,
-            payment_request=p.payment_request,
-            status=PaymentStatus.from_lnd_grpc(p.status),
-            fee_msat=p.fee_msat,
-            creation_time_ns=p.creation_time_ns,
-            htlcs=_get_attempts(p.htlcs),
-            payment_index=p.payment_index,
-            failure_reason=PaymentFailureReason.from_lnd_grpc(p.failure_reason),
+            payment_hash=p.payment_hash.hex(),
+            payment_preimage="",  # CLN currently doesn't return the preimage
+            value_msat=p.amount_sent_msat.msat,
+            payment_request=p.bolt11,
+            status=PaymentStatus.from_cln_grpc(p.status),
+            fee_msat=p.amount_sent_msat.msat - p.amount_msat.msat,
+            creation_time_ns=p.created_at,
+            label=p.label,
+            failure_reason=PaymentFailureReason.from_cln_grpc(p),
         )
 
 

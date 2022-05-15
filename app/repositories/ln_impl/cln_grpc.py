@@ -181,7 +181,26 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
 async def list_payments_impl(
     include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
 ):
-    raise NotImplementedError("c-lightning not yet implemented")
+    req = ln.ListpaysRequest()
+    res = await lncfg.cln_stub.ListPays(req)
+
+    pays = []
+    for p in res.pays:
+        if p.status == 2:
+            # always include completed payments
+            pays.append(Payment.from_cln_grpc(p))
+            continue
+
+        if include_incomplete:
+            pays.append(Payment.from_cln_grpc(p))
+
+    if reversed:
+        pays.reverse()
+
+    if max_payments == 0 or max_payments == None:
+        return pays
+
+    return pays[index_offset : index_offset + max_payments]
 
 
 async def add_invoice_impl(
