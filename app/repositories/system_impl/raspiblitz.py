@@ -23,11 +23,9 @@ async def get_system_info_impl() -> SystemInfo:
     lninfo = await get_ln_info()
     lan = await redis_get("internet_localip")
     tor = await redis_get("tor_web_addr")
-    node_address = await redis_get("ln_default_address")
 
     return SystemInfo(
         alias=lninfo.alias,
-        identity_pubkey=node_address,
         color=lninfo.color,
         platform=APIPlatform.RASPIBLITZ,
         platform_version=await redis_get("raspiBlitzVersion"),

@@ -6,6 +6,8 @@ from decouple import config
 from fastapi import status
 from fastapi.exceptions import HTTPException
 
+from app.models.system import APIPlatform
+
 from app.models.lightning import (
     FeeRevenue,
     GenericTx,
@@ -20,7 +22,7 @@ from app.models.lightning import (
     SendCoinsResponse,
     Channel,
 )
-from app.utils import SSE, lightning_config, send_sse_message
+from app.utils import SSE, lightning_config, send_sse_message, redis_get
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
@@ -75,6 +77,8 @@ ENABLE_FWD_NOTIFICATIONS = config(
 )
 
 FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float)
+
+PLATFORM = config("platform", cast=str)
 
 if FWD_GATHER_INTERVAL < 0.3:
     raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
@@ -178,7 +182,10 @@ async def channel_close(channel_id: int, force_close: bool) -> str:
 
 
 async def get_ln_info() -> LnInfo:
-    return await get_ln_info_impl()
+    ln_info =  await get_ln_info_impl()
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        ln_info.identity_uri = await redis_get("ln_default_address")
+    return ln_info
 
 
 async def unlock_wallet(password: str) -> bool:

@@ -29,7 +29,6 @@ async def get_system_info_impl() -> SystemInfo:
 
     return SystemInfo(
         alias=lninfo.alias,
-        identity_pubkey="",
         color=lninfo.color,
         platform=APIPlatform.NATIVE_PYTHON,
         platform_version=version,

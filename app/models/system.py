@@ -83,7 +83,6 @@ class APIPlatform(str, Enum):
 
 class SystemInfo(BaseModel):
     alias: str = Query("", description="Name of the node (same as Lightning alias)")
-    identity_pubkey: str = Query("the nodes URI", description="pubkey")
     color: str = Query(
         ..., description="The color of the current node in hex code format"
     )
