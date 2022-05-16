@@ -33,6 +33,7 @@ from app.models.lightning import (
 )
 from app.utils import bitcoin_rpc_async
 from app.utils import lightning_config as lncfg
+from app.utils import next_push_id
 
 
 def get_implementation_name() -> str:
@@ -206,7 +207,33 @@ async def list_payments_impl(
 async def add_invoice_impl(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
-    raise NotImplementedError("c-lightning not yet implemented")
+    if value_msat < 0:
+        raise ArgumentError("value_msat cannot be negative")
+
+    msat = None
+    if value_msat == 0:
+        msat = lnp.AmountOrAny(any=True)
+    elif value_msat > 0:
+        msat = lnp.AmountOrAny(amount=lnp.Amount(msat=value_msat))
+
+    id = next_push_id()
+    req = ln.InvoiceRequest(
+        msatoshi=msat,
+        description=memo,
+        label=id,
+        expiry=expiry,
+    )
+
+    res = await lncfg.cln_stub.Invoice(req)
+
+    return Invoice(
+        payment_request=res.bolt11,
+        memo=memo,
+        value_msat=value_msat,
+        expiry_date=res.expires_at,
+        add_index=id,
+        state=InvoiceState.OPEN,
+    )
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:

@@ -1,3 +1,13 @@
+add_invoice_desc = """
+Adds a new invoice to the database.
+
+LND is generating a unique auto-incrementing `add_index` for the invoice.
+
+CLN will receive a [Firebase-like PushID](https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68) from the backend for the `label` when creating the invoice.
+
+Please refer to the response schema docs for more information.
+"""
+
 get_balance_response_desc = """
 A JSON String with on chain wallet balances with on-chain balances in
 **sat** and channel balances in **msat**. Detailed description is in

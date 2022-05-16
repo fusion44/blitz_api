@@ -1,6 +1,9 @@
+import array
 import json
 import logging
 import os
+import random
+import time
 from types import coroutine
 from typing import Dict
 
@@ -228,3 +231,78 @@ class SSE:
     LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
     WALLET_LOCK_STATUS = "wallet_lock_status"
+
+
+# https://gist.github.com/risent/4cab3878d995bec7d1c2
+# https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68
+# https://gist.github.com/mikelehen/3596a30bd69384624c11
+class _PushID(object):
+    # Modeled after base64 web-safe chars, but ordered by ASCII.
+    PUSH_CHARS = (
+        "-0123456789" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "_abcdefghijklmnopqrstuvwxyz"
+    )
+
+    def __init__(self):
+
+        # Timestamp of last push, used to prevent local collisions if you
+        # pushtwice in one ms.
+        self.last_push_time = 0
+
+        # We generate 72-bits of randomness which get turned into 12
+        # characters and appended to the timestamp to prevent
+        # collisions with other clients.  We store the last characters
+        # we generated because in the event of a collision, we'll use
+        # those same characters except "incremented" by one.
+        self.last_rand_chars = array.array("i", [i for i in range(12)])
+
+    def next_id(self):
+        now = int(time.time() * 1000)
+        duplicate_time = now == self.last_push_time
+        self.last_push_time = now
+        time_stamp_chars = array.array("u", "12345678")
+
+        for i in range(7, -1, -1):
+            time_stamp_chars[i] = self.PUSH_CHARS[now % 64]
+            now = int(now / 64)
+
+        if now != 0:
+            raise ValueError("We should have converted the entire timestamp.")
+
+        uid = "".join(time_stamp_chars)
+
+        if not duplicate_time:
+            for i in range(12):
+                self.last_rand_chars[i] = int(random.random() * 64)
+        else:
+            # If the timestamp hasn't changed since last push, use the
+            # same random number, except incremented by 1.
+            for i in range(11, -1, -1):
+                if self.last_rand_chars[i] == 63:
+                    self.last_rand_chars[i] = 0
+                else:
+                    break
+            self.last_rand_chars[i] += 1
+
+        for i in range(12):
+            uid += self.PUSH_CHARS[self.last_rand_chars[i]]
+
+        if len(uid) != 20:
+            raise ValueError("Length should be 20.")
+
+        return uid
+
+
+pid_gen = _PushID()
+
+
+def next_push_id() -> str:
+    """Generates a unique random 20 character long string id
+
+    * They're based on timestamp so that they sort *after* any existing ids.
+    * They contain 72-bits of random data after the timestamp so that IDs won't collide with other clients' IDs.
+    * They sort *lexicographically* (so the timestamp is converted to characters that will sort properly).
+    * They're monotonically increasing.  Even if you generate more than one in the same timestamp, the
+      latter ones will sort after the former ones.  We do this by using the previous random bits
+      but "incrementing" them by 1 (only in the case of a timestamp collision).
+    """
+    return pid_gen.next_id()
