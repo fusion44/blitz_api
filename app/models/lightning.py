@@ -950,7 +950,10 @@ class LnInfo(BaseModel):
     commit_hash: str
 
     # The identity pubkey of the current node.
-    identity_pubkey: str
+    identity_pubkey: str = Query("the nodes pubkey")
+
+    # The complete URI (pubkey@physicaladdress:port) the current node.
+    identity_uri: str = Query("the nodes complete URI")
 
     # If applicable, the alias of the current node, e.g. "bob"
     alias: str
