@@ -101,10 +101,78 @@ async def _get_block_time(block_height: int) -> tuple:
     return block_cache[block_height]
 
 
+# Decoding the payment request take a long time,
+# hence we build a simple cache here.
+memo_cache = {}
+
+
 async def list_all_tx_impl(
     successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
-    raise NotImplementedError("c-lightning not yet implemented")
+    list_invoice_req = ln.ListinvoicesRequest()
+    list_payments_req = ln.ListpaysRequest()
+
+    try:
+        res = await asyncio.gather(
+            *[
+                lncfg.cln_stub.ListInvoices(list_invoice_req),
+                list_on_chain_tx_impl(),
+                lncfg.cln_stub.ListPays(list_payments_req),
+            ]
+        )
+        tx = []
+        for invoice in res[0].invoices:
+            i = GenericTx.from_cln_grpc_invoice(invoice)
+            if successfull_only and i.status == TxStatus.SUCCEEDED:
+                tx.append(i)
+                continue
+            tx.append(i)
+
+        for transaction in res[1]:
+            t = GenericTx.from_cln_onchain_tx(transaction)
+            if successfull_only and t.status == TxStatus.SUCCEEDED:
+                tx.append(t)
+                continue
+
+            tx.append(t)
+
+        for pay in res[2].pays:
+            comment = ""
+            # if p.bolt11 in memo_cache:
+            #     comment = memo_cache[p.bolt11]
+            # else:
+            #     # TODO: implement as soon as Core Lightning supports decoding
+            #     # payment requests via gRPC
+            #     pr = await decode_pay_request_impl(p.bolt11)
+            #     comment = pr.description
+            #     memo_cache[p.payment_request] = pr.description
+            p = GenericTx.from_cln_grpc_payment(pay, comment)
+            if successfull_only and p.status == TxStatus.SUCCEEDED:
+                tx.append(p)
+                continue
+
+            tx.append(p)
+
+        def sortKey(e: GenericTx):
+            return e.time_stamp
+
+        tx.sort(key=sortKey)
+
+        if reversed:
+            tx.reverse()
+
+        l = len(tx)
+        for invoice in range(l):
+            tx[invoice].index = invoice
+
+        if max_tx == 0:
+            max_tx = l
+
+        return tx[index_offset : index_offset + max_tx]
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
 
 
 async def list_invoices_impl(
