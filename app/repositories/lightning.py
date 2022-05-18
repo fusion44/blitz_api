@@ -6,9 +6,8 @@ from decouple import config
 from fastapi import status
 from fastapi.exceptions import HTTPException
 
-from app.models.system import APIPlatform
-
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     GenericTx,
     Invoice,
@@ -20,13 +19,16 @@ from app.models.lightning import (
     PaymentRequest,
     SendCoinsInput,
     SendCoinsResponse,
-    Channel,
 )
-from app.utils import SSE, lightning_config, send_sse_message, redis_get
+from app.models.system import APIPlatform
+from app.utils import SSE, lightning_config, redis_get, send_sse_message
 
 if lightning_config.ln_node == "lnd":
     from app.repositories.ln_impl.lnd import (
         add_invoice_impl,
+        channel_close_impl,
+        channel_list_impl,
+        channel_open_impl,
         decode_pay_request_impl,
         get_fee_revenue_impl,
         get_ln_info_impl,
@@ -41,13 +43,13 @@ if lightning_config.ln_node == "lnd":
         send_coins_impl,
         send_payment_impl,
         unlock_wallet_impl,
-        channel_open_impl,
-        channel_list_impl,
-        channel_close_impl,
     )
 else:
     from app.repositories.ln_impl.clightning import (
         add_invoice_impl,
+        channel_close_impl,
+        channel_list_impl,
+        channel_open_impl,
         decode_pay_request_impl,
         get_fee_revenue_impl,
         get_ln_info_impl,
@@ -62,9 +64,6 @@ else:
         send_coins_impl,
         send_payment_impl,
         unlock_wallet_impl,
-        channel_open_impl,
-        channel_list_impl,
-        channel_close_impl,
     )
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
@@ -153,21 +152,23 @@ async def send_payment(
     return res
 
 
-async def channel_open(local_funding_amount: int, node_URI: str, target_confs: int) -> str:
+async def channel_open(
+    local_funding_amount: int, node_URI: str, target_confs: int
+) -> str:
 
     if local_funding_amount < 1:
         raise ValueError("funding amount needs to be positive")
-        
+
     if target_confs < 1:
         raise ValueError("target confs needs to be positive")
 
     if len(node_URI) == 0:
         raise ValueError("node_URI cant be empty")
 
-    if not '@' in node_URI:
+    if not "@" in node_URI:
         raise ValueError("node_URI must contain @ with node physical address")
 
-    res =  await channel_open_impl(local_funding_amount, node_URI, target_confs)
+    res = await channel_open_impl(local_funding_amount, node_URI, target_confs)
     return res
 
 
@@ -182,7 +183,7 @@ async def channel_close(channel_id: int, force_close: bool) -> str:
 
 
 async def get_ln_info() -> LnInfo:
-    ln_info =  await get_ln_info_impl()
+    ln_info = await get_ln_info_impl()
     if PLATFORM == APIPlatform.RASPIBLITZ:
         ln_info.identity_uri = await redis_get("ln_default_address")
     return ln_info
@@ -357,4 +358,3 @@ def listen_for_ssh_unlock():
 
     loop = asyncio.get_event_loop()
     loop.create_task(_do_check_unlock())
-

@@ -8,17 +8,17 @@ from fastapi.params import Depends
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.external.sse_starlette import EventSourceResponse
-from app.models.system import LoginInput, RawDebugLogData, SystemInfo, ConnectionInfo
+from app.models.system import ConnectionInfo, LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
+    get_connection_info,
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
-    password_valid,
     password_change,
+    password_valid,
     shutdown,
     subscribe_hardware_info,
-    get_connection_info,
 )
 from app.routers.system_docs import (
     get_debug_logs_raw_desc,
@@ -52,7 +52,7 @@ async def login(i: LoginInput):
         # script does not work when called from api yet
         if password_valid(i.password):
             result = await call_script(
-                f"/home/admin/config.scripts/blitz.passwords.sh check a \"{i.password}\""
+                f'/home/admin/config.scripts/blitz.passwords.sh check a "{i.password}"'
             )
             data = parse_key_value_text(result)
             if data["correct"] == "1":
@@ -86,6 +86,7 @@ def refresh_token():
 async def change_password(type: str, old_password: str, new_password: str):
     return await password_change(type, old_password, new_password)
 
+
 @router.get(
     "/get-system-info",
     name=f"{_PREFIX}.get-system-info",
@@ -117,6 +118,7 @@ async def get_system_info_path():
 async def hw_info() -> map:
     return await get_hardware_info()
 
+
 @router.get(
     "/connection-info",
     name=f"{_PREFIX}.connection-info",
@@ -128,6 +130,7 @@ async def hw_info() -> map:
 )
 async def connection_info() -> map:
     return await get_connection_info()
+
 
 @router.get(
     "/get-debug-logs-raw",

@@ -5,10 +5,10 @@ from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     GenericTx,
     Invoice,
-    Channel,
     LightningInfoLite,
     LnInfo,
     NewAddressInput,
@@ -22,6 +22,9 @@ from app.models.lightning import (
 )
 from app.repositories.lightning import (
     add_invoice,
+    channel_close,
+    channel_list,
+    channel_open,
     decode_pay_request,
     get_fee_revenue,
     get_ln_info,
@@ -34,9 +37,6 @@ from app.repositories.lightning import (
     new_address,
     send_coins,
     send_payment,
-    channel_open,
-    channel_list,
-    channel_close,
     unlock_wallet,
 )
 from app.routers.lightning_docs import (
@@ -293,9 +293,7 @@ async def send_coins_path(input: SendCoinsInput):
     response_model=str,
     responses=responses,
 )
-async def channelopen(
-    local_funding_amount: int, node_URI: str, target_confs: int = 3
-):
+async def channelopen(local_funding_amount: int, node_URI: str, target_confs: int = 3):
     try:
         return await channel_open(local_funding_amount, node_URI, target_confs)
     except HTTPException as r:
@@ -325,6 +323,7 @@ async def channellist():
     except ValueError as r:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=r.args[0])
 
+
 @router.post(
     "/close-channel",
     name=f"{_PREFIX}.channel-close",
@@ -343,6 +342,7 @@ async def channelclose(channel_id: str, force_close: bool):
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
     except ValueError as r:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=r.args[0])
+
 
 @router.post(
     "/send-payment",

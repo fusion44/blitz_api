@@ -7,14 +7,20 @@ from decouple import config
 from app.constants import API_VERSION
 from app.models.system import (
     APIPlatform,
+    ConnectionInfo,
     HealthMessage,
     HealthMessagePriority,
     HealthState,
     SystemInfo,
-    ConnectionInfo,
 )
 from app.repositories.lightning import get_ln_info
-from app.utils import SSE, redis_get, send_sse_message, call_script, parse_key_value_text
+from app.utils import (
+    SSE,
+    call_script,
+    parse_key_value_text,
+    redis_get,
+    send_sse_message,
+)
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -78,70 +84,79 @@ async def shutdown_impl(reboot: bool) -> bool:
 
     return True
 
+
 async def get_connection_info_impl() -> ConnectionInfo:
 
     lightning = await redis_get("lightning")
 
     # Bitcoin RPC
     # seems to be local network that also needs open ports
-    # or tor that needs hidden service    
+    # or tor that needs hidden service
 
     # LND MACAROONS & TLS
-    data_lnd_rest_onion=""
-    data_lnd_admin_macaroon=""
-    data_lnd_invoice_macaroon=""
-    data_lnd_readonly_macaroon=""
-    data_lnd_tls_cert=""
+    data_lnd_rest_onion = ""
+    data_lnd_admin_macaroon = ""
+    data_lnd_invoice_macaroon = ""
+    data_lnd_readonly_macaroon = ""
+    data_lnd_tls_cert = ""
 
     if lightning == "lnd":
-        key_value_text = await call_script("/home/admin/config.scripts/lnd.export.sh hexstring key-value")
+        key_value_text = await call_script(
+            "/home/admin/config.scripts/lnd.export.sh hexstring key-value"
+        )
         key_value = parse_key_value_text(key_value_text)
         if "adminMacaroon" in key_value.keys():
-            data_lnd_admin_macaroon=key_value["adminMacaroon"]
+            data_lnd_admin_macaroon = key_value["adminMacaroon"]
         if "invoiceMacaroon" in key_value.keys():
-            data_lnd_invoice_macaroon=key_value["invoiceMacaroon"]
+            data_lnd_invoice_macaroon = key_value["invoiceMacaroon"]
         if "readonlyMacaroon" in key_value.keys():
-            data_lnd_readonly_macaroon=key_value["readonlyMacaroon"]
+            data_lnd_readonly_macaroon = key_value["readonlyMacaroon"]
         if "tlsCert" in key_value.keys():
-            data_lnd_tls_cert=key_value["tlsCert"]
+            data_lnd_tls_cert = key_value["tlsCert"]
         if "restTor" in key_value.keys():
-            data_lnd_rest_onion=key_value["restTor"]
+            data_lnd_rest_onion = key_value["restTor"]
         if "error" in key_value.keys():
             logging.warning(f"Error from script call: {key_value['error']}")
 
     # ZEUS-Wallet (LND)
-    data_lnd_zeus_connection_string=""
+    data_lnd_zeus_connection_string = ""
     if lightning == "lnd":
-        key_value_text = await call_script("/home/admin/config.scripts/bonus.lndconnect.sh zeus-android tor key-value")
+        key_value_text = await call_script(
+            "/home/admin/config.scripts/bonus.lndconnect.sh zeus-android tor key-value"
+        )
         key_value = parse_key_value_text(key_value_text)
         if "lndconnect" in key_value.keys():
-            data_lnd_zeus_connection_string=key_value["lndconnect"]
+            data_lnd_zeus_connection_string = key_value["lndconnect"]
         if "error" in key_value.keys():
             logging.warning(f"Error from script call: {key_value['error']}")
 
     # ZEUS-Wallet (Core Lightning)
-    data_cl_rest_zeus_connection_string=""
-    data_cl_rest_macaroon=""
-    data_cl_rest_onion=""
+    data_cl_rest_zeus_connection_string = ""
+    data_cl_rest_macaroon = ""
+    data_cl_rest_onion = ""
     if lightning == "cl":
-        key_value_text = await call_script("/home/admin/config.scripts/cl.rest.sh connect mainnet key-value")
+        key_value_text = await call_script(
+            "/home/admin/config.scripts/cl.rest.sh connect mainnet key-value"
+        )
         key_value = parse_key_value_text(key_value_text)
         if "connectstring" in key_value.keys():
-            data_cl_rest_zeus_connection_string=key_value["connectstring"]
+            data_cl_rest_zeus_connection_string = key_value["connectstring"]
         if "macaroon" in key_value.keys():
-            data_cl_rest_macaroon=key_value["macaroon"]
+            data_cl_rest_macaroon = key_value["macaroon"]
         if "toraddress" in key_value.keys():
-            data_cl_rest_onion=key_value["toraddress"]  
+            data_cl_rest_onion = key_value["toraddress"]
         if "error" in key_value.keys():
             logging.warning(f"Error from script call: {key_value['error']}")
 
     # BTC PAY CONNECTION STRING
-    data_lnd_btcpay_connection_string=""
+    data_lnd_btcpay_connection_string = ""
     if lightning == "lnd":
-        key_value_text = await call_script("/home/admin/config.scripts/lnd.export.sh btcpay key-value")
+        key_value_text = await call_script(
+            "/home/admin/config.scripts/lnd.export.sh btcpay key-value"
+        )
         key_value = parse_key_value_text(key_value_text)
         if "connectionString" in key_value.keys():
-            data_lnd_btcpay_connection_string=key_value["connectionString"]
+            data_lnd_btcpay_connection_string = key_value["connectionString"]
         if "error" in key_value.keys():
             logging.warning(f"Error from script call: {key_value['error']}")
 
@@ -155,5 +170,5 @@ async def get_connection_info_impl() -> ConnectionInfo:
         lnd_btcpay_connection_string=data_lnd_btcpay_connection_string,
         cl_rest_zeus_connection_string=data_cl_rest_zeus_connection_string,
         cl_rest_macaroon=data_cl_rest_macaroon,
-        cl_rest_onion=data_cl_rest_onion
+        cl_rest_onion=data_cl_rest_onion,
     )

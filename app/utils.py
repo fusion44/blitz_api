@@ -1,8 +1,8 @@
+import asyncio
 import json
 import logging
-import asyncio
-import re
 import os
+import re
 from types import coroutine
 from typing import Dict
 
@@ -226,7 +226,7 @@ async def call_script(scriptPath) -> str:
 def parse_key_value_lines(lines: list) -> dict:
     Dict = {}
     for line in lines:
-        line=line.strip()
+        line = line.strip()
         if len(line) == 0:
             continue
         if not re.match("^[a-zA-Z0-9]*=", line):

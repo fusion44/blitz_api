@@ -294,25 +294,26 @@ class Channel(BaseModel):
     def from_grpc(cls, c) -> "Channel":
         return cls(
             active=c.active,
-            channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
             peer_publickey=c.remote_pubkey,
             peer_alias="n/a",
             balance_local=c.local_balance,
             balance_remote=c.remote_balance,
-            balance_capacity=c.capacity
+            balance_capacity=c.capacity,
         )
 
     @classmethod
     def from_grpc_pending(cls, c) -> "Channel":
         return cls(
             active=False,
-            channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
             peer_publickey=c.remote_node_pub,
             peer_alias="n/a",
             balance_local=-1,
             balance_remote=-1,
-            balance_capacity=c.capacity
+            balance_capacity=c.capacity,
         )
+
 
 class Invoice(BaseModel):
     # optional memo to attach along with the invoice.

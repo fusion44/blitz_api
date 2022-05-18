@@ -11,6 +11,7 @@ _PREFIX = "apps"
 
 router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
 
+
 @router.get(
     "/status",
     name=f"{_PREFIX}/status",
@@ -26,6 +27,7 @@ async def get_status():
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
         )
 
+
 @router.get(
     "/status/{id}",
     name=f"{_PREFIX}/status",
@@ -39,6 +41,7 @@ async def get_single_status(id):
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
         )
+
 
 @router.get(
     "/status-sub",
@@ -65,8 +68,10 @@ async def get_status():
 async def install_app(name: str):
     return await repo.install_app_sub(name)
 
+
 class UninstallData(BaseModel):
-    keepData : bool = True
+    keepData: bool = True
+
 
 @router.post(
     "/uninstall/{name}",
