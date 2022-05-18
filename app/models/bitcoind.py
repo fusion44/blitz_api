@@ -276,9 +276,12 @@ class BlockchainInfo(BaseModel):
 
     @classmethod
     def from_rpc(cls, r):
+
+        # get softfork information if available
         softforks = []
-        for name in r["softforks"]:
-            softforks.append(SoftFork.from_rpc(name, r["softforks"][name]))
+        if "softforks" in r:
+            for name in r["softforks"]:
+                softforks.append(SoftFork.from_rpc(name, r["softforks"][name]))
 
         return cls(
             chain=r["chain"],
