@@ -5,6 +5,7 @@ from decouple import config
 from app.constants import API_VERSION
 from app.models.system import (
     APIPlatform,
+    ConnectionInfo,
     HealthMessage,
     HealthMessagePriority,
     HealthState,
@@ -50,3 +51,9 @@ async def get_system_info_impl() -> SystemInfo:
 async def shutdown_impl(reboot: bool) -> bool:
     logging.info("Shutdown / reboot not supported in native_python mode.")
     return False
+
+
+async def get_connection_info_impl() -> ConnectionInfo:
+
+    # return an empty connection info object for now
+    return ConnectionInfo()

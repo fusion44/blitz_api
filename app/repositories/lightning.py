@@ -7,6 +7,7 @@ from fastapi import status
 from fastapi.exceptions import HTTPException
 
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     GenericTx,
     Invoice,
@@ -18,9 +19,9 @@ from app.models.lightning import (
     PaymentRequest,
     SendCoinsInput,
     SendCoinsResponse,
-    Channel,
 )
-from app.utils import SSE, lightning_config, send_sse_message
+from app.models.system import APIPlatform
+from app.utils import SSE, lightning_config, redis_get, send_sse_message
 
 if lightning_config.ln_node == "lnd":
     import app.repositories.ln_impl.lnd_grpc as ln
@@ -39,6 +40,8 @@ ENABLE_FWD_NOTIFICATIONS = config(
 )
 
 FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float)
+
+PLATFORM = config("platform", cast=str)
 
 if FWD_GATHER_INTERVAL < 0.3:
     raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
@@ -115,21 +118,23 @@ async def send_payment(
     return res
 
 
-async def channel_open(local_funding_amount: int, node_URI: str, target_confs: int) -> str:
+async def channel_open(
+    local_funding_amount: int, node_URI: str, target_confs: int
+) -> str:
 
     if local_funding_amount < 1:
         raise ValueError("funding amount needs to be positive")
-        
+
     if target_confs < 1:
         raise ValueError("target confs needs to be positive")
 
     if len(node_URI) == 0:
         raise ValueError("node_URI cant be empty")
 
-    if not '@' in node_URI:
+    if not "@" in node_URI:
         raise ValueError("node_URI must contain @ with node physical address")
 
-    res =  await ln.channel_open_impl(local_funding_amount, node_URI, target_confs)
+    res = await ln.channel_open_impl(local_funding_amount, node_URI, target_confs)
     return res
 
 
@@ -144,7 +149,10 @@ async def channel_close(channel_id: int, force_close: bool) -> str:
 
 
 async def get_ln_info() -> LnInfo:
-    return await ln.get_ln_info_impl()
+    ln_info = await ln.get_ln_info_impl()
+    if PLATFORM == APIPlatform.RASPIBLITZ:
+        ln_info.identity_uri = await redis_get("ln_default_address")
+    return ln_info
 
 
 async def unlock_wallet(password: str) -> bool:
@@ -316,4 +324,3 @@ def listen_for_ssh_unlock():
 
     loop = asyncio.get_event_loop()
     loop.create_task(_do_check_unlock())
-

@@ -380,25 +380,26 @@ class Channel(BaseModel):
     def from_grpc(cls, c) -> "Channel":
         return cls(
             active=c.active,
-            channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
             peer_publickey=c.remote_pubkey,
             peer_alias="n/a",
             balance_local=c.local_balance,
             balance_remote=c.remote_balance,
-            balance_capacity=c.capacity
+            balance_capacity=c.capacity,
         )
 
     @classmethod
     def from_grpc_pending(cls, c) -> "Channel":
         return cls(
             active=False,
-            channel_id=c.channel_point, # use channel point as id because thats needed for closing the channel with lnd
+            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
             peer_publickey=c.remote_node_pub,
             peer_alias="n/a",
             balance_local=-1,
             balance_remote=-1,
-            balance_capacity=c.capacity
+            balance_capacity=c.capacity,
         )
+
 
 class Invoice(BaseModel):
     memo: str = Query(
@@ -1172,8 +1173,10 @@ class LnInfo(BaseModel):
         ..., description="The SHA1 commit hash that the daemon is compiled with."
     )
 
-    identity_pubkey: str = Query(
-        ..., description="The identity pubkey of the current node."
+    identity_pubkey: str = Query("The identity pubkey of the current node.")
+
+    identity_uri: str = Query(
+        "The complete URI (pubkey@physicaladdress:port) the current node."
     )
 
     alias: str = Query(..., description="The alias of the node.")

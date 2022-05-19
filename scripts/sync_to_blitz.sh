@@ -43,16 +43,17 @@ local=.
 remote=admin@$localIP:/root/blitz_api
 
 # clean pycache just in case the code was compiled locally before
-rm -r ./app/__pycache__
-rm -r ./app/repositories/ln_impl/protos/__pycache__
-rm -r ./app/repositories/ln_impl/__pycache__
-rm -r ./app/external/fastapi_versioning/__pycache__
-rm -r ./app/external/sse_starlette/__pycache__
-rm -r ./app/external/__pycache__
-rm -r ./app/models/__pycache__
-rm -r ./app/repositories/__pycache__
-rm -r ./app/routers/__pycache__
-rm -r ./app/auth/__pycache__
+echo "# local cache delete .."
+rm -r ./app/__pycache__ 2>/dev/null
+rm -r ./app/repositories/ln_impl/protos/__pycache__ 2>/dev/null
+rm -r ./app/repositories/ln_impl/__pycache__ 2>/dev/null
+rm -r ./app/external/fastapi_versioning/__pycache__ 2>/dev/null
+rm -r ./app/external/sse_starlette/__pycache__ 2>/dev/null
+rm -r ./app/external/__pycache__ 2>/dev/null
+rm -r ./app/models/__pycache__ 2>/dev/null
+rm -r ./app/repositories/__pycache__ 2>/dev/null
+rm -r ./app/routers/__pycache__ 2>/dev/null
+rm -r ./app/auth/__pycache__ 2>/dev/null
 
 # Needs sshpass installed
 echo "# syncing local code to: ${remote}"

@@ -10,8 +10,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 
 from app.constants import available_app_ids
-from app.repositories.system import call_script, parse_key_value_text
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, call_script, parse_key_value_text, send_sse_message
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -48,7 +47,7 @@ async def get_app_status_single(app_iD):
         }
 
     try:
-        error=""
+        error = ""
         if "error" in data.keys():
             error = data["error"]
 
@@ -65,7 +64,7 @@ async def get_app_status_single(app_iD):
             if httpsForced == "1":
                 address = f"https://{localIP}:{httpsPort}"
             hiddenService = data["toraddress"]
-            authMethod="none"
+            authMethod = "none"
             if "authMethod" in data.keys():
                 authMethod = data["authMethod"]
             details = {}
@@ -86,14 +85,14 @@ async def get_app_status_single(app_iD):
                 "hiddenService": hiddenService,
                 "authMethod": authMethod,
                 "details": details,
-                "error": error
+                "error": error,
             }
         else:
             return {
                 "id": app_iD,
                 "installed": False,
                 "status": "offline",
-                "error": error
+                "error": error,
             }
     except:
         logging.warning(f"error on repackage data: {result}")
@@ -101,6 +100,7 @@ async def get_app_status_single(app_iD):
             "id": f"{app_iD}",
             "error": f"script result processing error: {script_call}",
         }
+
 
 async def get_app_status():
     appStatusList: Array = []
@@ -172,8 +172,8 @@ async def run_bonus_script(app_id: str, params: str):
     tested_app_id = ""
     for id in available_app_ids:
         if id == app_id:
-            tested_app_id=id 
-        
+            tested_app_id = id
+
     # run script and get results
     script_path = f"{SHELL_SCRIPT_PATH}/config.scripts/bonus.{tested_app_id}.sh"
     cmd = f"bash {script_path} {params}"
@@ -245,7 +245,7 @@ async def run_bonus_script(app_id: str, params: str):
             updatedAppData = await get_app_status_single(app_id)
 
             # in case of script error
-            if updatedAppData["error"] != "" :
+            if updatedAppData["error"] != "":
                 logging.warning(f"Error Detected ...")
                 logging.warning(f"updatedAppData: {updatedAppData}")
                 await send_sse_message(
@@ -259,7 +259,7 @@ async def run_bonus_script(app_id: str, params: str):
                 )
 
             # if install was running
-            elif mode == "on" :
+            elif mode == "on":
                 if updatedAppData["installed"]:
                     logging.info(f"WIN - install was effective")
                     await send_sse_message(
@@ -283,7 +283,7 @@ async def run_bonus_script(app_id: str, params: str):
                             "id": app_id,
                             "mode": mode,
                             "result": "fail",
-                            "details": "install was not effective"
+                            "details": "install was not effective",
                         },
                     )
 

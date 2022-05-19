@@ -8,5 +8,5 @@ available_app_ids = {
     "btcpayserver",
     "lnbits",
     "mempool",
-    "thunderhub"
+    "thunderhub",
 }
