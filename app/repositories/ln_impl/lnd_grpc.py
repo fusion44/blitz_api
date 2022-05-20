@@ -490,14 +490,14 @@ async def channel_list_impl() -> List[Channel]:
 
         channels = []
         for channel_grpc in response.channels:
-            channel = Channel.from_grpc(channel_grpc)
+            channel = Channel.from_lnd_grpc(channel_grpc)
             channel.peer_alias = await peer_resolve_alias(channel.peer_publickey)
             channels.append(channel)
 
         request = ln.PendingChannelsRequest()
         response = await lncfg.lnd_stub.PendingChannels(request)
         for channel_grpc in response.pending_open_channels:
-            channel = Channel.from_grpc_pending(channel_grpc.channel)
+            channel = Channel.from_lnd_grpc_pending(channel_grpc.channel)
             channel.peer_alias = await peer_resolve_alias(channel.peer_publickey)
             channels.append(channel)
 

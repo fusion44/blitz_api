@@ -13,6 +13,7 @@ from starlette import status
 import app.repositories.ln_impl.protos.cln.node_pb2 as ln
 import app.repositories.ln_impl.protos.cln.primitives_pb2 as lnp
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
@@ -490,3 +491,31 @@ async def listen_forward_events() -> ForwardSuccessEvent:
 
             num_fwd_last_poll = len(res.forwards)
         await asyncio.sleep(interval - 0.1)
+
+
+async def channel_open_impl(
+    local_funding_amount: int, node_URI: str, target_confs: int
+) -> str:
+    raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def channel_list_impl() -> List[Channel]:
+    try:
+        i = await get_ln_info_impl()
+        req = ln.ListchannelsRequest(source=bytes.fromhex(i.identity_pubkey))
+        res = await lncfg.cln_stub.ListChannels(req)
+
+        channels = []
+        for c in res.channels:
+            chan = Channel.from_cln_grpc(c)
+            channels.append(chan)
+
+        return channels
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
+async def channel_close_impl(channel_id: int, force_close: bool) -> str:
+    raise NotImplementedError("c-lightning not yet implemented")

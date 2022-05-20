@@ -377,7 +377,7 @@ class Channel(BaseModel):
     balance_capacity: Optional[int]
 
     @classmethod
-    def from_grpc(cls, c) -> "Channel":
+    def from_lnd_grpc(cls, c) -> "Channel":
         return cls(
             active=c.active,
             channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
@@ -389,7 +389,7 @@ class Channel(BaseModel):
         )
 
     @classmethod
-    def from_grpc_pending(cls, c) -> "Channel":
+    def from_lnd_grpc_pending(cls, c) -> "Channel":
         return cls(
             active=False,
             channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
@@ -398,6 +398,19 @@ class Channel(BaseModel):
             balance_local=-1,
             balance_remote=-1,
             balance_capacity=c.capacity,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, c) -> "Channel":
+        # TODO: get alias and balance of the channel
+        return cls(
+            active=c.active,
+            channel_id=c.short_channel_id,  # use channel point as id because thats needed for closing the channel with lnd
+            peer_publickey=c.destination.hex(),
+            peer_alias="n/a",
+            balance_local=-1,
+            balance_remote=-1,
+            balance_capacity=c.amount_msat.msat,
         )
 
 
