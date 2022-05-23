@@ -9,6 +9,7 @@ import app.repositories.ln_impl.protos.lightning_pb2 as ln
 import app.repositories.ln_impl.protos.router_pb2 as router
 import app.repositories.ln_impl.protos.walletunlocker_pb2 as unlocker
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
@@ -35,10 +36,11 @@ def get_implementation_name() -> str:
 
 async def get_wallet_balance_impl() -> WalletBalance:
     try:
-        req = ln.WalletBalanceRequest()
-        req = ln.ChannelBalanceRequest()
-        onchain = await lncfg.lnd_stub.WalletBalance(req)
-        channel = await lncfg.lnd_stub.ChannelBalance(req)
+        w_req = ln.WalletBalanceRequest()
+        onchain = await lncfg.lnd_stub.WalletBalance(w_req)
+
+        c_req = ln.ChannelBalanceRequest()
+        channel = await lncfg.lnd_stub.ChannelBalance(c_req)
 
         return WalletBalance.from_grpc(onchain, channel)
     except grpc.aio._call.AioRpcError as error:
@@ -54,11 +56,11 @@ memo_cache = {}
 
 
 async def list_all_tx_impl(
-    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+    successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
     # TODO: find a better caching strategy
     list_invoice_req = ln.ListInvoiceRequest(
-        pending_only=successfull_only,
+        pending_only=successful_only,
         index_offset=0,
         num_max_invoices=0,
         reversed=reversed,
@@ -67,7 +69,7 @@ async def list_all_tx_impl(
     get_tx_req = ln.GetTransactionsRequest()
 
     list_payments_req = ln.ListPaymentsRequest(
-        include_incomplete=not successfull_only,
+        include_incomplete=not successful_only,
         index_offset=0,
         max_payments=0,
         reversed=reversed,
@@ -420,4 +422,118 @@ def _check_if_locked(error):
         raise HTTPException(
             status.HTTP_423_LOCKED,
             detail="Wallet is locked. Unlock via /lightning/unlock-wallet",
+        )
+
+
+async def channel_open_impl(
+    local_funding_amount: int, node_URI: str, target_confs: int
+) -> str:
+
+    try:
+
+        pubkey = node_URI.split("@")[0]
+        host = node_URI.split("@")[1]
+
+        # make sure to be connected to peer
+        r = ln.ConnectPeerRequest(
+            addr=ln.LightningAddress(pubkey=pubkey, host=host),
+            perm=False,
+            timeout=10,
+        )
+        try:
+            await lncfg.lnd_stub.ConnectPeer(r)
+        except grpc.aio._call.AioRpcError as error:
+            if (
+                error.details() != None
+                and error.details().find("already connected to peer") > -1
+            ):
+                print("ALREADY CONNECTED TO PEER")
+                print(str(pubkey))
+
+            else:
+                raise error
+
+        # open channel
+        r = ln.OpenChannelRequest(
+            node_pubkey=bytes.fromhex(pubkey),
+            local_funding_amount=local_funding_amount,
+            target_conf=target_confs,
+        )
+        async for response in lncfg.lnd_stub.OpenChannel(r):
+            # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
+            return str(response.chan_pending.txid.hex())
+
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
+async def peer_resolve_alias(nodepub: str) -> str:
+
+    # get fresh list of peers and their aliases
+    try:
+
+        request = ln.NodeInfoRequest(pub_key=nodepub, include_channels=False)
+        response = await lncfg.lnd_stub.GetNodeInfo(request)
+        return str(response.node.alias)
+
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
+async def channel_list_impl() -> List[Channel]:
+
+    try:
+
+        request = ln.ListChannelsRequest()
+        response = await lncfg.lnd_stub.ListChannels(request)
+
+        channels = []
+        for channel_grpc in response.channels:
+            channel = Channel.from_grpc(channel_grpc)
+            channel.peer_alias = await peer_resolve_alias(channel.peer_publickey)
+            channels.append(channel)
+
+        request = ln.PendingChannelsRequest()
+        response = await lncfg.lnd_stub.PendingChannels(request)
+        for channel_grpc in response.pending_open_channels:
+            channel = Channel.from_grpc_pending(channel_grpc.channel)
+            channel.peer_alias = await peer_resolve_alias(channel.peer_publickey)
+            channels.append(channel)
+
+        return channels
+
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
+async def channel_close_impl(channel_id: int, force_close: bool) -> str:
+
+    if not ":" in channel_id:
+        raise ValueError("channel_id must contain : for lnd")
+
+    try:
+
+        funding_txid = channel_id.split(":")[0]
+        output_index = channel_id.split(":")[1]
+
+        request = ln.CloseChannelRequest(
+            channel_point=ln.ChannelPoint(
+                funding_txid_str=funding_txid, output_index=int(output_index)
+            ),
+            force=force_close,
+            target_conf=6,
+        )
+        async for response in lncfg.lnd_stub.CloseChannel(request):
+            # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
+            return str(response.close_pending.txid.hex())
+
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
         )

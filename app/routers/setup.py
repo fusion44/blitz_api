@@ -1,22 +1,18 @@
-import asyncio
-
-# from asyncio.windows_events import NULL
 import logging
 from pickle import FALSE
-import re
 from xmlrpc.client import boolean
-from pydantic import BaseModel
 
 from aioredis import Redis
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
 from fastapi_plugins import depends_redis
+from pydantic import BaseModel
 from setuptools import setup
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
-from app.repositories.system import call_script, parse_key_value_lines, password_valid, name_valid, parse_key_value_lines, shutdown
-from app.utils import redis_get
+from app.repositories.system import name_valid, password_valid, shutdown
+from app.utils import call_script, parse_key_value_lines, redis_get
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 
@@ -37,11 +33,13 @@ async def get_status():
     message = await redis_get("message")
     if setupPhase == "done":
         try:
-            blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
-            if blitz_sync_initial_done == "1":
+            btc_default_sync_initial_done = await redis_get(
+                "btc_default_sync_initial_done"
+            )
+            if btc_default_sync_initial_done == "1":
                 initialsync = "done"
             else:
-                initialsync = "running"  
+                initialsync = "running"
         except:
             initialsync = ""
     else:
@@ -50,8 +48,9 @@ async def get_status():
         "setupPhase": setupPhase,
         "state": state,
         "message": message,
-        "initialsync": initialsync
+        "initialsync": initialsync,
     }
+
 
 # if setupPhase!="done" && state="waitsetup" then
 # 'setup/setup_start_info' should be called
@@ -87,25 +86,23 @@ async def setup_start_info():
 
 
 def write_text_file(filename: str, arrayOfLines):
-    logging.warning(f"writing {filename}")
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(arrayOfLines))
 
 
 class StartDoneData(BaseModel):
-    hostname        : str = ""
-    forceFreshSetup : bool = False
-    keepBlockchain  : bool = True
-    lightning       : str = ""
-    passwordA       : str = ""
-    passwordB       : str = ""
-    passwordC       : str = ""
+    hostname: str = ""
+    forceFreshSetup: bool = False
+    keepBlockchain: bool = True
+    lightning: str = ""
+    passwordA: str = ""
+    passwordB: str = ""
+    passwordC: str = ""
+
 
 # With all this info the WebUi can run its own runs its dialogs and in the end makes a call to
 @router.post("/setup-start-done")
-async def setup_start_done(
-    data: StartDoneData ):
-    logging.warning(f"START /setup-start-done")
+async def setup_start_done(data: StartDoneData):
 
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
@@ -119,67 +116,73 @@ async def setup_start_done(
     # check if a fresh setup is forced
     if data.forceFreshSetup:
         logging.warning(f"forcing node to fresh setup")
-        setupPhase="setup"
+        setupPhase = "setup"
 
     #### SETUP ####
-    if setupPhase == "setup": 
+    if setupPhase == "setup":
         if name_valid(data.hostname) == False:
             logging.warning(f"hostname is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if data.lightning!="lnd" and data.lightning!="cl" and data.lightning!="none":
-            logging.warning(f"lightning is not valid") 
+        if (
+            data.lightning != "lnd"
+            and data.lightning != "cl"
+            and data.lightning != "none"
+        ):
+            logging.warning(f"lightning is not valid")
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordB) == False:
             logging.warning(f"passwordB is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if data.lightning!="none" and password_valid(data.passwordC)==False:
+        if data.lightning != "none" and password_valid(data.passwordC) == False:
             logging.warning(f"passwordC is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if hddGotBlockchain!="1" and data.keepBlockchain:
+        if hddGotBlockchain != "1" and data.keepBlockchain:
             logging.warning(f"cannot keep blockchain that does not exists")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
         if data.keepBlockchain:
-            formatHDD=0
-            cleanHDD=1
+            formatHDD = 0
+            cleanHDD = 1
         else:
-            formatHDD=1
-            cleanHDD=0
-        write_text_file(setupFilePath,[
-            f"formatHDD={formatHDD}",
-            f"cleanHDD={cleanHDD}",
-            "network=bitcoin",
-            "chain=main",
-            f"lightning={data.lightning}",
-            f"hostname={data.hostname}",
-            "setPasswordA=1",
-            "setPasswordB=1",
-            "setPasswordC=1",
-            f"passwordA='{data.passwordA}'",
-            f"passwordB='{data.passwordB}'",
-            f"passwordC='{data.passwordC}'",
-            ""
-        ])
+            formatHDD = 1
+            cleanHDD = 0
+        write_text_file(
+            setupFilePath,
+            [
+                f"formatHDD={formatHDD}",
+                f"cleanHDD={cleanHDD}",
+                "network=bitcoin",
+                "chain=main",
+                f"lightning={data.lightning}",
+                f"hostname={data.hostname}",
+                "setPasswordA=1",
+                "setPasswordB=1",
+                "setPasswordC=1",
+                f"passwordA='{data.passwordA}'",
+                f"passwordB='{data.passwordB}'",
+                f"passwordC='{data.passwordC}'",
+                "",
+            ],
+        )
 
     #### RECOVERY ####
-    elif setupPhase == "recovery": 
+    elif setupPhase == "recovery":
         logging.warning(f"check recovery data")
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        write_text_file(setupFilePath,[
-            "setPasswordA=1",
-            f"passwordA='{data.passwordA}'"
-        ])
+        write_text_file(
+            setupFilePath, ["setPasswordA=1", f"passwordA='{data.passwordA}'"]
+        )
 
     #### MIGRATION ####
-    elif setupPhase == "migration": 
+    elif setupPhase == "migration":
         logging.warning(f"check migration data")
         hddGotMigrationData = await redis_get("hddGotMigrationData")
         if hddGotMigrationData == "":
             logging.warning(f"hddGotMigrationData is not available")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)    
+            return HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
@@ -189,21 +192,23 @@ async def setup_start_done(
         if password_valid(data.passwordC) == False:
             logging.warning(f"passwordC is not valid")
             return HTTPException(status.HTTP_400_BAD_REQUEST)
-        write_text_file(setupFilePath,[
-            f"migrationOS={hddGotMigrationData}",
-            "setPasswordA=1",
-            "setPasswordB=1",
-            "setPasswordC=1",
-            f"passwordA='{data.passwordA}'",
-            f"passwordB='{data.passwordB}'",
-            f"passwordC='{data.passwordC}'"
-        ])
-        
+        write_text_file(
+            setupFilePath,
+            [
+                f"migrationOS={hddGotMigrationData}",
+                "setPasswordA=1",
+                "setPasswordB=1",
+                "setPasswordC=1",
+                f"passwordA='{data.passwordA}'",
+                f"passwordB='{data.passwordB}'",
+                f"passwordC='{data.passwordC}'",
+            ],
+        )
+
     else:
         logging.warning(f"not handled setupPhase state ({setupPhase})")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    logging.warning(f"kicking off recovery")
     await call_script("/home/admin/_cache.sh set state waitprovision")
 
     # TODO: Following input parameters:
@@ -222,7 +227,7 @@ async def setup_start_done(
     # those values get stored in: /var/cache/raspiblitz/temp/raspiblitz.setup
     # also a skeleton raspiblitz.conf gets created (see controlSetupDialog.sh Line 318)
     # and then API sets state to `waitprovision` to kick-off provision
-    
+
     return sign_jwt()
 
 
@@ -248,15 +253,13 @@ async def setup_final_info():
     with open(setupFilePath, "r") as setupfile:
         resultlines = setupfile.readlines()
     data = parse_key_value_lines(resultlines)
-    logging.warning(f"data({data})")
     try:
         seedwordsNEW = data["seedwordsNEW"]
     except:
-        seedwordsNEW=""
+        seedwordsNEW = ""
 
-    return {
-        "seedwordsNEW": seedwordsNEW
-    }
+    return {"seedwordsNEW": seedwordsNEW}
+
 
 # When WebUI displayed seed words & user confirmed write the calls:
 @router.post("/setup-final-done", dependencies=[Depends(JWTBearer())])
@@ -272,13 +275,14 @@ async def setup_final_done():
     await call_script("/home/admin/_cache.sh set state donefinal")
     return {"state": "donefinal"}
 
+
 @router.get("/shutdown")
 async def get_shutdown():
 
     # only allow unauthorized shutdowns during setup
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
-    if setupPhase == "done"  :
+    if setupPhase == "done":
         logging.warning(f"can only be called when node is not setuped yet")
         return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
     if state != "waitsetup":
@@ -287,6 +291,7 @@ async def get_shutdown():
 
     # do the shutdown
     return await shutdown(False)
+
 
 # When WebUI displayed seed words & user confirmed write the calls:
 @router.post("/setup-sync-info", dependencies=[Depends(JWTBearer())])
@@ -309,21 +314,21 @@ async def setup_sync_info():
         btc_default_peers = await redis_get("btc_default_peers")
         system_count_start_blockchain = await redis_get("system_count_start_blockchain")
     except:
-        initialsync=""
-        btc_default_ready=""
-        btc_default_sync_percentage=""
-        btc_default_peers=""
-        system_count_start_blockchain="0"
+        initialsync = ""
+        btc_default_ready = ""
+        btc_default_sync_percentage = ""
+        btc_default_peers = ""
+        system_count_start_blockchain = "0"
     try:
         ln_default = await redis_get("lightning")
         ln_default_ready = await redis_get("ln_default_ready")
         ln_default_locked = await redis_get("ln_default_locked")
         system_count_start_lightning = await redis_get("system_count_start_lightning")
     except:
-        ln_default=""
-        ln_default_ready=""
-        ln_default_locked=""
-        system_count_start_lightning="0"
+        ln_default = ""
+        ln_default_ready = ""
+        ln_default_locked = ""
+        system_count_start_lightning = "0"
     return {
         "initialsync": initialsync,
         "btc_default": "bitcoin",
@@ -331,8 +336,8 @@ async def setup_sync_info():
         "btc_default_sync_percentage": btc_default_sync_percentage,
         "btc_default_peers": btc_default_peers,
         "system_count_start_blockchain": system_count_start_blockchain,
-        "ln_default" : ln_default,
-        "ln_default_ready" : ln_default_ready,
-        "ln_default_locked" : ln_default_locked,
-        "system_count_start_lightning": system_count_start_lightning
+        "ln_default": ln_default,
+        "ln_default_ready": ln_default_ready,
+        "ln_default_locked": ln_default_locked,
+        "system_count_start_lightning": system_count_start_lightning,
     }

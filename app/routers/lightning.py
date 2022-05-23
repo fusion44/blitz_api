@@ -5,6 +5,7 @@ from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     GenericTx,
     Invoice,
@@ -21,6 +22,9 @@ from app.models.lightning import (
 )
 from app.repositories.lightning import (
     add_invoice,
+    channel_close,
+    channel_list,
+    channel_open,
     decode_pay_request,
     get_fee_revenue,
     get_ln_info,
@@ -278,6 +282,66 @@ async def send_coins_path(input: SendCoinsInput):
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+@router.post(
+    "/open-channel",
+    name=f"{_PREFIX}.open-channel",
+    summary="open a new lightning channel",
+    description="For additional information see [LND docs](https://api.lightning.community/#openchannel)",
+    dependencies=[Depends(JWTBearer())],
+    response_model=str,
+    responses=responses,
+)
+async def channelopen(local_funding_amount: int, node_URI: str, target_confs: int = 3):
+    try:
+        return await channel_open(local_funding_amount, node_URI, target_confs)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+    except ValueError as r:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=r.args[0])
+
+
+@router.get(
+    "/list-channel",
+    name=f"{_PREFIX}.list-channel",
+    summary="Returns a list of open channels",
+    response_model=List[Channel],
+    response_description="A list of all open channels.",
+    dependencies=[Depends(JWTBearer())],
+    responses=responses,
+)
+async def channellist():
+    try:
+        return await channel_list()
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+    except ValueError as r:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=r.args[0])
+
+
+@router.post(
+    "/close-channel",
+    name=f"{_PREFIX}.channel-close",
+    summary="close a channel",
+    description="For additional information see [LND docs](https://api.lightning.community/#closechannel)",
+    dependencies=[Depends(JWTBearer())],
+    response_model=str,
+    responses=responses,
+)
+async def channelclose(channel_id: str, force_close: bool):
+    try:
+        return await channel_close(channel_id, force_close)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+    except ValueError as r:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=r.args[0])
 
 
 @router.post(

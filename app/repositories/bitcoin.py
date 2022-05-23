@@ -9,7 +9,13 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from starlette import status
 
-from app.models.bitcoind import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
+from app.models.bitcoind import (
+    BlockchainInfo,
+    BlockRpcFunc,
+    BtcInfo,
+    FeeEstimationMode,
+    NetworkInfo,
+)
 from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
 
 
@@ -82,12 +88,22 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
     ctx = zmq.asyncio.Context()
     zmq_socket = ctx.socket(zmq.SUB)
     zmq_socket.setsockopt(zmq.RCVHWM, 0)
-    zmq_socket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
+    zmq_socket.setsockopt_string(zmq.SUBSCRIBE, bitcoin_config.zmq_block_rpc)
     zmq_socket.connect(bitcoin_config.zmq_url)
 
     while True:
+        hash = ""
         _, body, _ = await zmq_socket.recv_multipart()
-        hash = binascii.hexlify(body).decode("utf-8")
+        if bitcoin_config.zmq_block_rpc == BlockRpcFunc.HASHBLOCK:
+            hash = binascii.hexlify(body).decode("utf-8")
+        elif bitcoin_config.zmq_block_rpc == BlockRpcFunc.RAWBLOCK:
+            r1 = await bitcoin_rpc_async("getbestblockhash", [])
+            hash = r1["result"]
+        else:
+            raise NotImplementedError(
+                f"ZMQ block function {bitcoin_config.zmq_block_rpc} not supported"
+            )
+
         r = await bitcoin_rpc_async("getblock", [hash, verbosity])
         await send_sse_message(SSE.BTC_NEW_BLOC, r["result"])
 

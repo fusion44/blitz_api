@@ -21,6 +21,7 @@ async def get_client_warmup_data() -> List:
             get_ln_info_lite(),
             get_fee_revenue(),
             get_wallet_balance(),
+            get_app_status(),
         ]
     )
-    return [*res, get_app_status()]
+    return [*res]

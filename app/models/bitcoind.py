@@ -1,3 +1,4 @@
+from argparse import ArgumentError
 from enum import Enum
 from typing import List, Optional
 
@@ -8,6 +9,20 @@ from pydantic.main import BaseModel
 class FeeEstimationMode(str, Enum):
     CONSERVATIVE = "conservative"
     ECONOMICAL = "economical"
+
+
+class BlockRpcFunc(str, Enum):
+    HASHBLOCK = "hashblock"
+    RAWBLOCK = "rawblock"
+
+    @classmethod
+    def from_string(cls, func: str):
+        if func == "hashblock":
+            return cls.HASHBLOCK
+        elif func == "rawblock":
+            return cls.RAWBLOCK
+        else:
+            raise ArgumentError("Function name must either be 'hasblock' or 'rawblock'")
 
 
 class BtcNetwork(BaseModel):
@@ -261,9 +276,12 @@ class BlockchainInfo(BaseModel):
 
     @classmethod
     def from_rpc(cls, r):
+
+        # get softfork information if available
         softforks = []
-        for name in r["softforks"]:
-            softforks.append(SoftFork.from_rpc(name, r["softforks"][name]))
+        if "softforks" in r:
+            for name in r["softforks"]:
+                softforks.append(SoftFork.from_rpc(name, r["softforks"][name]))
 
         return cls(
             chain=r["chain"],

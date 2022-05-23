@@ -278,6 +278,43 @@ class RouteHint(BaseModel):
         return cls(hop_hints=hop_hints)
 
 
+class Channel(BaseModel):
+
+    channel_id: Optional[str]
+    active: Optional[bool]
+
+    peer_publickey: Optional[str]
+    peer_alias: Optional[str]
+
+    balance_local: Optional[int]
+    balance_remote: Optional[int]
+    balance_capacity: Optional[int]
+
+    @classmethod
+    def from_grpc(cls, c) -> "Channel":
+        return cls(
+            active=c.active,
+            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
+            peer_publickey=c.remote_pubkey,
+            peer_alias="n/a",
+            balance_local=c.local_balance,
+            balance_remote=c.remote_balance,
+            balance_capacity=c.capacity,
+        )
+
+    @classmethod
+    def from_grpc_pending(cls, c) -> "Channel":
+        return cls(
+            active=False,
+            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
+            peer_publickey=c.remote_node_pub,
+            peer_alias="n/a",
+            balance_local=-1,
+            balance_remote=-1,
+            balance_capacity=c.capacity,
+        )
+
+
 class Invoice(BaseModel):
     # optional memo to attach along with the invoice.
     # Used for record keeping purposes for the invoice's
@@ -914,7 +951,10 @@ class LnInfo(BaseModel):
     commit_hash: str
 
     # The identity pubkey of the current node.
-    identity_pubkey: str
+    identity_pubkey: str = Query("the nodes pubkey")
+
+    # The complete URI (pubkey@physicaladdress:port) the current node.
+    identity_uri: str = Query("the nodes complete URI")
 
     # If applicable, the alias of the current node, e.g. "bob"
     alias: str

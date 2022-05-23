@@ -1,6 +1,8 @@
+import asyncio
 import json
 import logging
 import os
+import re
 from types import coroutine
 from typing import Dict
 
@@ -15,20 +17,22 @@ from starlette import status
 import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
 import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
 import app.repositories.ln_impl.protos.walletunlocker_pb2_grpc as unlockerrpc
+from app.models.bitcoind import BlockRpcFunc
 
 
 class BitcoinConfig:
     def __init__(self) -> None:
         self.network = config("network")
+        self.zmq_block_rpc = BlockRpcFunc.from_string(config("bitcoind_zmq_block_rpc"))
 
         if self.network == "testnet":
             self.ip = config("bitcoind_ip_testnet")
             self.rpc_port = config("bitcoind_port_rpc_testnet")
-            self.zmq_port = config("bitcoind_port_zmq_hashblock_testnet")
+            self.zmq_port = config("bitcoind_zmq_block_port_testnet")
         else:
             self.ip = config("bitcoind_ip_mainnet")
             self.rpc_port = config("bitcoind_port_rpc_mainnet")
-            self.zmq_port = config("bitcoind_port_zmq_hashblock_mainnet")
+            self.zmq_port = config("bitcoind_zmq_block_port_mainnet")
 
         self.rpc_url = f"http://{self.ip}:{self.rpc_port}"
         self.zmq_url = f"tcp://{self.ip}:{self.zmq_port}"
@@ -185,6 +189,7 @@ class SSE:
     SYSTEM_REBOOT_ERROR = "system_reboot_error"
     HARDWARE_INFO = "hardware_info"
 
+    INSTALL_APP = "install"
     INSTALLED_APP_STATUS = "installed_app_status"
 
     BTC_NETWORK_STATUS = "btc_network_status"
@@ -201,3 +206,35 @@ class SSE:
     LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
     WALLET_LOCK_STATUS = "wallet_lock_status"
+
+
+async def call_script(scriptPath) -> str:
+    cmd = f"bash {scriptPath}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return stdout.decode()
+    if stderr:
+        logging.error(stderr.decode())
+    return ""
+
+
+def parse_key_value_lines(lines: list) -> dict:
+    Dict = {}
+    for line in lines:
+        line = line.strip()
+        if len(line) == 0:
+            continue
+        if not re.match("^[a-zA-Z0-9]*=", line):
+            continue
+        key, value = line.strip().split("=", 1)
+        Dict[key] = value.strip('"').strip("'")
+    return Dict
+
+
+def parse_key_value_text(text: str) -> dict:
+    return parse_key_value_lines(text.splitlines())

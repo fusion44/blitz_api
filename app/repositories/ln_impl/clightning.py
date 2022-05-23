@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from app.models.lightning import (
+    Channel,
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
@@ -24,7 +25,7 @@ async def get_wallet_balance_impl():
 
 
 async def list_all_tx_impl(
-    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+    successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
     raise NotImplementedError("c-lightning not yet implemented")
 
@@ -90,3 +91,17 @@ async def listen_invoices() -> Invoice:
 
 async def listen_forward_events() -> ForwardSuccessEvent:
     raise NotImplementedError("c-lightning not yet implemented")
+
+
+async def channel_open_impl(
+    local_funding_amount: int, node_URI: str, target_confs: int
+) -> str:
+    raise NotImplementedError("not yet implemented")
+
+
+async def channel_list_impl() -> List[Channel]:
+    raise NotImplementedError("not yet implemented")
+
+
+async def channel_close_impl(channel_id: int, force_close: bool) -> str:
+    raise NotImplementedError("not yet implemented")
