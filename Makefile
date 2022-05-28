@@ -8,7 +8,7 @@ help:
 	@echo "To test the project type 'make test'"
 	@echo "To assess test coverage type 'make coverage'"
 	@echo "To generate the requirements.txt file for pip type 'make requirements'"
-	@echo "To sync current changes to a blitz for testing, type 'make sync_to_blitz'. Adjust connection values in scripts/push_to_blitz.sh"
+	@echo "To sync current changes to a blitz for testing, type 'make sync-to-blitz'. Adjust connection values in scripts/push_to_blitz.sh"
 	@echo "------------------------------------"
 
 clean:
@@ -19,7 +19,7 @@ clean:
 install:
 	python -m pip install -r requirements.txt
 
-install_dev:
+install-dev:
 	poetry shell && poetry install && pre-commit install
 
 run:
@@ -32,11 +32,11 @@ coverage:
 	python -m coverage run --source=. -m pytest
 	python -m coverage html
 
-requirements:
-	poetry export > requirements.txt
+update-requirements-file:
+	poetry update && poetry export --output requirements.txt
 
-sync_to_blitz:
+sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
 
-pre_commit:
+pre-commit:
 	pre-commit run --all-files
