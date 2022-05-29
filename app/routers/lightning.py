@@ -42,6 +42,7 @@ from app.repositories.lightning import (
 from app.routers.lightning_docs import (
     get_balance_response_desc,
     new_address_desc,
+    open_channel_desc,
     send_coins_desc,
     send_payment_desc,
 )
@@ -51,7 +52,9 @@ _PREFIX = "lightning"
 router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
 
 responses = {
-    423: {"description": "Wallet is locked. Unlock via /lightning/unlock-wallet"}
+    423: {
+        "description": "LND only: Wallet is locked. Unlock via /lightning/unlock-wallet."
+    }
 }
 
 
@@ -291,10 +294,14 @@ async def send_coins_path(input: SendCoinsInput):
     "/open-channel",
     name=f"{_PREFIX}.open-channel",
     summary="open a new lightning channel",
-    description="For additional information see [LND docs](https://api.lightning.community/#openchannel)",
+    description=open_channel_desc,
     dependencies=[Depends(JWTBearer())],
     response_model=str,
-    responses=responses,
+    responses={
+        412: {"description": "When not enough funds are available."},
+        423: responses[423],
+        504: {"description": "When the peer is not reachable."},
+    },
 )
 async def channelopen(local_funding_amount: int, node_URI: str, target_confs: int = 3):
     try:

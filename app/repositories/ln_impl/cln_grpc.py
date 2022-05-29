@@ -1,4 +1,6 @@
 import asyncio
+import json
+import logging
 import shutil
 import sqlite3
 import time
@@ -27,14 +29,26 @@ from app.models.lightning import (
     PaymentRequest,
     SendCoinsInput,
     SendCoinsResponse,
-    TxCategory,
     TxStatus,
-    TxType,
     WalletBalance,
 )
 from app.utils import bitcoin_rpc_async
 from app.utils import lightning_config as lncfg
 from app.utils import next_push_id
+
+
+async def _make_local_call(cmd: str):
+    # FIXME: this is a hack because some of the commands are not exposed
+    # in the CLN grpc interface yet.
+
+    testnet = config("network") == "testnet"
+    cmd = f"lightning-cli -k {'--testnet ' if testnet else ''}{cmd}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    return await proc.communicate()
 
 
 def get_implementation_name() -> str:
@@ -493,10 +507,87 @@ async def listen_forward_events() -> ForwardSuccessEvent:
         await asyncio.sleep(interval - 0.1)
 
 
+async def connect_peer_impl(node_URI: str) -> bool:
+    try:
+        id = node_URI.split("@")[0]
+        stdout, stderr = await _make_local_call(f"connect id={node_URI}")
+        if stdout:
+            if id in stdout.decode():
+                return True
+            if "Connection timed out" in stdout.decode():
+                raise HTTPException(
+                    status.HTTP_504_GATEWAY_TIMEOUT,
+                    detail="Connection establishment: Connection timed out.",
+                )
+            if "Connection refused" in stdout.decode():
+                raise HTTPException(
+                    status.HTTP_504_GATEWAY_TIMEOUT,
+                    detail="Connection establishment: Connection refused.",
+                )
+        if stderr:
+            logging.error(stderr.decode())
+
+        return False
+
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
 async def channel_open_impl(
     local_funding_amount: int, node_URI: str, target_confs: int
 ) -> str:
-    raise NotImplementedError("c-lightning not yet implemented")
+    fee_rate = None
+    if target_confs == 1:
+        fee_rate = "urgent"
+    elif target_confs >= 2 and target_confs <= 9:
+        fee_rate = "normal"
+    elif target_confs >= 10:
+        fee_rate = "slow"
+
+    try:
+        res = await connect_peer_impl(node_URI)
+        if not res:
+            raise HTTPException(
+                status.HTTP_408_REQUEST_TIMEOUT,
+                detail="Unknown error while trying to connect to peer",
+            )
+
+        cmd = f"fundchannel id={node_URI} amount={local_funding_amount} feerate={fee_rate}"
+        stdout, stderr = await _make_local_call(cmd)
+        if stdout:
+            o = stdout.decode()
+            j = json.loads(o)
+            if "txid" in o and "channel_id" in o:
+                return j["txid"]
+            if "Unknown peer" in o:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="We where able to connect to the peer but CLN can't find it when opening a channel.",
+                )
+            if "Owning subdaemon openingd died" in o:
+                # https://github.com/ElementsProject/lightning/issues/2798#issuecomment-511205719
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="Likely the peer didn't like our channel opening proposal and disconnected from us.",
+                )
+            if "Could not afford " in o:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=j["message"])
+            if "Number of pending channels exceed maximum" in o:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=j["message"])
+
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=j["message"]
+            )
+        if stderr:
+            logging.error(stderr.decode())
+
+        return False
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
 
 
 async def channel_list_impl() -> List[Channel]:
@@ -518,4 +609,37 @@ async def channel_list_impl() -> List[Channel]:
 
 
 async def channel_close_impl(channel_id: int, force_close: bool) -> str:
-    raise NotImplementedError("c-lightning not yet implemented")
+    try:
+        # on CLN we wait for 2 minutes to negotiate a channel close
+        # if peer doesn't respond we force close
+        wait_time_before_unilateral_close = 120 if force_close else 0
+        req = ln.CloseRequest(
+            id=channel_id,
+            unilateraltimeout=wait_time_before_unilateral_close,
+            feerange=[lnp.Feerate(slow=True), lnp.Feerate(urgent=True)],
+        )
+        res = await lncfg.cln_stub.Close(req)
+
+        # “mutual”, “unilateral”, “unopened”
+        t = res.item_type
+        if t == 0 or t == 1:  # mutual, unilateral
+            return res.txid.hex()
+        elif t == 2:  # unopened
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Channel is not open yet."
+            )
+
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=f"CLN returned unknown close type: {t}",
+        )
+    except grpc.aio._call.AioRpcError as error:
+        if "Channel is in state AWAITING_UNILATERAL" in error.details():
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Channel is awaiting an unilateral close.",
+            )
+
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
