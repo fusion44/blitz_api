@@ -133,6 +133,7 @@ async def list_all_tx_impl(
                 lncfg.cln_stub.ListInvoices(list_invoice_req),
                 list_on_chain_tx_impl(),
                 lncfg.cln_stub.ListPays(list_payments_req),
+                get_ln_info_impl(),
             ]
         )
         tx = []
@@ -144,7 +145,7 @@ async def list_all_tx_impl(
             tx.append(i)
 
         for transaction in res[1]:
-            t = GenericTx.from_cln_onchain_tx(transaction)
+            t = GenericTx.from_cln_grpc_onchain_tx(transaction, res[3].block_height)
             if successfull_only and t.status == TxStatus.SUCCEEDED:
                 tx.append(t)
                 continue

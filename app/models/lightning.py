@@ -1722,3 +1722,71 @@ class GenericTx(BaseModel):
             - payment["amount_msat"].millisatoshis,
             comment=comment,
         )
+
+    @classmethod
+    def from_cln_grpc_invoice(cls, i) -> "GenericTx":
+        status = TxStatus.UNKNOWN
+        time_stamp = i.expires_at
+        amount = i.amount_msat.msat
+        if i.status == 0:  # unpaid
+            status = TxStatus.IN_FLIGHT
+        elif i.status == 1:  # paid
+            status = TxStatus.SUCCEEDED
+            time_stamp = i.paid_at
+            amount = i.amount_received_msat.msat
+        elif i.status == 2:  # expired
+            status = TxStatus.FAILED
+
+        return cls(
+            id=i.bolt11,
+            category=TxCategory.LIGHTNING,
+            type=TxType.RECEIVE,
+            amount=amount,
+            time_stamp=time_stamp,
+            comment=i.description,
+            status=status,
+        )
+
+    @classmethod
+    def from_cln_grpc_onchain_tx(
+        cls, tx: OnChainTransaction, current_block_height: int
+    ) -> "GenericTx":
+        confs = current_block_height - tx.block_height
+        s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
+
+        t = TxType.SEND
+        if tx.total_fees == 0:
+            t = TxType.RECEIVE
+
+        return cls(
+            id=tx.tx_hash,
+            category=TxCategory.ONCHAIN,
+            type=t,
+            amount=tx.amount,
+            time_stamp=0,
+            status=s,
+            comment="",
+            block_height=tx.block_height,
+            num_confs=confs,
+        )
+
+    @classmethod
+    def from_cln_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
+        status = TxStatus.UNKNOWN
+        if payment.status == 0:  # pending
+            status = TxStatus.IN_FLIGHT
+        elif payment.status == 1:  # failed
+            status = TxStatus.FAILED
+        elif payment.status == 2:  # complete
+            status = TxStatus.SUCCEEDED
+
+        return cls(
+            id=payment.bolt11,
+            category=TxCategory.LIGHTNING,
+            type=TxType.SEND,
+            time_stamp=payment.created_at,
+            amount=-payment.amount_msat.msat,
+            status=status,
+            total_fees=payment.amount_sent_msat.msat - payment.amount_msat.msat,
+            comment=comment,
+        )
