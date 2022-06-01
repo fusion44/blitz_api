@@ -154,15 +154,15 @@ async def list_all_tx_impl(
 
         for pay in res[2].pays:
             comment = ""
-            # if p.bolt11 in memo_cache:
-            #     comment = memo_cache[p.bolt11]
-            # else:
-            #     # TODO: implement as soon as Core Lightning supports decoding
-            #     # payment requests via gRPC
-            #     pr = await decode_pay_request_impl(p.bolt11)
-            #     comment = pr.description
-            #     memo_cache[p.payment_request] = pr.description
+
+            if pay.bolt11 in memo_cache:
+                comment = memo_cache[pay.bolt11]
+            else:
+                pr = await decode_pay_request_impl(pay.bolt11)
+                comment = pr.description
+                memo_cache[pay.bolt11] = pr.description
             p = GenericTx.from_cln_grpc_payment(pay, comment)
+
             if successfull_only and p.status == TxStatus.SUCCEEDED:
                 tx.append(p)
                 continue
@@ -321,7 +321,28 @@ async def add_invoice_impl(
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
-    raise NotImplementedError("c-lightning not yet implemented")
+    res = await _make_local_call(f"decodepay bolt11={pay_req}")
+
+    if not res:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unknown CLN error decoding pay request",
+        )
+
+    if len(res) == 0:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No response from CLN decoding pay request",
+        )
+
+    decoded = res[0].decode()
+
+    if "Invalid bolt11: Bad bech32 string" in decoded:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="Invalid bolt11: Bad bech32 string"
+        )
+
+    return PaymentRequest.from_cln_json(json.loads(decoded))
 
 
 async def get_fee_revenue_impl() -> FeeRevenue:

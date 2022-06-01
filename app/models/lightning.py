@@ -1473,8 +1473,8 @@ class PaymentRequest(BaseModel):
             routes = [RouteHint.from_cln_json(rh) for rh in r["routes"]]
 
         msat = 0
-        if "amount_msat" in r:
-            msat = r["amount_msat"]
+        if "msatoshi" in r:
+            msat = r["msatoshi"]
 
         features = []
         # TODO: Map CLN's feature advertisements to LND's
@@ -1496,6 +1496,47 @@ class PaymentRequest(BaseModel):
             route_hints=routes,
             num_msat=msat,
             payment_addr=r["payment_secret"],
+            features=features,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, r):
+        routes = []
+        if "routes" in r.keys():
+            routes = [RouteHint.from_cln_json(rh) for rh in r["routes"]]
+
+        msat = 0
+        if "amount_msat" in r:
+            msat = r["amount_msat"]
+
+        features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # if "features" in r:
+        #     features = [
+        #         FeaturesEntry.from_cln_json(k, r["features"][k]) for k in r["features"]
+        #     ]
+
+        dhash = ""
+        if hasattr(r, "payment_hash"):
+            dhash = r.payment_hash.hex()
+
+        fback = []
+        if hasattr(r, "fallbacks"):
+            fback = r["fallbacks"][0]
+
+        return cls(
+            destination=r.payee,
+            payment_hash=r.payment_hash.hex(),
+            num_satoshis=msat / 1000,
+            timestamp=r.created_at,
+            expiry=r.expiry,
+            description=r.description,
+            description_hash=dhash,
+            fallback_addr=fback,
+            cltv_expiry=r.min_final_cltv_expiry,
+            route_hints=routes,
+            num_msat=msat,
+            payment_addr=r.payment_secret,
             features=features,
         )
 
