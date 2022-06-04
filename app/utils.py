@@ -26,9 +26,10 @@ elif node_type == "cln_grpc":
     import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
 elif node_type == "cln_unix_socket":
     from pyln.client import LightningRpc
+elif node_type == "" or node_type == "none":
+    logging.info("Running in bitcoin-only mode")
 else:
     raise ValueError(f"Unknown node type: {node_type}")
-
 
 from app.models.bitcoind import BlockRpcFunc
 
@@ -104,7 +105,7 @@ class LightningConfig:
             opts = (("grpc.ssl_target_name_override", "cln"),)
             self._channel = grpc.aio.secure_channel(cln_grpc_url, creds, options=opts)
             self.cln_stub = clnrpc.NodeStub(self._channel)
-        elif self.ln_node == "none":
+        elif self.ln_node == "none" or self.ln_node == "":
             # its ok to run raspiblitz also without lightning
             pass
         else:

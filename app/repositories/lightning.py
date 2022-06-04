@@ -177,6 +177,11 @@ async def register_lightning_listener():
     """
 
     try:
+
+        if lightning_config.ln_node == "" or lightning_config.ln_node == "none":
+            logging.info("SKIPPING register_lightning_listener -> no lightning configured")
+            return
+
         await ln.get_ln_info_impl()
 
         loop = asyncio.get_event_loop()
