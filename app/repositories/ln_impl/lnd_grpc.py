@@ -31,7 +31,7 @@ from app.utils import send_sse_message
 
 
 def get_implementation_name() -> str:
-    return "LND"
+    return "LND_GRPC"
 
 
 async def get_wallet_balance_impl() -> WalletBalance:
@@ -94,9 +94,10 @@ async def list_all_tx_impl(
             if p.payment_request in memo_cache:
                 comment = memo_cache[p.payment_request]
             else:
-                pr = await decode_pay_request_impl(p.payment_request)
-                comment = pr.description
-                memo_cache[p.payment_request] = pr.description
+                if p.payment_request is not None and p.payment_request != "":
+                    pr = await decode_pay_request_impl(p.payment_request)
+                    comment = pr.description
+                    memo_cache[p.payment_request] = pr.description
             tx.append(GenericTx.from_lnd_grpc_payment(p, comment))
 
         def sortKey(e: GenericTx):

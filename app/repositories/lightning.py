@@ -23,7 +23,7 @@ from app.models.lightning import (
 from app.models.system import APIPlatform
 from app.utils import SSE, lightning_config, redis_get, send_sse_message
 
-if lightning_config.ln_node == "lnd":
+if lightning_config.ln_node == "lnd_grpc":
     import app.repositories.ln_impl.lnd_grpc as ln
 elif lightning_config.ln_node == "cln_grpc":
     import app.repositories.ln_impl.cln_grpc as ln

@@ -18,7 +18,7 @@ from fastapi_plugins import redis_plugin
 from starlette import status
 
 node_type = config("ln_node")
-if node_type == "lnd":
+if node_type == "lnd_grpc":
     import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
     import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
     import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
@@ -104,12 +104,12 @@ class LightningConfig:
             opts = (("grpc.ssl_target_name_override", "cln"),)
             self._channel = grpc.aio.secure_channel(cln_grpc_url, creds, options=opts)
             self.cln_stub = clnrpc.NodeStub(self._channel)
-        elif self.ln_node == "":
+        elif self.ln_node == "none":
             # its ok to run raspiblitz also without lightning
             pass
         else:
             raise NameError(
-                f'Node type "{self.ln_node}" is unknown. Use "lnd" or "clightning"'
+                f'Node type "{self.ln_node}" is unknown. Use "lnd_grpc" or "cln_grpc" or "none"'
             )
 
     def metadata_callback(self, context, callback):
