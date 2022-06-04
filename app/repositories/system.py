@@ -70,7 +70,7 @@ async def password_change(type: str, old_password: str, new_password: str):
     if not type in ["a", "b", "c"]:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="unknown password type")
 
-    # check password formattings
+    # check password formatting
     if not password_valid(old_password):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="old password format invalid"
@@ -93,13 +93,13 @@ async def password_change(type: str, old_password: str, new_password: str):
             )
 
         # second set new password
-        scriptcall = (
+        script_call = (
             f'/home/admin/config.scripts/blitz.passwords.sh set {type} "{new_password}"'
         )
         if type == "c":
             # will set password c of both lnd & core lightning if installed/activated
-            scriptcall = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'
-        result = await call_script(scriptcall)
+            script_call = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'
+        result = await call_script(script_call)
         data = parse_key_value_text(result)
         print(str(data))
         if "error" in data.keys() and len(data["error"]) > 0:

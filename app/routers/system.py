@@ -122,7 +122,7 @@ async def hw_info() -> map:
 @router.get(
     "/connection-info",
     name=f"{_PREFIX}.connection-info",
-    summary="Get credential information to connect externbal apps.",
+    summary="Get credential information to connect external apps.",
     response_description="Returns a JSON string with credential information.",
     response_model=ConnectionInfo,
     dependencies=[Depends(JWTBearer())],

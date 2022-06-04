@@ -177,13 +177,13 @@ register_handlers_finished = False
 async def check_defer_register_handlers():
     """
     Special case for RaspiBlitz: Depending on the current setup step
-    there still isn't a Bitcoin Deamon or Lightning Node running.
+    there still isn't a Bitcoin Daemon or Lightning Node running.
     We must defer the registration of all those handlers until later
     when everything is properly setup.
 
     Since there is a final reboot after the setup there is no need to
     check in the background whether setup is finished. The API server
-    is restartet anyway.
+    is restarted anyway.
     """
 
     platform = APIPlatform.get_current()
@@ -198,7 +198,7 @@ async def check_defer_register_handlers():
             await register_all_handlers(redis_plugin.redis)
         else:
             logging.warning(
-                f"Setup not finished. Defering handler startup. Current phase: '{setup_phase}'"
+                f"Setup not finished. Deferring handler startup. Current phase: '{setup_phase}'"
             )
 
 

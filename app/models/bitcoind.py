@@ -22,7 +22,9 @@ class BlockRpcFunc(str, Enum):
         elif func == "rawblock":
             return cls.RAWBLOCK
         else:
-            raise ArgumentError("Function name must either be 'hasblock' or 'rawblock'")
+            raise ArgumentError(
+                "Function name must either be 'hashblock' or 'rawblock'"
+            )
 
 
 class BtcNetwork(BaseModel):

@@ -46,7 +46,7 @@ async def estimate_fee(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail=errors[0 : len(errors) - 1]
         )
 
-    # returned in BTC by Bitcoincoin Core => convert to msat
+    # returned in BTC by Bitcoin Core => convert to msat
     rate_btc = result["result"]["feerate"]
     return rate_btc * 100000000
 

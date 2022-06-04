@@ -3,14 +3,7 @@ import logging
 from decouple import config
 
 from app.constants import API_VERSION
-from app.models.system import (
-    APIPlatform,
-    ConnectionInfo,
-    HealthMessage,
-    HealthMessagePriority,
-    HealthState,
-    SystemInfo,
-)
+from app.models.system import APIPlatform, ConnectionInfo, SystemInfo
 from app.repositories.lightning import get_ln_info
 
 
@@ -33,12 +26,6 @@ async def get_system_info_impl() -> SystemInfo:
         platform=APIPlatform.NATIVE_PYTHON,
         platform_version=version,
         api_version=API_VERSION,
-        health=HealthState.ATTENTION_REQUIRED,
-        health_messages=[
-            HealthMessage(
-                id=25, level=HealthMessagePriority.WARNING, message="HDD 85% full"
-            )
-        ],
         tor_web_ui=tor_api_docs,
         tor_api=tor_api,
         lan_web_ui=lan_api_docs,

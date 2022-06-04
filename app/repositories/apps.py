@@ -114,7 +114,7 @@ async def get_app_status_sub():
     while True:
         status = "online" if switch else "offline"
         app_list = [
-            # Specter is deactivated for now because it uses its own selfsigned HTTPS cert that makes trouble in chome on last test
+            # Specter is deactivated for now because it uses its own self signed HTTPS cert that makes trouble in Chrome on last test
             # also see: app/constants.py where specter is deactivated
             # {"id": "specter", "name": "Specter Desktop", "status": status},
             {"id": "sphinx", "name": "Sphinx Chat", "status": status},
@@ -168,7 +168,7 @@ async def uninstall_app_sub(app_id: str, delete_data: bool):
 
 async def run_bonus_script(app_id: str, params: str):
 
-    # to satisfy CodeQL: test again against pedefined array and dont use 'user value'
+    # to satisfy CodeQL: test again against predefined array and don't use 'user value'
     tested_app_id = ""
     for id in available_app_ids:
         if id == app_id:
@@ -201,7 +201,7 @@ async def run_bonus_script(app_id: str, params: str):
     logFileName = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
     logging.info(f"WRITING LONG FILE: {logFileName}")
     with open(logFileName, "w", encoding="utf-8") as f:
-        f.write(f"API triggred script: {cmd}\n")
+        f.write(f"API triggered script: {cmd}\n")
         f.write(f"###### STDOUT #######\n")
         if stdout:
             f.write(stdout.decode())

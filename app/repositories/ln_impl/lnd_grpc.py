@@ -458,7 +458,7 @@ async def channel_open_impl(
             target_conf=target_confs,
         )
         async for response in lncfg.lnd_stub.OpenChannel(r):
-            # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
+            # TODO: this is still some bytestring that needs correct conversion to a string txid (ok OK for now)
             return str(response.chan_pending.txid.hex())
 
     except grpc.aio._call.AioRpcError as error:
@@ -467,12 +467,12 @@ async def channel_open_impl(
         )
 
 
-async def peer_resolve_alias(nodepub: str) -> str:
+async def peer_resolve_alias(node_pub: str) -> str:
 
     # get fresh list of peers and their aliases
     try:
 
-        request = ln.NodeInfoRequest(pub_key=nodepub, include_channels=False)
+        request = ln.NodeInfoRequest(pub_key=node_pub, include_channels=False)
         response = await lncfg.lnd_stub.GetNodeInfo(request)
         return str(response.node.alias)
 
@@ -528,7 +528,7 @@ async def channel_close_impl(channel_id: int, force_close: bool) -> str:
             target_conf=6,
         )
         async for response in lncfg.lnd_stub.CloseChannel(request):
-            # TODO: this is still some bytestring that needs correct convertion to a string txid (ok OK for now)
+            # TODO: this is still some bytestring that needs correct conversion to a string txid (ok OK for now)
             return str(response.close_pending.txid.hex())
 
     except grpc.aio._call.AioRpcError as error:

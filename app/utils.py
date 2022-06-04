@@ -279,7 +279,7 @@ class _PushID(object):
     def __init__(self):
 
         # Timestamp of last push, used to prevent local collisions if you
-        # pushtwice in one ms.
+        # push twice in one ms.
         self.last_push_time = 0
 
         # We generate 72-bits of randomness which get turned into 12

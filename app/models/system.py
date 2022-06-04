@@ -17,54 +17,6 @@ class LoginInput(BaseModel):
     ] = None
 
 
-class HealthMessagePriority(str, Enum):
-    INFO = "info"  # FYI, can normally be ignored.
-    WARNING = (
-        "warning"  # Potential problem might occur, user interaction possibly required.
-    )
-    ERROR = "error"  # Something bad happened. User interaction deinitely required.
-
-
-class HealthMessage(BaseModel):
-    id: int = Query(
-        None,
-        description="""ID of the message.
-Idea behind the ID is that messages can be replacable on the client.
-To prevent spamming the user with multiple messages, message with ID 25 will be replaced with never data of ID 25
-        """,
-        example="""
-```{
-    id: 25,
-    level: "warning",
-    message: "HDD is 89.3% full"
-}```
-    """,
-    )
-
-    level: HealthMessagePriority = Query(
-        HealthMessagePriority.INFO,
-        description="""Priority level of the message. For more info see `message`.
-
-`INFO`:       FYI, can normally be ignored.\n
-`WARNING`:    Potential problem might occur, user interaction possibly required.\n
-`ERROR`:      Something bad happened. User interaction definitely required.
-
-If there are multiple messages with different priorities, the most severe level will be shown.
-        """,
-    )
-    message: str = Query(..., description="Detailed message description")
-
-
-class HealthState(str, Enum):
-    # All systems work nominally
-    GOOD = "good"
-    # Some event requires users attention (Software update, HDD nearly full)
-    ATTENTION_REQUIRED = "attention_required"
-    # An error happened which prevents the node from working properly
-    # (Hardware failure, DB corruption, Internet connection not available, ...)
-    STOPPED = "stopped"
-
-
 class APIPlatform(str, Enum):
     RASPIBLITZ = "raspiblitz"
     NATIVE_PYTHON = "native_python"
@@ -96,12 +48,6 @@ class SystemInfo(BaseModel):
     )
     api_version: str = Query(
         ..., description="Version of the API software on this system."
-    )
-    health: HealthState = Query(
-        ..., description="General health state of the Raspiblitz"
-    )
-    health_messages: List[HealthMessage] = Query(
-        [], description="List of all messages regarding node health."
     )
     tor_web_ui: str = Query("", description="WebUI TOR address")
     tor_api: str = Query("", description="API TOR address")

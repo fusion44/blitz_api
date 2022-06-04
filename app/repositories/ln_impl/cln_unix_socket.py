@@ -140,7 +140,7 @@ def _get_block_time(block_height: int) -> tuple:
 
 
 async def list_all_tx_impl(
-    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+    successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
     @force_async
     def _list_invoices():
@@ -420,7 +420,7 @@ async def listen_forward_events() -> ForwardSuccessEvent:
         # repository.
         interval - 0.1
 
-    # make sure we know how many forewards we have
+    # make sure we know how many forwards we have
     # we need to calculate the difference between each iteration
     res = lncfg.cln_sock.listforwards(status="settled")
     num_fwd_last_poll = len(res["forwards"])

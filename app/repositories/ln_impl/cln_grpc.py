@@ -121,7 +121,7 @@ memo_cache = {}
 
 
 async def list_all_tx_impl(
-    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+    successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
     list_invoice_req = ln.ListinvoicesRequest()
     list_payments_req = ln.ListpaysRequest()
@@ -138,14 +138,14 @@ async def list_all_tx_impl(
         tx = []
         for invoice in res[0].invoices:
             i = GenericTx.from_cln_grpc_invoice(invoice)
-            if successfull_only and i.status == TxStatus.SUCCEEDED:
+            if successful_only and i.status == TxStatus.SUCCEEDED:
                 tx.append(i)
                 continue
             tx.append(i)
 
         for transaction in res[1]:
             t = GenericTx.from_cln_grpc_onchain_tx(transaction, res[3].block_height)
-            if successfull_only and t.status == TxStatus.SUCCEEDED:
+            if successful_only and t.status == TxStatus.SUCCEEDED:
                 tx.append(t)
                 continue
 
@@ -162,7 +162,7 @@ async def list_all_tx_impl(
                 memo_cache[pay.bolt11] = pr.description
             p = GenericTx.from_cln_grpc_payment(pay, comment)
 
-            if successfull_only and p.status == TxStatus.SUCCEEDED:
+            if successful_only and p.status == TxStatus.SUCCEEDED:
                 tx.append(p)
                 continue
 
@@ -511,7 +511,7 @@ async def listen_forward_events() -> ForwardSuccessEvent:
 
     interval = config("gather_ln_info_interval", default=2, cast=float)
 
-    # make sure we know how many forewards we have
+    # make sure we know how many forwards we have
     # we need to calculate the difference between each iteration
     # status=1 == "settled"
     req = ln.ListforwardsRequest(status=1)

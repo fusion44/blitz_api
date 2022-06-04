@@ -57,9 +57,9 @@ async def get_wallet_balance():
 
 
 async def list_all_tx(
-    successfull_only: bool, index_offset: int, max_tx: int, reversed: bool
+    successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
-    return await ln.list_all_tx_impl(successfull_only, index_offset, max_tx, reversed)
+    return await ln.list_all_tx_impl(successful_only, index_offset, max_tx, reversed)
 
 
 async def list_invoices(
@@ -189,10 +189,10 @@ async def register_lightning_listener():
                 """
 Unable to connect to LND. Possible reasons:
 * Node is not reachable (ports, network down, ...)
-* Maccaroon is not correct
+* Macaroon is not correct
 * IP is not included in LND tls certificate
     Add tlsextraip=192.168.1.xxx to lnd.conf and restart LND.
-    This will recreate the TLS certificate. The .env must be adpted accordingly.
+    This will recreate the TLS certificate. The .env must be adapted accordingly.
 * TLS certificate is wrong. (settings changed, ...)
 
 To Debug gRPC problems uncomment the following line in app.utils.LightningConfig._init():

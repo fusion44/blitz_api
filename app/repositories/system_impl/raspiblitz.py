@@ -5,14 +5,7 @@ import os
 from decouple import config
 
 from app.constants import API_VERSION
-from app.models.system import (
-    APIPlatform,
-    ConnectionInfo,
-    HealthMessage,
-    HealthMessagePriority,
-    HealthState,
-    SystemInfo,
-)
+from app.models.system import APIPlatform, ConnectionInfo, SystemInfo
 from app.repositories.lightning import get_ln_info
 from app.utils import (
     SSE,
@@ -36,12 +29,6 @@ async def get_system_info_impl() -> SystemInfo:
         platform=APIPlatform.RASPIBLITZ,
         platform_version=await redis_get("raspiBlitzVersion"),
         api_version=API_VERSION,
-        health=HealthState.ATTENTION_REQUIRED,
-        health_messages=[
-            HealthMessage(
-                id=25, level=HealthMessagePriority.WARNING, message="HDD 85% full"
-            )
-        ],
         tor_web_ui=tor,
         tor_api=f"{tor}/api",
         lan_web_ui=f"http://{lan}/",

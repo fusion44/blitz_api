@@ -129,7 +129,7 @@ async def get_fee_revenue_path() -> FeeRevenue:
     responses=responses,
 )
 async def list_all_tx_path(
-    successfull_only: bool = Query(
+    successful_only: bool = Query(
         False,
         description="If set, only successful transaction will be returned in the response.",
     ),
@@ -147,7 +147,7 @@ async def list_all_tx_path(
     ),
 ):
     try:
-        return await list_all_tx(successfull_only, index_offset, max_tx, reversed)
+        return await list_all_tx(successful_only, index_offset, max_tx, reversed)
     except HTTPException as r:
         raise
     except NotImplementedError as r:

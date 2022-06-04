@@ -218,7 +218,7 @@ async def setup_start_done(data: StartDoneData):
     # hostname=[string]
     # passwordA=[string]
     # passwordB=[string]
-    # passwordC=[string] (might be empty of no lightning was choosen)
+    # passwordC=[string] (might be empty of no lightning was chosen)
     # lndrescue=[path] (might be used later if lnd rescue file upload is offered)
     # clrescue=[path] (might be used later if c-lightning rescue file upload is offered)
     # seedWords= (might be used later if we offer recover from seed words)
@@ -249,10 +249,10 @@ async def setup_final_info():
         )
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    resultlines = []
-    with open(setupFilePath, "r") as setupfile:
-        resultlines = setupfile.readlines()
-    data = parse_key_value_lines(resultlines)
+    result_lines = []
+    with open(setupFilePath, "r") as setup_file:
+        result_lines = setup_file.readlines()
+    data = parse_key_value_lines(result_lines)
     try:
         seedwordsNEW = data["seedwordsNEW"]
     except:
@@ -283,7 +283,7 @@ async def get_shutdown():
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
     if setupPhase == "done":
-        logging.warning(f"can only be called when node is not setuped yet")
+        logging.warning(f"can only be called when the nodes is not finalized yet")
         return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
     if state != "waitsetup":
         logging.warning(f"can only be called when nodes awaits setup")
