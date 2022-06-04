@@ -4,7 +4,6 @@ import logging
 import shutil
 import sqlite3
 import time
-from argparse import ArgumentError
 from typing import AsyncGenerator, List, Optional
 
 import grpc
@@ -104,7 +103,7 @@ block_cache = {}
 
 async def _get_block_time(block_height: int) -> tuple:
     if block_height is None or block_height < 0:
-        raise ArgumentError("block_height cannot be None or negative")
+        raise ValueError("block_height cannot be None or negative")
 
     if block_height in block_cache:
         return block_cache[block_height]
@@ -208,7 +207,7 @@ async def list_invoices_impl(
     if reversed:
         tx.reverse()
 
-    if num_max_invoices == 0 or num_max_invoices == None:
+    if num_max_invoices == 0 or num_max_invoices is None:
         return tx
 
     return tx[index_offset : index_offset + num_max_invoices]
@@ -282,7 +281,7 @@ async def list_payments_impl(
     if reversed:
         pays.reverse()
 
-    if max_payments == 0 or max_payments == None:
+    if max_payments == 0 or max_payments is None:
         return pays
 
     return pays[index_offset : index_offset + max_payments]
@@ -292,7 +291,7 @@ async def add_invoice_impl(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
     if value_msat < 0:
-        raise ArgumentError("value_msat cannot be negative")
+        raise ValueError("value_msat cannot be negative")
 
     msat = None
     if value_msat == 0:
