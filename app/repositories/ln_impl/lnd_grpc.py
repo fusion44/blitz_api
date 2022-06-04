@@ -5,9 +5,9 @@ import grpc
 from fastapi.exceptions import HTTPException
 from starlette import status
 
-import app.repositories.ln_impl.protos.lightning_pb2 as ln
-import app.repositories.ln_impl.protos.router_pb2 as router
-import app.repositories.ln_impl.protos.walletunlocker_pb2 as unlocker
+import app.repositories.ln_impl.protos.lnd.lightning_pb2 as ln
+import app.repositories.ln_impl.protos.lnd.router_pb2 as router
+import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2 as unlocker
 from app.models.lightning import (
     Channel,
     FeeRevenue,
@@ -42,7 +42,7 @@ async def get_wallet_balance_impl() -> WalletBalance:
         c_req = ln.ChannelBalanceRequest()
         channel = await lncfg.lnd_stub.ChannelBalance(c_req)
 
-        return WalletBalance.from_grpc(onchain, channel)
+        return WalletBalance.from_lnd_grpc(onchain, channel)
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(
@@ -86,9 +86,9 @@ async def list_all_tx_impl(
 
         tx = []
         for i in res[0].invoices:
-            tx.append(GenericTx.from_grpc_invoice(i))
+            tx.append(GenericTx.from_lnd_grpc_invoice(i))
         for t in res[1].transactions:
-            tx.append(GenericTx.from_grpc_onchain_tx(t))
+            tx.append(GenericTx.from_lnd_grpc_onchain_tx(t))
         for p in res[2].payments:
             comment = ""
             if p.payment_request in memo_cache:
@@ -97,7 +97,7 @@ async def list_all_tx_impl(
                 pr = await decode_pay_request_impl(p.payment_request)
                 comment = pr.description
                 memo_cache[p.payment_request] = pr.description
-            tx.append(GenericTx.from_grpc_payment(p, comment))
+            tx.append(GenericTx.from_lnd_grpc_payment(p, comment))
 
         def sortKey(e: GenericTx):
             return e.time_stamp
@@ -133,7 +133,7 @@ async def list_invoices_impl(
             reversed=reversed,
         )
         response = await lncfg.lnd_stub.ListInvoices(req)
-        return [Invoice.from_grpc(i) for i in response.invoices]
+        return [Invoice.from_lnd_grpc(i) for i in response.invoices]
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(
@@ -145,7 +145,7 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     try:
         req = ln.GetTransactionsRequest()
         response = await lncfg.lnd_stub.GetTransactions(req)
-        return [OnChainTransaction.from_grpc(t) for t in response.transactions]
+        return [OnChainTransaction.from_lnd_grpc(t) for t in response.transactions]
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(
@@ -164,7 +164,7 @@ async def list_payments_impl(
             reversed=reversed,
         )
         response = await lncfg.lnd_stub.ListPayments(req)
-        return [Payment.from_grpc(p) for p in response.payments]
+        return [Payment.from_lnd_grpc(p) for p in response.payments]
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(
@@ -185,7 +185,7 @@ async def add_invoice_impl(
 
         response = await lncfg.lnd_stub.AddInvoice(i)
 
-        # Can't use Invoice.from_grpc() here because
+        # Can't use Invoice.from_lnd_grpc() here because
         # the response is not a standard invoice
         invoice = Invoice(
             memo=memo,
@@ -210,7 +210,7 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
     try:
         req = ln.PayReqString(pay_req=pay_req)
         res = await lncfg.lnd_stub.DecodePayReq(req)
-        return PaymentRequest.from_grpc(res)
+        return PaymentRequest.from_lnd_grpc(res)
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         if error.details() != None and error.details().find("checksum failed.") > -1:
@@ -226,7 +226,7 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
 async def get_fee_revenue_impl() -> FeeRevenue:
     req = ln.FeeReportRequest()
     res = await lncfg.lnd_stub.FeeReport(req)
-    return FeeRevenue.from_grpc(res)
+    return FeeRevenue.from_lnd_grpc(res)
 
 
 async def new_address_impl(input: NewAddressInput) -> str:
@@ -254,7 +254,7 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
         )
 
         response = await lncfg.lnd_stub.SendCoins(r)
-        r = SendCoinsResponse.from_grpc(response, input)
+        r = SendCoinsResponse.from_lnd_grpc(response, input)
         await send_sse_message(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
         return r
     except grpc.aio._call.AioRpcError as error:
@@ -262,16 +262,13 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
         details = error.details()
         if details and details.find("invalid bech32 string") > -1:
             raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+                status.HTTP_400_BAD_REQUEST,
+                detail="Could not parse destination address, destination should be a valid address.",
             )
         elif details and details.find("insufficient funds available") > -1:
-            raise HTTPException(
-                status.HTTP_412_PRECONDITION_FAILED, detail=error.details()
-            )
+            raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
         else:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
-            )
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
 
 
 async def send_payment_impl(
@@ -290,7 +287,7 @@ async def send_payment_impl(
 
         p = None
         async for response in lncfg.router_stub.SendPaymentV2(r):
-            p = Payment.from_grpc(response)
+            p = Payment.from_lnd_grpc(response)
             await send_sse_message(SSE.LN_PAYMENT_STATUS, p.dict())
         return p
     except grpc.aio._call.AioRpcError as error:
@@ -341,7 +338,7 @@ async def get_ln_info_impl() -> LnInfo:
     try:
         req = ln.GetInfoRequest()
         response = await lncfg.lnd_stub.GetInfo(req)
-        return LnInfo.from_grpc(get_implementation_name(), response)
+        return LnInfo.from_lnd_grpc(get_implementation_name(), response)
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(
@@ -371,7 +368,7 @@ async def listen_invoices() -> Invoice:
     request = ln.InvoiceSubscription()
     try:
         async for r in lncfg.lnd_stub.SubscribeInvoices(request):
-            yield Invoice.from_grpc(r)
+            yield Invoice.from_lnd_grpc(r)
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
         raise HTTPException(
@@ -493,14 +490,14 @@ async def channel_list_impl() -> List[Channel]:
 
         channels = []
         for channel_grpc in response.channels:
-            channel = Channel.from_grpc(channel_grpc)
+            channel = Channel.from_lnd_grpc(channel_grpc)
             channel.peer_alias = await peer_resolve_alias(channel.peer_publickey)
             channels.append(channel)
 
         request = ln.PendingChannelsRequest()
         response = await lncfg.lnd_stub.PendingChannels(request)
         for channel_grpc in response.pending_open_channels:
-            channel = Channel.from_grpc_pending(channel_grpc.channel)
+            channel = Channel.from_lnd_grpc_pending(channel_grpc.channel)
             channel.peer_alias = await peer_resolve_alias(channel.peer_publickey)
             channels.append(channel)
 

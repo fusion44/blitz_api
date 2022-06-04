@@ -21,7 +21,7 @@ class InvoiceState(str, Enum):
     ACCEPTED = "accepted"
 
     @classmethod
-    def from_grpc(cls, id) -> "InvoiceState":
+    def from_lnd_grpc(cls, id) -> "InvoiceState":
         if id == 0:
             return InvoiceState.OPEN
         elif id == 1:
@@ -33,6 +33,28 @@ class InvoiceState(str, Enum):
         else:
             raise NotImplementedError(f"InvoiceState {id} is not implemented")
 
+    @classmethod
+    def from_cln_json(cls, id) -> "InvoiceState":
+        if id == "unpaid":
+            return InvoiceState.OPEN
+        elif id == "paid":
+            return InvoiceState.SETTLED
+        elif id == "expired":
+            return InvoiceState.CANCELED
+        else:
+            raise NotImplementedError(f"InvoiceState {id} is not implemented")
+
+    @classmethod
+    def from_cln_grpc(cls, i) -> "InvoiceState":
+        if i.status == 0:
+            return InvoiceState.OPEN
+        elif i.status == 1:
+            return InvoiceState.SETTLED
+        elif i.status == 2:
+            return InvoiceState.CANCELED
+        else:
+            raise NotImplementedError(f"InvoiceState {id} is not implemented")
+
 
 class InvoiceHTLCState(str, Enum):
     ACCEPTED = "accepted"
@@ -40,7 +62,7 @@ class InvoiceHTLCState(str, Enum):
     CANCELED = "canceled"
 
     @classmethod
-    def from_grpc(cls, id) -> "InvoiceHTLCState":
+    def from_lnd_grpc(cls, id) -> "InvoiceHTLCState":
         if id == 0:
             return InvoiceHTLCState.ACCEPTED
         elif id == 1:
@@ -65,11 +87,19 @@ class FeeRevenue(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, fee_report) -> "FeeRevenue":
+    def from_lnd_grpc(cls, fee_report) -> "FeeRevenue":
         return cls(
             day=int(fee_report.day_fee_sum),
             week=int(fee_report.week_fee_sum),
             month=int(fee_report.month_fee_sum),
+        )
+
+    @classmethod
+    def from_cln_json(cls, fee_report) -> "FeeRevenue":
+        return cls(
+            day=int(fee_report["day_fee_sum"]),
+            week=int(fee_report["week_fee_sum"]),
+            month=int(fee_report["month_fee_sum"]),
         )
 
 
@@ -100,7 +130,7 @@ class ForwardSuccessEvent(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, evt) -> "ForwardSuccessEvent":
+    def from_lnd_grpc(cls, evt) -> "ForwardSuccessEvent":
         return cls(
             timestamp=int(evt.timestamp),
             chan_id_in=int(evt.chan_id_in),
@@ -110,19 +140,45 @@ class ForwardSuccessEvent(BaseModel):
             fee_msat=int(evt.fee_msat),
         )
 
+    @classmethod
+    def from_cln_json(cls, fwd) -> "ForwardSuccessEvent":
+        return cls(
+            timestamp_ns=fwd["resolved_time"],
+            chan_id_in=fwd["in_channel"],
+            chan_id_out=fwd["out_channel"],
+            amt_in_msat=fwd["in_msatoshi"],
+            amt_out_msat=fwd["out_msatoshi"],
+            fee_msat=fwd["fee"],
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, fwd) -> "ForwardSuccessEvent":
+        return cls(
+            timestamp_ns=fwd.received_time,
+            chan_id_in=fwd.in_channel,
+            chan_id_out=fwd.out_channel,
+            amt_in_msat=fwd.in_msat.msat,
+            amt_out_msat=fwd.out_msat.msat,
+            fee_msat=fwd.fee_msat.msat,
+        )
+
 
 class Feature(BaseModel):
     name: str
-    is_required: bool
-    is_known: bool
+    is_required: Optional[bool]
+    is_known: Optional[bool]
 
     @classmethod
-    def from_grpc(cls, f) -> "Feature":
+    def from_lnd_grpc(cls, f) -> "Feature":
         return cls(
             name=f.name,
             is_required=f.is_required,
             is_known=f.is_known,
         )
+
+    @classmethod
+    def from_cln_json(cls, f) -> "Feature":
+        return cls(name=f)
 
 
 class FeaturesEntry(BaseModel):
@@ -130,10 +186,17 @@ class FeaturesEntry(BaseModel):
     value: Feature
 
     @classmethod
-    def from_grpc(cls, entry_key, feature) -> "FeaturesEntry":
+    def from_lnd_grpc(cls, entry_key, feature) -> "FeaturesEntry":
         return cls(
             key=entry_key,
-            value=Feature.from_grpc(feature),
+            value=Feature.from_lnd_grpc(feature),
+        )
+
+    @classmethod
+    def from_cln_json(self, entry_key, feature):
+        return self(
+            key=entry_key,
+            value=Feature.from_cln_json(feature),
         )
 
 
@@ -158,7 +221,7 @@ class AMP(BaseModel):
     preimage: str
 
     @classmethod
-    def from_grpc(cls, a) -> "AMP":
+    def from_lnd_grpc(cls, a) -> "AMP":
         return cls(
             root_share=a.root_share.hex(),
             set_id=a.set_id.hex(),
@@ -173,7 +236,7 @@ class CustomRecordsEntry(BaseModel):
     value: str
 
     @classmethod
-    def from_grpc(cls, e) -> "CustomRecordsEntry":
+    def from_lnd_grpc(cls, e) -> "CustomRecordsEntry":
         return cls(
             key=e.key,
             value=e.value,
@@ -181,46 +244,51 @@ class CustomRecordsEntry(BaseModel):
 
 
 class InvoiceHTLC(BaseModel):
-    # Short channel id over which the htlc was received.
-    chan_id: int
+    chan_id: int = Query(
+        ..., description="The channel ID over which the HTLC was received."
+    )
 
-    # Index identifying the htlc on the channel.
-    htlc_index: int
+    htlc_index: int = Query(..., description="The index of the HTLC on the channel.")
 
-    # The amount of the htlc in msat.
-    amt_msat: int
+    amt_msat: int = Query(..., description="The amount of the HTLC in msat.")
 
-    # Block height at which this htlc was accepted.
-    accept_height: int
+    accept_height: int = Query(
+        ..., description="The block height at which this HTLC was accepted."
+    )
 
-    # Time at which this htlc was accepted.
-    accept_time: int
+    accept_time: int = Query(
+        ..., description="The time at which this HTLC was accepted."
+    )
 
-    # Time at which this htlc was settled or canceled.
-    resolve_time: int
+    resolve_time: int = Query(
+        ..., description="The time at which this HTLC was resolved."
+    )
 
-    # Block height at which this htlc expires.
-    expiry_height: int
+    expiry_height: int = Query(
+        ..., description="The block height at which this HTLC expires."
+    )
 
-    # Current state the htlc is in.
-    state: InvoiceHTLCState
+    state: InvoiceHTLCState = Query(..., description="The state of the HTLC.")
 
-    # Custom tlv records.
-    custom_records: List[CustomRecordsEntry]
+    custom_records: List[CustomRecordsEntry] = Query(
+        [], description="Custom tlv records."
+    )
 
-    # The total amount of the mpp payment in msat.
-    mpp_total_amt_msat: int
+    mpp_total_amt_msat: int = Query(
+        ..., description="The total amount of the mpp payment in msat."
+    )
 
-    # Details relevant to AMP HTLCs, only populated
-    # if this is an AMP HTLC.
-    amp: AMP
+    amp: AMP = Query(
+        None,
+        description="Details relevant to AMP HTLCs, only populated if this is an AMP HTLC.",
+    )
 
     @classmethod
-    def from_grpc(cls, h) -> "InvoiceHTLC":
+    def from_lnd_grpc(cls, h) -> "InvoiceHTLC":
         def _crecords(recs):
             l = []
             for r in recs:
-                l.append(CustomRecordsEntry.from_grpc(r))
+                l.append(CustomRecordsEntry.from_lnd_grpc(r))
             return l
 
         return cls(
@@ -231,38 +299,51 @@ class InvoiceHTLC(BaseModel):
             accept_time=h.accept_time,
             resolve_time=h.resolve_time,
             expiry_height=h.expiry_height,
-            state=InvoiceHTLCState.from_grpc(h.state),
+            state=InvoiceHTLCState.from_lnd_grpc(h.state),
             custom_records=_crecords(h.custom_records),
             mpp_total_amt_msat=h.mpp_total_amt_msat,
-            amp=AMP.from_grpc(h.amp),
+            amp=AMP.from_lnd_grpc(h.amp),
         )
 
 
 class HopHint(BaseModel):
-    # The public key of the node at the start of the channel.
-    node_id: str
+    node_id: str = Query(
+        ..., description="The public key of the node at the start of the channel."
+    )
 
-    # The unique identifier of the channel.
-    chan_id: int
+    chan_id: int = Query(..., description="The unique identifier of the channel.")
 
-    # The base fee of the channel denominated in millisatoshis.
-    fee_base_msat: int
+    fee_base_msat: int = Query(
+        ..., description="The base fee of the channel denominated in msat."
+    )
 
-    # The fee rate of the channel for sending one satoshi
-    # across it denominated in millionths of a satoshi.
-    fee_proportional_millionths: int
+    fee_proportional_millionths: int = Query(
+        ...,
+        description="The fee rate of the channel for sending one satoshi across it denominated in msat",
+    )
 
-    # The time-lock delta of the channel.
-    cltv_expiry_delta: int
+    cltv_expiry_delta: int = Query(
+        ..., description="The time-lock delta of the channel."
+    )
 
     @classmethod
-    def from_grpc(cls, h) -> "HopHint":
+    def from_lnd_grpc(cls, h) -> "HopHint":
         return cls(
             node_id=h.node_id,
             chan_id=h.chan_id,
             fee_base_msat=h.fee_base_msat,
             fee_proportional_millionths=h.fee_proportional_millionths,
             cltv_expiry_delta=h.cltv_expiry_delta,
+        )
+
+    @classmethod
+    def from_cln_json(cls, h) -> "HopHint":
+        return cls(
+            node_id=h["pubkey"],
+            chan_id=h["short_channel_id"],
+            fee_base_msat=h["fee_base_msat"],
+            fee_proportional_millionths=h["fee_proportional_millionths"],
+            cltv_expiry_delta=h["cltv_expiry_delta"],
         )
 
 
@@ -273,8 +354,13 @@ class RouteHint(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, h) -> "RouteHint":
-        hop_hints = [HopHint.from_grpc(hh) for hh in h.hop_hints]
+    def from_lnd_grpc(cls, h) -> "RouteHint":
+        hop_hints = [HopHint.from_lnd_grpc(hh) for hh in h.hop_hints]
+        return cls(hop_hints=hop_hints)
+
+    @classmethod
+    def from_cln_json(cls, h) -> "RouteHint":
+        hop_hints = [HopHint.from_cln_json(hh) for hh in h.hop_hints]
         return cls(hop_hints=hop_hints)
 
 
@@ -291,7 +377,7 @@ class Channel(BaseModel):
     balance_capacity: Optional[int]
 
     @classmethod
-    def from_grpc(cls, c) -> "Channel":
+    def from_lnd_grpc(cls, c) -> "Channel":
         return cls(
             active=c.active,
             channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
@@ -303,7 +389,7 @@ class Channel(BaseModel):
         )
 
     @classmethod
-    def from_grpc_pending(cls, c) -> "Channel":
+    def from_lnd_grpc_pending(cls, c) -> "Channel":
         return cls(
             active=False,
             channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
@@ -314,133 +400,181 @@ class Channel(BaseModel):
             balance_capacity=c.capacity,
         )
 
+    @classmethod
+    def from_cln_grpc(cls, c) -> "Channel":
+        # TODO: get alias and balance of the channel
+        return cls(
+            active=c.active,
+            channel_id=c.short_channel_id,  # use channel point as id because thats needed for closing the channel with lnd
+            peer_publickey=c.destination.hex(),
+            peer_alias="n/a",
+            balance_local=-1,
+            balance_remote=-1,
+            balance_capacity=c.amount_msat.msat,
+        )
+
 
 class Invoice(BaseModel):
-    # optional memo to attach along with the invoice.
-    # Used for record keeping purposes for the invoice's
-    # creator, and will also be set in the description
-    # field of the encoded payment request if the
-    # description_hash field is not being used.
-    memo: Optional[str]
+    memo: str = Query(
+        None,
+        description="""Optional memo to attach along with the invoice. Used for record keeping purposes for the invoice's creator,
+        and will also be set in the description field of the encoded payment request if the description_hash field is not being used.""",
+    )
 
-    # The hex-encoded preimage(32 byte) which will allow
-    # settling an incoming HTLC payable to this preimage.
-    r_preimage: Optional[str]
+    r_preimage: str = Query(
+        None,
+        description="""The hex-encoded preimage(32 byte) which will allow settling an incoming HTLC payable to this preimage.""",
+    )
 
-    # The hash of the preimage.
-    r_hash: Optional[str]
+    r_hash: str = Query(None, description="The hash of the preimage.")
 
-    # The value of this invoice in satoshis
-    # The fields value and value_msat are mutually exclusive.
-    value: Optional[int]
-    # The value of this invoice in millisatoshis The
-    # fields value and value_msat are mutually exclusive.
-    value_msat: Optional[int]
+    value_msat: int = Query(
+        ..., description="The value of this invoice in milli satoshis."
+    )
 
-    # Whether this invoice has been fulfilled
-    settled: Optional[bool]
+    settled: bool = Query(False, description="Whether this invoice has been fulfilled")
 
-    # When this invoice was created
-    creation_date: Optional[int]
+    creation_date: int = Query(
+        None,
+        description="When this invoice was created. Not available with CLN.",
+    )
 
-    # When this invoice was settled
-    settle_date: Optional[int]
+    settle_date: int = Query(
+        None,
+        description="When this invoice was settled. Not available with pending invoices.",
+    )
 
-    # A bare-bones invoice for a payment within the
-    # Lightning Network. With the details of the invoice,
-    # the sender has all the data necessary to send a
-    # payment to the recipient.
-    payment_request: Optional[str]
+    expiry_date: int = Query(None, description="The time at which this invoice expires")
 
-    # Hash(SHA-256) of a description of the payment.
-    # Used if the description of payment(memo) is too
-    # long to naturally fit within the description field of
-    # an encoded payment request.
-    description_hash: Optional[str]
+    payment_request: str = Query(
+        None,
+        description="""A bare-bones invoice for a payment within the
+    Lightning Network. With the details of the invoice, the sender has all the data necessary to
+    send a payment to the recipient.
+    """,
+    )
 
-    # Payment request expiry time in seconds. Default is 3600 (1 hour).
-    expiry: Optional[int]
+    description_hash: str = Query(
+        None,
+        description="""
+    Hash(SHA-256) of a description of the payment. Used if the description of payment(memo) is too
+    long to naturally fit within the description field of an encoded payment request.
+    """,
+    )
 
-    # Fallback on-chain address.
-    fallback_addr: Optional[str]
+    expiry: int = Query(
+        None,
+        description="Payment request expiry time in seconds. Default is 3600 (1 hour).",
+    )
 
-    # Delta to use for the time-lock of the CLTV extended to the final hop.
-    cltv_expiry: Optional[int]
+    fallback_addr: str = Query(None, description="Fallback on-chain address.")
 
-    # Route hints that can each be individually used
-    # to assist in reaching the invoice's destination.
-    route_hints: Optional[List[RouteHint]]
+    cltv_expiry: int = Query(
+        None,
+        description="Delta to use for the time-lock of the CLTV extended to the final hop.",
+    )
 
-    # Whether this invoice should include routing hints for private channels.
-    private: Optional[bool]
+    route_hints: List[RouteHint] = Query(
+        None,
+        description="""
+    Route hints that can each be individually used to assist in reaching the invoice's destination.
+    """,
+    )
 
-    # The "add" index of this invoice. Each newly created invoice
-    # will increment this index making it monotonically increasing.
-    # Callers to the SubscribeInvoices call can use this to instantly
-    # get notified of all added invoices with an add_index greater than this one.
-    add_index: Optional[int]
+    private: bool = Query(
+        None,
+        description="Whether this invoice should include routing hints for private channels.",
+    )
 
-    # The "settle" index of this invoice. Each newly settled invoice will
-    # increment this index making it monotonically increasing. Callers to
-    # the SubscribeInvoices call can use this to instantly get notified of
-    # all settled invoices with an settle_index greater than this one.
-    settle_index: Optional[int]
+    add_index: str = Query(
+        ...,
+        description="""
+The index of this invoice. Each newly created invoice will increment this index making it monotonically increasing.
+CLN and LND handle ids differently. LND will generate an auto incremented integer id, while CLN will use a user supplied string id.
+To unify both, we auto generate an id for CLN and use the add_index for LND.
 
-    # The amount that was accepted for this invoice, in satoshis. This
-    # will ONLY be set if this invoice has been settled. We provide
-    # this field as if the invoice was created with a zero value,
-    # then we need to record what amount was ultimately accepted.
-    # Additionally, it's possible that the sender paid MORE that
-    # was specified in the original invoice. So we'll record that here as well.
-    amt_paid_sat: Optional[int]
+For `LND` this will be an `integer` in string form. This is auto generated by LND.
 
-    # The amount that was accepted for this invoice, in millisatoshis.
-    # This will ONLY be set if this invoice has been settled. We
-    # provide this field as if the invoice was created with a zero value,
-    # then we need to record what amount was ultimately accepted. Additionally,
-    # it's possible that the sender paid MORE that was specified in the
-    # original invoice. So we'll record that here as well.
-    amt_paid_msat: Optional[int]
+For `CLN` this will be a `string`. If the invoice was generated by BlitzAPI, this will be a
+[Firebase-like PushID](https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68).
+If generated by some other method, it'll be the string supplied by the user at the time of creation of the invoice.
+""",
+    )
 
-    # The state the invoice is in.
-    state: Optional[InvoiceState]
+    settle_index: int = Query(
+        None,
+        description="""
+        The "settle" index of this invoice. Each newly settled invoice will  increment this index making it monotonically increasing.
+    """,
+    )
 
-    # List of HTLCs paying to this invoice[EXPERIMENTAL].
-    htlcs: Optional[List[InvoiceHTLC]]
+    amt_paid_sat: int = Query(
+        None,
+        description="""
+    The amount that was accepted for this invoice, in satoshis. This
+    will ONLY be set if this invoice has been settled. We provide
+    this field as if the invoice was created with a zero value,
+    then we need to record what amount was ultimately accepted.
+    Additionally, it's possible that the sender paid MORE that
+    was specified in the original invoice. So we'll record that here as well.
+    """,
+    )
 
-    # List of features advertised on the invoice.
-    features: Optional[List[FeaturesEntry]]
+    amt_paid_msat: int = Query(
+        None,
+        description="""
+    The amount that was accepted for this invoice, in millisatoshis.
+    This will ONLY be set if this invoice has been settled. We
+    provide this field as if the invoice was created with a zero value,
+    then we need to record what amount was ultimately accepted. Additionally,
+    it's possible that the sender paid MORE that was specified in the
+    original invoice. So we'll record that here as well.
+    """,
+    )
 
-    # Indicates if this invoice was a spontaneous payment
-    # that arrived via keysend[EXPERIMENTAL].
-    is_keysend: Optional[bool]
+    state: InvoiceState = Query(..., description="The state the invoice is in.")
 
-    # The payment address of this invoice. This value will
-    # be used in MPP payments, and also for newer invoices
-    # that always require the MPP payload for added end-to-end security.
-    payment_addr: Optional[str]
+    htlcs: List[InvoiceHTLC] = Query(
+        None, description="List of HTLCs paying to this invoice[EXPERIMENTAL]."
+    )
 
-    # Signals whether or not this is an AMP invoice.
-    is_amp: Optional[bool]
+    features: List[FeaturesEntry] = Query(
+        None, description="List of features advertised on the invoice."
+    )
+
+    is_keysend: bool = Query(
+        None,
+        description="[LND only] Indicates if this invoice was a spontaneous payment that arrived via keysend[EXPERIMENTAL].",
+    )
+
+    payment_addr: str = Query(
+        None,
+        description=""" The payment address of this invoice. This value will be used in MPP payments,
+    and also for newer invoices that always require the MPP payload for added end-to-end security.""",
+    )
+
+    is_amp: bool = Query(
+        None, description="Signals whether or not this is an AMP invoice."
+    )
 
     @classmethod
-    def from_grpc(cls, i) -> "Invoice":
+    def from_lnd_grpc(cls, i) -> "Invoice":
         def _route_hints(hints):
             l = []
             for h in hints:
-                l.append(RouteHint.from_grpc((h)))
+                l.append(RouteHint.from_lnd_grpc((h)))
             return l
 
         def _htlcs(htlcs):
             l = []
             for h in htlcs:
-                l.append(InvoiceHTLC.from_grpc(h))
+                l.append(InvoiceHTLC.from_lnd_grpc(h))
             return l
 
         def _features(features):
             l = []
             for k in features:
-                l.append(FeaturesEntry.from_grpc(k, features[k]))
+                l.append(FeaturesEntry.from_lnd_grpc(k, features[k]))
             return l
 
         return cls(
@@ -451,6 +585,7 @@ class Invoice(BaseModel):
             value_msat=i.value_msat,
             settled=i.settled,
             creation_date=i.creation_date,
+            expiry_date=i.creation_date + i.expiry,
             settle_date=i.settle_date,
             payment_request=i.payment_request,
             description_hash=i.description_hash,
@@ -463,12 +598,55 @@ class Invoice(BaseModel):
             settle_index=i.settle_index,
             amt_paid_sat=i.amt_paid_sat,
             amt_paid_msat=i.amt_paid_msat,
-            state=InvoiceState.from_grpc(i.state),
+            state=InvoiceState.from_lnd_grpc(i.state),
             htlcs=_htlcs(i.htlcs),
             features=_features(i.features),
             is_keysend=i.is_keysend,
             payment_addr=i.payment_addr.hex(),
             is_amp=i.is_amp,
+        )
+
+    @classmethod
+    def from_cln_json(cls, i) -> "Invoice":
+        return cls(
+            add_index=i["label"],
+            memo=i["description"],
+            r_preimage=i["payment_preimage"] if "payment_preimage" in i else None,
+            r_hash=i["payment_hash"],
+            value=i["msatoshi"] / 1000,
+            value_msat=i["msatoshi"],
+            settled=True if i["status"] == "paid" else False,
+            expiry_date=i["expires_at"],
+            settle_date=i["paid_at"] if "paid_at" in i else None,
+            payment_request=i["bolt11"],
+            settle_index=i["pay_index"] if "pay_index" in i else None,
+            amt_paid_sat=i["amount_received_msat"] / 1000
+            if "amount_received_msat" in i
+            else None,
+            amt_paid_msat=i["amount_received_msat"]
+            if "amount_received_msat" in i
+            else None,
+            state=InvoiceState.from_cln_json(i["status"]),
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, i) -> "Invoice":
+        state = InvoiceState.from_cln_grpc(i)
+        return cls(
+            add_index=i.label,
+            memo=i.description,
+            r_preimage=i.payment_preimage.hex(),
+            r_hash=i.payment_hash.hex(),
+            value=i.amount_msat.msat / 1000,
+            value_msat=i.amount_msat.msat,
+            settled=True if state == InvoiceState.SETTLED else False,
+            expiry_date=i.expires_at,
+            settle_date=i.paid_at,
+            payment_request=i.bolt11,
+            settle_index=i.pay_index,
+            amt_paid_sat=i.amount_received_msat.msat / 1000,
+            amt_paid_msat=i.amount_received_msat.msat,
+            state=state,
         )
 
 
@@ -479,7 +657,7 @@ class PaymentStatus(str, Enum):
     FAILED = "failed"
 
     @classmethod
-    def from_grpc(cls, id) -> "PaymentStatus":
+    def from_lnd_grpc(cls, id) -> "PaymentStatus":
         if id == 0:
             return PaymentStatus.UNKNOWN
         elif id == 1:
@@ -488,6 +666,17 @@ class PaymentStatus(str, Enum):
             return PaymentStatus.SUCCEEDED
         elif id == 3:
             return PaymentStatus.FAILED
+        else:
+            raise NotImplementedError(f"PaymentStatus {id} is not implemented")
+
+    @classmethod
+    def from_cln_grpc(cls, id) -> "PaymentStatus":
+        if id == 0:
+            return PaymentStatus.IN_FLIGHT
+        elif id == 1:
+            return PaymentStatus.FAILED
+        elif id == 2:
+            return PaymentStatus.SUCCEEDED
         else:
             raise NotImplementedError(f"PaymentStatus {id} is not implemented")
 
@@ -515,7 +704,7 @@ class PaymentFailureReason(str, Enum):
     FAILURE_REASON_INSUFFICIENT_BALANCE = "FAILURE_REASON_INSUFFICIENT_BALANCE"
 
     @classmethod
-    def from_grpc(cls, f) -> "PaymentFailureReason":
+    def from_lnd_grpc(cls, f) -> "PaymentFailureReason":
         if f == 0:
             return PaymentFailureReason.FAILURE_REASON_NONE
         elif f == 1:
@@ -530,6 +719,16 @@ class PaymentFailureReason(str, Enum):
             return PaymentFailureReason.FAILURE_REASON_INSUFFICIENT_BALANCE
         else:
             raise NotImplementedError(f"PaymentFailureReason {id} is not implemented")
+
+    @classmethod
+    def from_cln_grpc(cls, p) -> "PaymentFailureReason":
+        if p.status == 0 or p.status == 2:
+            return PaymentFailureReason.FAILURE_REASON_NONE
+
+        # TODO: find a way to describe the failure reason. CLN currently doesn't
+        # seem to provide an API for this.
+
+        return PaymentFailureReason.FAILURE_REASON_ERROR
 
 
 class ChannelUpdate(BaseModel):
@@ -584,7 +783,7 @@ class ChannelUpdate(BaseModel):
     extra_opaque_data: str
 
     @classmethod
-    def from_grpc(cls, u) -> "ChannelUpdate":
+    def from_lnd_grpc(cls, u) -> "ChannelUpdate":
         return cls(
             signature=u.signature,
             chain_hash=u.chain_hash,
@@ -624,7 +823,7 @@ class Hop(BaseModel):
     tlv_payload: bool
 
     @classmethod
-    def from_grpc(cls, h) -> "Hop":
+    def from_lnd_grpc(cls, h) -> "Hop":
         return cls(
             chan_id=h.chan_id,
             chan_capacity=h.chan_capacity,
@@ -643,7 +842,7 @@ class MPPRecord(BaseModel):
     total_amt_msat: int
 
     @classmethod
-    def from_grpc(cls, r) -> "MPPRecord":
+    def from_lnd_grpc(cls, r) -> "MPPRecord":
         return cls(
             payment_addr=r.payment_addr,
             total_amt_msat=r.total_amt_msat,
@@ -656,7 +855,7 @@ class AMPRecord(BaseModel):
     child_index: int
 
     @classmethod
-    def from_grpc(cls, r) -> "AMPRecord":
+    def from_lnd_grpc(cls, r) -> "AMPRecord":
         return cls(
             root_share=r.root_share,
             set_id=r.set_id,
@@ -676,7 +875,7 @@ class Route(BaseModel):
     custom_records: List[CustomRecordsEntry]
 
     @classmethod
-    def from_grpc(cls, r):
+    def from_lnd_grpc(cls, r):
         def _crecords(recs):
             l = []
             for r in recs:
@@ -686,16 +885,16 @@ class Route(BaseModel):
         def _get_hops(hops) -> List[Hop]:
             l = []
             for h in hops:
-                l.append(Hop.from_grpc(h))
+                l.append(Hop.from_lnd_grpc(h))
             return l
 
         mpp = None
         if hasattr(r, "mpp_record"):
-            mpp = MPPRecord.from_grpc(r.mpp_record)
+            mpp = MPPRecord.from_lnd_grpc(r.mpp_record)
 
         amp = None
         if hasattr(r, "amp_record"):
-            amp = AMPRecord.from_grpc(r.amp_record)
+            amp = AMPRecord.from_lnd_grpc(r.amp_record)
 
         crecords = []
         if hasattr(r, "custom_records"):
@@ -742,7 +941,7 @@ class HTLCAttemptFailure(BaseModel):
     height: int
 
     @classmethod
-    def from_grpc(cls, f) -> "HTLCAttemptFailure":
+    def from_lnd_grpc(cls, f) -> "HTLCAttemptFailure":
         code = None
         if hasattr(f, "code"):
             code = f.code
@@ -753,7 +952,7 @@ class HTLCAttemptFailure(BaseModel):
 
         return cls(
             code=code,
-            channel_update=ChannelUpdate.from_grpc(f.channel_update),
+            channel_update=ChannelUpdate.from_lnd_grpc(f.channel_update),
             htlc_msat=htlc_msat,
             onion_sha_256=f.onion_sha_256,
             cltv_expiry=f.cltv_expiry,
@@ -769,7 +968,7 @@ class HTLCStatus(str, Enum):
     FAILED = "failed"
 
     @classmethod
-    def from_grpc(cls, s) -> "HTLCStatus":
+    def from_lnd_grpc(cls, s) -> "HTLCStatus":
         if s == 0:
             return HTLCStatus.IN_FLIGHT
         elif s == 1:
@@ -804,57 +1003,64 @@ class HTLCAttempt(BaseModel):
     preimage: str
 
     @classmethod
-    def from_grpc(cls, a) -> "HTLCAttempt":
+    def from_lnd_grpc(cls, a) -> "HTLCAttempt":
         return cls(
             attempt_id=a.attempt_id,
-            status=HTLCStatus.from_grpc(a.status),
-            route=Route.from_grpc(a.route),
+            status=HTLCStatus.from_lnd_grpc(a.status),
+            route=Route.from_lnd_grpc(a.route),
             attempt_time_ns=a.attempt_time_ns,
             resolve_time_ns=a.resolve_time_ns,
-            failure=HTLCAttemptFailure.from_grpc(a.failure),
+            failure=HTLCAttemptFailure.from_lnd_grpc(a.failure),
             preimage=a.preimage.hex(),
         )
 
 
 class Payment(BaseModel):
-    # The payment hash
-    payment_hash: str
+    payment_hash: str = Query(..., description="The payment hash")
 
-    # The payment preimage
-    payment_preimage: Optional[str]
+    payment_preimage: Optional[str] = Query(None, description="The payment preimage")
 
-    # The value of the payment in milli-satoshis
-    value_msat: int
+    value_msat: int = Query(
+        ..., description="The value of the payment in milli-satoshis"
+    )
 
-    # The optional payment request being fulfilled.
-    payment_request: Optional[str]
+    payment_request: str = Query(
+        None, description="The optional payment request being fulfilled."
+    )
 
-    # The status of the payment.
-    status: PaymentStatus = PaymentStatus.UNKNOWN
+    status: PaymentStatus = Query(
+        PaymentStatus.UNKNOWN, description="The status of the payment."
+    )
 
-    # The fee paid for this payment in milli-satoshis
-    fee_msat: int
+    fee_msat: int = Query(..., description="The fee paid for this payment in msat")
 
-    # The time in UNIX nanoseconds at which the payment was created.
-    creation_time_ns: int
+    creation_time_ns: int = Query(
+        ...,
+        description="The time in UNIX nanoseconds at which the payment was created.",
+    )
 
-    # The HTLCs made in attempt to settle the payment.
-    htlcs: List[HTLCAttempt] = []
+    htlcs: List[HTLCAttempt] = Query(
+        [], description="The HTLCs made in attempt to settle the payment."
+    )
 
-    # The creation index of this payment. Each payment can be uniquely
-    # identified by this index, which may not strictly increment by 1
-    # for payments made in older versions of lnd.
-    payment_index: int
+    payment_index: int = Query(
+        0, description="The payment index. Only set with LND, 0 otherwise."
+    )
 
-    # The failure reason
-    failure_reason: PaymentFailureReason
+    label: str = Query(
+        "", description="The payment label. Only set with CLN, empty otherwise."
+    )
+
+    failure_reason: PaymentFailureReason = Query(
+        PaymentFailureReason.FAILURE_REASON_NONE, description="The failure reason"
+    )
 
     @classmethod
-    def from_grpc(cls, p) -> "Payment":
+    def from_lnd_grpc(cls, p) -> "Payment":
         def _get_attempts(attempts):
             l = []
             for a in attempts:
-                l.append(HTLCAttempt.from_grpc(a))
+                l.append(HTLCAttempt.from_lnd_grpc(a))
             return l
 
         return cls(
@@ -862,12 +1068,26 @@ class Payment(BaseModel):
             payment_preimage=p.payment_preimage,
             value_msat=p.value_msat,
             payment_request=p.payment_request,
-            status=PaymentStatus.from_grpc(p.status),
+            status=PaymentStatus.from_lnd_grpc(p.status),
             fee_msat=p.fee_msat,
             creation_time_ns=p.creation_time_ns,
             htlcs=_get_attempts(p.htlcs),
             payment_index=p.payment_index,
-            failure_reason=PaymentFailureReason.from_grpc(p.failure_reason),
+            failure_reason=PaymentFailureReason.from_lnd_grpc(p.failure_reason),
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, p) -> "Payment":
+        return cls(
+            payment_hash=p.payment_hash.hex(),
+            payment_preimage="",  # CLN currently doesn't return the preimage
+            value_msat=p.amount_sent_msat.msat,
+            payment_request=p.bolt11,
+            status=PaymentStatus.from_cln_grpc(p.status),
+            fee_msat=p.amount_sent_msat.msat - p.amount_msat.msat,
+            creation_time_ns=p.created_at,
+            label=p.label,
+            failure_reason=PaymentFailureReason.from_cln_grpc(p),
         )
 
 
@@ -896,18 +1116,20 @@ class SendCoinsInput(BaseModel):
         description="The number of bitcoin denominated in satoshis to send",
     )
     target_conf: int = Query(
-        0,
+        None,
         description="The number of blocks that the transaction *should* confirm in, will be used for fee estimation",
     )
     sat_per_vbyte: int = Query(
-        0,
+        None,
         description="A manual fee expressed in sat/vbyte that should be used when crafting the transaction (default: 0)",
     )
     min_confs: int = Query(
         1,
         description="The minimum number of confirmations each one of your outputs used for the transaction must satisfy",
     )
-    label: str = Query("", description="A label for the transaction")
+    label: str = Query(
+        "", description="A label for the transaction. Ignored by CLN backend."
+    )
 
 
 class SendCoinsResponse(BaseModel):
@@ -920,10 +1142,21 @@ class SendCoinsResponse(BaseModel):
         ...,
         description="The number of bitcoin denominated in satoshis which where sent",
     )
-    label: str = Query("", description="The label used for the transaction")
+    label: str = Query(
+        "", description="The label used for the transaction. Ignored by CLN backend."
+    )
 
     @classmethod
-    def from_grpc(cls, r, input: SendCoinsInput):
+    def from_lnd_grpc(cls, r, input: SendCoinsInput):
+        return cls(
+            txid=r.txid,
+            address=input.address,
+            amount=input.amount,
+            label=input.label,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, r, input: SendCoinsInput):
         return cls(
             txid=r.txid,
             address=input.address,
@@ -942,62 +1175,72 @@ class Chain(BaseModel):
 
 class LnInfo(BaseModel):
     implementation: str = Query(
-        ..., description="Lightning software implementation (LND, c-lightning)"
+        ..., description="Lightning software implementation (LND, CLN)"
     )
-    # The version of the LND software that the node is running.
-    version: str
 
-    # The SHA1 commit hash that the daemon is compiled with.
-    commit_hash: str
+    version: str = Query(
+        ..., description="The version of the software that the node is running."
+    )
 
-    # The identity pubkey of the current node.
-    identity_pubkey: str = Query("the nodes pubkey")
+    commit_hash: str = Query(
+        ..., description="The SHA1 commit hash that the daemon is compiled with."
+    )
 
-    # The complete URI (pubkey@physicaladdress:port) the current node.
-    identity_uri: str = Query("the nodes complete URI")
+    identity_pubkey: str = Query("The identity pubkey of the current node.")
 
-    # If applicable, the alias of the current node, e.g. "bob"
-    alias: str
+    identity_uri: str = Query(
+        "The complete URI (pubkey@physicaladdress:port) the current node."
+    )
 
-    # The color of the current node in hex code format
-    color: str
+    alias: str = Query(..., description="The alias of the node.")
 
-    # Number of pending channels
-    num_pending_channels: int
+    color: str = Query(
+        ..., description="The color of the current node in hex code format."
+    )
 
-    # Number of active channels
-    num_active_channels: int
+    num_pending_channels: int = Query(..., description="Number of pending channels.")
 
-    # Number of inactive channels
-    num_inactive_channels: int
+    num_active_channels: int = Query(..., description="Number of active channels.")
 
-    # Number of peers
-    num_peers: int
+    num_inactive_channels: int = Query(..., description="Number of inactive channels.")
 
-    # The node's current view of the height of the best block
-    block_height: int
+    num_peers: int = Query(..., description="Number of peers.")
 
-    # The node's current view of the hash of the best block
-    block_hash: str
+    block_height: int = Query(
+        ...,
+        description="The node's current view of the height of the best block. Only available with LND.",
+    )
 
-    # Timestamp of the block best known to the wallet
-    best_header_timestamp: int
+    block_hash: str = Query(
+        "",
+        description="The node's current view of the hash of the best block. Only available with LND.",
+    )
 
-    # Whether the wallet's view is synced to the main chain
-    synced_to_chain: bool
+    best_header_timestamp: int = Query(
+        None,
+        description="Timestamp of the block best known to the wallet. Only available with LND.",
+    )
 
-    # Whether we consider ourselves synced with the public channel graph.
-    synced_to_graph: bool
+    synced_to_chain: bool = Query(
+        None,
+        description="Whether the wallet's view is synced to the main chain. Only available with LND.",
+    )
 
-    # A list of active chains the node is connected to
-    chains: List[Chain]
+    synced_to_graph: bool = Query(
+        None,
+        description="Whether we consider ourselves synced with the public channel graph. Only available with LND.",
+    )
 
-    # The URIs of the current node.
-    uris: List[str]
+    chains: List[Chain] = Query(
+        [], description="A list of active chains the node is connected to"
+    )
 
-    # Features that our node has advertised in our init message,
-    # node announcements and invoices.
-    features: List[FeaturesEntry]
+    uris: List[str] = Query([], description="The URIs of the current node.")
+
+    features: List[FeaturesEntry] = Query(
+        [],
+        description="Features that our node has advertised in our init message node announcements and invoices. Not yet implemented with CLN",
+    )
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -1010,14 +1253,14 @@ class LnInfo(BaseModel):
         return not self.__eq__(other)
 
     @classmethod
-    def from_grpc(cls, implementation, i) -> "LnInfo":
+    def from_lnd_grpc(cls, implementation, i) -> "LnInfo":
         _chains = []
         for c in i.chains:
             _chains.append(Chain(chain=c.chain, network=c.network))
 
         _features = []
         for f in i.features:
-            _features.append(FeaturesEntry.from_grpc(f, i.features[f]))
+            _features.append(FeaturesEntry.from_lnd_grpc(f, i.features[f]))
 
         _uris = [u for u in i.uris]
 
@@ -1042,6 +1285,66 @@ class LnInfo(BaseModel):
             features=_features,
         )
 
+    @classmethod
+    def from_cln_json(cls, implementation, i) -> "LnInfo":
+        _chains = [Chain(chain="bitcoin", network=i["network"])]
+
+        _features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # for k in i["our_features"].keys():
+        #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
+
+        _uris = []
+        for b in i["binding"]:
+            _uris.append(f"{b['address']}:{b['port']}")
+
+        return LnInfo(
+            implementation=implementation,
+            version=i["version"],
+            commit_hash=i["version"].split("-")[-1],
+            identity_pubkey=i["id"],
+            alias=i["alias"],
+            color=i["color"],
+            num_pending_channels=i["num_pending_channels"],
+            num_active_channels=i["num_active_channels"],
+            num_inactive_channels=i["num_inactive_channels"],
+            num_peers=i["num_peers"],
+            block_height=i["blockheight"],
+            chains=_chains,
+            uris=_uris,
+            features=_features,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, implementation, i) -> "LnInfo":
+        _chains = [Chain(chain="bitcoin", network=i.network)]
+
+        _features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # for k in i["our_features"].keys():
+        #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
+
+        _uris = []
+        for b in i.binding:
+            _uris.append(f"{b.address}:{b.port}")
+
+        return LnInfo(
+            implementation=implementation,
+            version=i.version,
+            commit_hash=i.version.split("-")[-1],
+            identity_pubkey=i.id.hex(),
+            alias=i.alias,
+            color=i.color.hex(),
+            num_pending_channels=i.num_pending_channels,
+            num_active_channels=i.num_active_channels,
+            num_inactive_channels=i.num_inactive_channels,
+            num_peers=i.num_peers,
+            block_height=i.blockheight,
+            chains=_chains,
+            uris=_uris,
+            features=_features,
+        )
+
 
 class LightningInfoLite(BaseModel):
     implementation: str = Query(
@@ -1056,15 +1359,15 @@ class LightningInfoLite(BaseModel):
         ..., description="The node's current view of the height of the best block"
     )
     synced_to_chain: bool = Query(
-        ..., description="Whether the wallet's view is synced to the main chain"
+        None, description="Whether the wallet's view is synced to the main chain"
     )
     synced_to_graph: bool = Query(
-        ...,
+        None,
         description="Whether we consider ourselves synced with the public channel graph.",
     )
 
     @classmethod
-    def from_grpc(cls, info: LnInfo):
+    def from_lninfo(cls, info: LnInfo):
         return cls(
             implementation=info.implementation,
             version=info.version,
@@ -1110,7 +1413,7 @@ class WalletBalance(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, onchain, channel) -> "WalletBalance":
+    def from_lnd_grpc(cls, onchain, channel) -> "WalletBalance":
         return cls(
             onchain_confirmed_balance=onchain.confirmed_balance,
             onchain_total_balance=onchain.total_balance,
@@ -1127,22 +1430,24 @@ class WalletBalance(BaseModel):
 class PaymentRequest(BaseModel):
     destination: str
     payment_hash: str
-    num_satoshis: int
+    num_satoshis: int = Query(
+        None, description="Deprecated. User num_msat instead", deprecated=True
+    )
     timestamp: int
     expiry: int
     description: str
-    description_hash: str
+    description_hash: Optional[str]
     fallback_addr: Optional[str]
     cltv_expiry: int
     route_hints: List[RouteHint] = Query(
         [], description="A list of [HopHint] for the RouteHint"
     )
-    payment_addr: str = Query(..., description="The payment address in hex format")
-    num_msat: int
+    payment_addr: str = Query("", description="The payment address in hex format")
+    num_msat: Optional[int]
     features: List[FeaturesEntry] = Query([])
 
     @classmethod
-    def from_grpc(cls, r):
+    def from_lnd_grpc(cls, r):
         return cls(
             destination=r.destination,
             payment_hash=r.payment_hash,
@@ -1153,10 +1458,86 @@ class PaymentRequest(BaseModel):
             description_hash=r.description_hash,
             fallback_addr=r.fallback_addr,
             cltv_expiry=r.cltv_expiry,
-            route_hints=[RouteHint.from_grpc(rh) for rh in r.route_hints],
+            route_hints=[RouteHint.from_lnd_grpc(rh) for rh in r.route_hints],
             payment_addr=r.payment_addr.hex(),
             num_msat=r.num_msat,
-            features=[FeaturesEntry.from_grpc(k, r.features[k]) for k in r.features],
+            features=[
+                FeaturesEntry.from_lnd_grpc(k, r.features[k]) for k in r.features
+            ],
+        )
+
+    @classmethod
+    def from_cln_json(cls, r):
+        routes = []
+        if "routes" in r.keys():
+            routes = [RouteHint.from_cln_json(rh) for rh in r["routes"]]
+
+        msat = 0
+        if "msatoshi" in r:
+            msat = r["msatoshi"]
+
+        features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # if "features" in r:
+        #     features = [
+        #         FeaturesEntry.from_cln_json(k, r["features"][k]) for k in r["features"]
+        #     ]
+
+        return cls(
+            destination=r["payee"],
+            payment_hash=r["payment_hash"],
+            num_satoshis=msat / 1000,
+            timestamp=r["created_at"],
+            expiry=r["expiry"],
+            description=r["description"],
+            description_hash="" if "payment_hash" not in r else r["payment_hash"],
+            fallback_addr="" if "fallbacks" not in r else r["fallbacks"][0],
+            cltv_expiry=r["min_final_cltv_expiry"],
+            route_hints=routes,
+            num_msat=msat,
+            payment_addr=r["payment_secret"],
+            features=features,
+        )
+
+    @classmethod
+    def from_cln_grpc(cls, r):
+        routes = []
+        if "routes" in r.keys():
+            routes = [RouteHint.from_cln_json(rh) for rh in r["routes"]]
+
+        msat = 0
+        if "amount_msat" in r:
+            msat = r["amount_msat"]
+
+        features = []
+        # TODO: Map CLN's feature advertisements to LND's
+        # if "features" in r:
+        #     features = [
+        #         FeaturesEntry.from_cln_json(k, r["features"][k]) for k in r["features"]
+        #     ]
+
+        dhash = ""
+        if hasattr(r, "payment_hash"):
+            dhash = r.payment_hash.hex()
+
+        fback = []
+        if hasattr(r, "fallbacks"):
+            fback = r["fallbacks"][0]
+
+        return cls(
+            destination=r.payee,
+            payment_hash=r.payment_hash.hex(),
+            num_satoshis=msat / 1000,
+            timestamp=r.created_at,
+            expiry=r.expiry,
+            description=r.description,
+            description_hash=dhash,
+            fallback_addr=fback,
+            cltv_expiry=r.min_final_cltv_expiry,
+            route_hints=routes,
+            num_msat=msat,
+            payment_addr=r.payment_secret,
+            features=features,
         )
 
 
@@ -1179,7 +1560,7 @@ class OnChainTransaction(BaseModel):
     )
 
     @classmethod
-    def from_grpc(cls, t):
+    def from_lnd_grpc(cls, t):
         addrs = [a for a in t.dest_addresses]
         return cls(
             tx_hash=t.tx_hash,
@@ -1237,7 +1618,7 @@ class GenericTx(BaseModel):
     total_fees: int = Query(None, description="Total fees paid for this transaction")
 
     @classmethod
-    def from_grpc_invoice(cls, i):
+    def from_lnd_grpc_invoice(cls, i) -> "GenericTx":
         status = TxStatus.UNKNOWN
         time_stamp = i.creation_date
         amount = i.value_msat
@@ -1261,7 +1642,7 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_grpc_onchain_tx(cls, tx):
+    def from_lnd_grpc_onchain_tx(cls, tx) -> "GenericTx":
         s = TxStatus.SUCCEEDED if tx.num_confirmations > 0 else TxStatus.IN_FLIGHT
 
         t = TxType.UNKNOWN
@@ -1284,7 +1665,7 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_grpc_payment(cls, payment, comment: str = ""):
+    def from_lnd_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
         status = TxStatus.UNKNOWN
         if payment.status == 1:
             status = TxStatus.IN_FLIGHT
@@ -1301,5 +1682,151 @@ class GenericTx(BaseModel):
             amount=-payment.value_msat,
             status=status,
             total_fees=payment.fee_msat,
+            comment=comment,
+        )
+
+    @classmethod
+    def from_cln_json_invoice(cls, i) -> "GenericTx":
+        status = TxStatus.UNKNOWN
+        time_stamp = i["expires_at"]
+        amount = i["msatoshi"]
+        if i["status"] == "paid":
+            status = TxStatus.SUCCEEDED
+            time_stamp = i["paid_at"]
+            amount = i["amount_received_msat"]
+        elif i["status"] == "unpaid":
+            status = TxStatus.IN_FLIGHT
+        elif i["status"] == "expired":
+            status = TxStatus.FAILED
+
+        return cls(
+            id=i["bolt11"],
+            category=TxCategory.LIGHTNING,
+            type=TxType.RECEIVE,
+            amount=amount,
+            time_stamp=time_stamp,
+            comment=i["description"],
+            status=status,
+        )
+
+    @classmethod
+    def from_cln_json_onchain_tx(cls, tx, current_block_height: int) -> "GenericTx":
+        confs = current_block_height - tx["blockheight"]
+        s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
+
+        print(tx["hash"])
+
+        for ins in tx["inputs"]:
+            print(f"i:  {ins['index']}")
+
+        amount = 0
+        for out in tx["outputs"]:
+            amount += out["msat"].millisatoshis
+
+        t = TxType.UNKNOWN
+        if amount > 0:
+            t = TxType.RECEIVE
+        elif amount < 0:
+            t = TxType.SEND
+
+        return cls(
+            id=tx["hash"],
+            category=TxCategory.ONCHAIN,
+            type=t,
+            amount=amount,
+            time_stamp=0,
+            status=s,
+            comment="",
+            block_height=tx["blockheight"],
+            num_confs=confs,
+        )
+
+    @classmethod
+    def from_cln_json_payment(cls, payment, comment: str = "") -> "GenericTx":
+        status = TxStatus.UNKNOWN  #  “pending”, “failed”, “complete”
+        if payment["status"] == "pending":
+            status = TxStatus.IN_FLIGHT
+        elif payment["status"] == "complete":
+            status = TxStatus.SUCCEEDED
+        elif payment["status"] == "failed":
+            status = TxStatus.FAILED
+
+        return cls(
+            id=payment["bolt11"],
+            category=TxCategory.LIGHTNING,
+            type=TxType.SEND,
+            time_stamp=payment["created_at"],
+            amount=-payment["amount_msat"].millisatoshis,
+            status=status,
+            total_fees=payment["amount_sent_msat"].millisatoshis
+            - payment["amount_msat"].millisatoshis,
+            comment=comment,
+        )
+
+    @classmethod
+    def from_cln_grpc_invoice(cls, i) -> "GenericTx":
+        status = TxStatus.UNKNOWN
+        time_stamp = i.expires_at
+        amount = i.amount_msat.msat
+        if i.status == 0:  # unpaid
+            status = TxStatus.IN_FLIGHT
+        elif i.status == 1:  # paid
+            status = TxStatus.SUCCEEDED
+            time_stamp = i.paid_at
+            amount = i.amount_received_msat.msat
+        elif i.status == 2:  # expired
+            status = TxStatus.FAILED
+
+        return cls(
+            id=i.bolt11,
+            category=TxCategory.LIGHTNING,
+            type=TxType.RECEIVE,
+            amount=amount,
+            time_stamp=time_stamp,
+            comment=i.description,
+            status=status,
+        )
+
+    @classmethod
+    def from_cln_grpc_onchain_tx(
+        cls, tx: OnChainTransaction, current_block_height: int
+    ) -> "GenericTx":
+        confs = current_block_height - tx.block_height
+        s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
+
+        t = TxType.SEND
+        if tx.total_fees == 0:
+            t = TxType.RECEIVE
+
+        return cls(
+            id=tx.tx_hash,
+            category=TxCategory.ONCHAIN,
+            type=t,
+            amount=tx.amount,
+            time_stamp=0,
+            status=s,
+            comment="",
+            block_height=tx.block_height,
+            num_confs=confs,
+        )
+
+    @classmethod
+    def from_cln_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
+        status = TxStatus.UNKNOWN
+        if payment.status == 0:  # pending
+            status = TxStatus.IN_FLIGHT
+        elif payment.status == 1:  # failed
+            status = TxStatus.FAILED
+        elif payment.status == 2:  # complete
+            status = TxStatus.SUCCEEDED
+
+        return cls(
+            id=payment.bolt11,
+            category=TxCategory.LIGHTNING,
+            type=TxType.SEND,
+            time_stamp=payment.created_at,
+            amount=-payment.amount_msat.msat,
+            status=status,
+            total_fees=payment.amount_sent_msat.msat - payment.amount_msat.msat,
             comment=comment,
         )

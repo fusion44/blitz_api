@@ -1,8 +1,11 @@
+import array
 import asyncio
 import json
 import logging
 import os
+import random
 import re
+import time
 from types import coroutine
 from typing import Dict
 
@@ -14,9 +17,19 @@ from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 from starlette import status
 
-import app.repositories.ln_impl.protos.lightning_pb2_grpc as lnrpc
-import app.repositories.ln_impl.protos.router_pb2_grpc as routerrpc
-import app.repositories.ln_impl.protos.walletunlocker_pb2_grpc as unlockerrpc
+node_type = config("ln_node")
+if node_type == "lnd":
+    import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
+    import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
+    import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
+elif node_type == "cln_grpc":
+    import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
+elif node_type == "cln_unix_socket":
+    from pyln.client import LightningRpc
+else:
+    raise ValueError(f"Unknown node type: {node_type}")
+
+
 from app.models.bitcoind import BlockRpcFunc
 
 
@@ -48,8 +61,9 @@ class LightningConfig:
     def __init__(self) -> None:
         self.network = config("network")
         self.ln_node = config("ln_node")
+        self.cln_sock: "LightningRpc" = None
 
-        if self.ln_node == "lnd":
+        if self.ln_node == "lnd_grpc":
             # Due to updated ECDSA generated tls.cert we need to let gprc know that
             # we need to use that cipher suite otherwise there will be a handshake
             # error when we communicate with the lnd rpc server.
@@ -74,9 +88,22 @@ class LightningConfig:
             self.lnd_stub = lnrpc.LightningStub(self._channel)
             self.router_stub = routerrpc.RouterStub(self._channel)
             self.wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
-        elif self.ln_node == "clightning":
-            # TODO: implement c-lightning
-            pass
+        elif self.ln_node == "cln_unix_socket":
+            self._cln_socket_path = config("cln_socket_path")
+            self.cln_sock = LightningRpc(self._cln_socket_path)  # type: LightningRpc
+        elif self.ln_node == "cln_grpc":
+            cln_grpc_cert = bytes.fromhex(config("cln_grpc_cert"))
+            cln_grpc_key = bytes.fromhex(config("cln_grpc_key"))
+            cln_grpc_ca = bytes.fromhex(config("cln_grpc_ca"))
+            cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
+            creds = grpc.ssl_channel_credentials(
+                root_certificates=cln_grpc_ca,
+                private_key=cln_grpc_key,
+                certificate_chain=cln_grpc_cert,
+            )
+            opts = (("grpc.ssl_target_name_override", "cln"),)
+            self._channel = grpc.aio.secure_channel(cln_grpc_url, creds, options=opts)
+            self.cln_stub = clnrpc.NodeStub(self._channel)
         elif self.ln_node == "":
             # its ok to run raspiblitz also without lightning
             pass
@@ -238,3 +265,78 @@ def parse_key_value_lines(lines: list) -> dict:
 
 def parse_key_value_text(text: str) -> dict:
     return parse_key_value_lines(text.splitlines())
+
+
+# https://gist.github.com/risent/4cab3878d995bec7d1c2
+# https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68
+# https://gist.github.com/mikelehen/3596a30bd69384624c11
+class _PushID(object):
+    # Modeled after base64 web-safe chars, but ordered by ASCII.
+    PUSH_CHARS = (
+        "-0123456789" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "_abcdefghijklmnopqrstuvwxyz"
+    )
+
+    def __init__(self):
+
+        # Timestamp of last push, used to prevent local collisions if you
+        # pushtwice in one ms.
+        self.last_push_time = 0
+
+        # We generate 72-bits of randomness which get turned into 12
+        # characters and appended to the timestamp to prevent
+        # collisions with other clients.  We store the last characters
+        # we generated because in the event of a collision, we'll use
+        # those same characters except "incremented" by one.
+        self.last_rand_chars = array.array("i", [i for i in range(12)])
+
+    def next_id(self):
+        now = int(time.time() * 1000)
+        duplicate_time = now == self.last_push_time
+        self.last_push_time = now
+        time_stamp_chars = array.array("u", "12345678")
+
+        for i in range(7, -1, -1):
+            time_stamp_chars[i] = self.PUSH_CHARS[now % 64]
+            now = int(now / 64)
+
+        if now != 0:
+            raise ValueError("We should have converted the entire timestamp.")
+
+        uid = "".join(time_stamp_chars)
+
+        if not duplicate_time:
+            for i in range(12):
+                self.last_rand_chars[i] = int(random.random() * 64)
+        else:
+            # If the timestamp hasn't changed since last push, use the
+            # same random number, except incremented by 1.
+            for i in range(11, -1, -1):
+                if self.last_rand_chars[i] == 63:
+                    self.last_rand_chars[i] = 0
+                else:
+                    break
+            self.last_rand_chars[i] += 1
+
+        for i in range(12):
+            uid += self.PUSH_CHARS[self.last_rand_chars[i]]
+
+        if len(uid) != 20:
+            raise ValueError("Length should be 20.")
+
+        return uid
+
+
+pid_gen = _PushID()
+
+
+def next_push_id() -> str:
+    """Generates a unique random 20 character long string id
+
+    * They're based on timestamp so that they sort *after* any existing ids.
+    * They contain 72-bits of random data after the timestamp so that IDs won't collide with other clients' IDs.
+    * They sort *lexicographically* (so the timestamp is converted to characters that will sort properly).
+    * They're monotonically increasing.  Even if you generate more than one in the same timestamp, the
+      latter ones will sort after the former ones.  We do this by using the previous random bits
+      but "incrementing" them by 1 (only in the case of a timestamp collision).
+    """
+    return pid_gen.next_id()

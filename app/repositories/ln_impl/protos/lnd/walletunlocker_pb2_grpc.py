@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import app.repositories.ln_impl.protos.walletunlocker_pb2 as walletunlocker__pb2
+import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2 as walletunlocker__pb2
 
 
 class WalletUnlockerStub(object):

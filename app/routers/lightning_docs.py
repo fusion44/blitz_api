@@ -1,3 +1,13 @@
+add_invoice_desc = """
+Adds a new invoice to the database.
+
+LND is generating a unique auto-incrementing `add_index` for the invoice.
+
+CLN will receive a [Firebase-like PushID](https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68) from the backend for the `label` when creating the invoice.
+
+Please refer to the response schema docs for more information.
+"""
+
 get_balance_response_desc = """
 A JSON String with on chain wallet balances with on-chain balances in
 **sat** and channel balances in **msat**. Detailed description is in
@@ -30,4 +40,18 @@ send_payment_desc = """
 This endpoints attempts to pay a payment request.
 
 Intermediate status updates will be sent via the SSE channel. This endpoint returns the last success or error message from the node.
+"""
+
+open_channel_desc = """
+__open-channel__ attempts to open a channel with a peer.
+
+### LND:
+__target_conf__: The target number of blocks that the funding transaction should be confirmed by.
+
+### c-lightning:
+* Set __target_conf__ ==1: interpreted as urgent (aim for next block)
+* Set __target_conf__ >=2: interpreted as normal (next 4 blocks or so, **default**)
+* Set __target_cont__ >=10: interpreted as slow (next 100 blocks or so)
+
+> 👉 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)
 """
