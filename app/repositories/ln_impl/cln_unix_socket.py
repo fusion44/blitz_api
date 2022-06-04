@@ -3,9 +3,7 @@ import functools
 import shutil
 import sqlite3
 import time
-from argparse import ArgumentError
 from typing import AsyncGenerator, List, Optional
-from unicodedata import category
 
 from decouple import config
 from fastapi.exceptions import HTTPException
@@ -40,7 +38,6 @@ def force_async(fn):
     """
     turns a sync function to async function using threads
     """
-    import asyncio
     from concurrent.futures import ThreadPoolExecutor
 
     pool = ThreadPoolExecutor()
@@ -129,7 +126,7 @@ class CLNOutput:
 
 def _get_block_time(block_height: int) -> tuple:
     if block_height is None or block_height < 0:
-        raise ArgumentError("block_height cannot be None or negative")
+        raise ValueError("block_height cannot be None or negative")
 
     if block_height in block_cache:
         print("cache hit")
@@ -168,7 +165,6 @@ async def list_all_tx_impl(
 
         txs = []
         for o in res:
-            # prev_out_tx = o[0].hex()
             amount = o[2]
             conf_block = o[9]
             spent_block = o[10]
@@ -283,7 +279,7 @@ async def list_invoices_impl(
     if reversed:
         tx.reverse()
 
-    if num_max_invoices == 0 or num_max_invoices == None:
+    if num_max_invoices == 0 or num_max_invoices is None:
         return tx
 
     return tx[index_offset : index_offset + num_max_invoices]

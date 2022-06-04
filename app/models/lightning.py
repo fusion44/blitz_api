@@ -1696,7 +1696,7 @@ class GenericTx(BaseModel):
             amount = i["amount_received_msat"]
         elif i["status"] == "unpaid":
             status = TxStatus.IN_FLIGHT
-        elif ["status"] == "expired":
+        elif i["status"] == "expired":
             status = TxStatus.FAILED
 
         return cls(
@@ -1721,8 +1721,7 @@ class GenericTx(BaseModel):
 
         amount = 0
         for out in tx["outputs"]:
-            print(f"o: {out['index']} {out['msat'].millisatoshis}")
-            # amount += out["msat"].millisatoshis
+            amount += out["msat"].millisatoshis
 
         t = TxType.UNKNOWN
         if amount > 0:
