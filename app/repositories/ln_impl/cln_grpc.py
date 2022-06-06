@@ -18,6 +18,7 @@ from app.models.lightning import (
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
+    InitLnRepoUpdate,
     Invoice,
     InvoiceState,
     LnInfo,
@@ -52,6 +53,10 @@ async def _make_local_call(cmd: str):
 
 def get_implementation_name() -> str:
     return "CLN_GRPC"
+
+
+async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    return True
 
 
 async def get_wallet_balance_impl() -> WalletBalance:

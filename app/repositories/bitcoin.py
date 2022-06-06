@@ -5,6 +5,7 @@ import logging
 
 import zmq
 import zmq.asyncio
+from aiohttp import client_exceptions
 from fastapi import Request
 from fastapi.exceptions import HTTPException
 from starlette import status
@@ -17,6 +18,32 @@ from app.models.bitcoind import (
     NetworkInfo,
 )
 from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
+
+_initialized = False
+
+
+async def initialize_bitcoin_repo() -> bool:
+    global _initialized
+    if _initialized:
+        return True
+
+    logging.info("Initializing bitcoin repository")
+    # Wait until the bitcoin node is ready to accept RPC calls
+    while not _initialized:
+        try:
+            await get_blockchain_info()
+            _initialized = True
+            logging.info("Bitcoin repository initialized")
+            return True
+        except client_exceptions.ClientConnectorError:
+            logging.debug("Unable to connect to Bitcoin Core, waiting...")
+            await asyncio.sleep(2)
+        except HTTPException:
+            logging.debug(
+                "Connected to Bitcoin Core but it seems to be initializing, waiting..."
+            )
+
+            await asyncio.sleep(2)
 
 
 async def get_blockchain_info() -> BlockchainInfo:

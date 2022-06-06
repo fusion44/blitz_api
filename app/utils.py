@@ -18,7 +18,9 @@ from fastapi_plugins import redis_plugin
 from starlette import status
 
 node_type = config("ln_node")
-if node_type == "lnd_grpc":
+if node_type == "none":
+    pass
+elif node_type == "lnd_grpc":
     import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
     import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
     import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
@@ -64,30 +66,8 @@ class LightningConfig:
         self.cln_sock: "LightningRpc" = None
 
         if self.ln_node == "lnd_grpc":
-            # Due to updated ECDSA generated tls.cert we need to let gprc know that
-            # we need to use that cipher suite otherwise there will be a handshake
-            # error when we communicate with the lnd rpc server.
-            os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
-
-            # Uncomment to see full gRPC logs
-            # os.environ["GRPC_TRACE"] = "all"
-            # os.environ["GRPC_VERBOSITY"] = "DEBUG"
-
-            self.lnd_macaroon = config("lnd_macaroon")
-            self._lnd_cert = bytes.fromhex(config("lnd_cert"))
-            self._lnd_grpc_ip = config("lnd_grpc_ip")
-            self._lnd_grpc_port = config("lnd_grpc_port")
-            self._lnd_rest_port = config("lnd_rest_port")
-            self._lnd_grpc_url = self._lnd_grpc_ip + ":" + self._lnd_grpc_port
-
-            auth_creds = grpc.metadata_call_credentials(self.metadata_callback)
-            ssl_creds = grpc.ssl_channel_credentials(self._lnd_cert)
-            combined_creds = grpc.composite_channel_credentials(ssl_creds, auth_creds)
-
-            self._channel = grpc.aio.secure_channel(self._lnd_grpc_url, combined_creds)
-            self.lnd_stub = lnrpc.LightningStub(self._channel)
-            self.router_stub = routerrpc.RouterStub(self._channel)
-            self.wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
+            # nothing to do here; functionality moved to lnd_grpc
+            pass
         elif self.ln_node == "cln_unix_socket":
             self._cln_socket_path = config("cln_socket_path")
             self.cln_sock = LightningRpc(self._cln_socket_path)  # type: LightningRpc
@@ -111,10 +91,6 @@ class LightningConfig:
             raise NameError(
                 f'Node type "{self.ln_node}" is unknown. Use "lnd_grpc" or "cln_grpc" or "none"'
             )
-
-    def metadata_callback(self, context, callback):
-        # for more info see grpc docs
-        callback([("macaroon", self.lnd_macaroon)], None)
 
 
 lightning_config = LightningConfig()
@@ -212,6 +188,7 @@ class SSE:
     SYSTEM_INFO = "system_info"
     SYSTEM_SHUTDOWN_NOTICE = "system_shutdown_initiated"
     SYSTEM_SHUTDOWN_ERROR = "system_shutdown_error"
+    SYSTEM_STARTUP_INFO = "system_startup_info"
     SYSTEM_REBOOT_NOTICE = "system_reboot_initiated"
     SYSTEM_REBOOT_ERROR = "system_reboot_error"
     HARDWARE_INFO = "hardware_info"
@@ -232,7 +209,6 @@ class SSE:
     LN_FEE_REVENUE = "ln_fee_revenue"
     LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
-    WALLET_LOCK_STATUS = "wallet_lock_status"
 
 
 async def call_script(scriptPath) -> str:
