@@ -167,7 +167,7 @@ async def setup_start_done(data: StartDoneData):
         )
 
     #### RECOVERY ####
-    elif setupPhase == "recovery":
+    elif setupPhase == "recovery" or setupPhase == "update":
         logging.warning(f"check recovery data")
         if password_valid(data.passwordA) == False:
             logging.warning(f"passwordA is not valid")
