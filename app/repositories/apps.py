@@ -132,7 +132,7 @@ async def install_app_sub(app_id: str):
     if not app_id in available_app_ids:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            detail=app_id + "install script not exist/supported",
+            detail=app_id + "install script does not exist / is not supported",
         )
 
     await send_sse_message(
