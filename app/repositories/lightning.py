@@ -29,6 +29,8 @@ elif lightning_config.ln_node == "cln_grpc":
     import app.repositories.ln_impl.cln_grpc as ln
 elif lightning_config.ln_node == "cln_unix_socket":
     import app.repositories.ln_impl.cln_unix_socket as ln
+else:
+    logging.error(f"lightning_config.ln_node unkown ({lightning_config.ln_node})")
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
 
