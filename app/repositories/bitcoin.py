@@ -17,7 +17,8 @@ from app.models.bitcoind import (
     FeeEstimationMode,
     NetworkInfo,
 )
-from app.utils import SSE, bitcoin_config, bitcoin_rpc_async, send_sse_message
+from app.repositories.bitcoin_utils import bitcoin_config, bitcoin_rpc_async
+from app.utils import SSE, send_sse_message
 
 _initialized = False
 

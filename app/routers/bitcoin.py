@@ -11,8 +11,8 @@ from app.repositories.bitcoin import (
     get_network_info,
     handle_block_sub,
 )
+from app.repositories.bitcoin_utils import bitcoin_rpc
 from app.routers.bitcoin_docs import blocks_sub_doc, estimate_fee_mode_desc
-from app.utils import bitcoin_rpc
 
 _PREFIX = "bitcoin"
 

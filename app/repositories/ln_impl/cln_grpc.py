@@ -32,7 +32,7 @@ from app.models.lightning import (
     TxStatus,
     WalletBalance,
 )
-from app.utils import bitcoin_rpc_async
+from app.repositories.bitcoin_utils import bitcoin_rpc_async
 from app.utils import lightning_config as lncfg
 from app.utils import next_push_id
 
