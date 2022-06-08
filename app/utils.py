@@ -7,61 +7,8 @@ import re
 import time
 from typing import Dict
 
-import grpc
-from decouple import config
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
-
-node_type = config("ln_node")
-if node_type == "none":
-    pass
-elif node_type == "lnd_grpc":
-    import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
-    import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
-    import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
-elif node_type == "cln_grpc":
-    import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
-elif node_type == "cln_unix_socket":
-    from pyln.client import LightningRpc
-else:
-    raise ValueError(f"Unknown node type: {node_type}")
-
-
-class LightningConfig:
-    def __init__(self) -> None:
-        self.network = config("network")
-        self.ln_node = config("ln_node")
-        self.cln_sock: "LightningRpc" = None
-
-        if self.ln_node == "lnd_grpc":
-            # nothing to do here; functionality moved to lnd_grpc
-            pass
-        elif self.ln_node == "cln_unix_socket":
-            self._cln_socket_path = config("cln_socket_path")
-            self.cln_sock = LightningRpc(self._cln_socket_path)  # type: LightningRpc
-        elif self.ln_node == "cln_grpc":
-            cln_grpc_cert = bytes.fromhex(config("cln_grpc_cert"))
-            cln_grpc_key = bytes.fromhex(config("cln_grpc_key"))
-            cln_grpc_ca = bytes.fromhex(config("cln_grpc_ca"))
-            cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
-            creds = grpc.ssl_channel_credentials(
-                root_certificates=cln_grpc_ca,
-                private_key=cln_grpc_key,
-                certificate_chain=cln_grpc_cert,
-            )
-            opts = (("grpc.ssl_target_name_override", "cln"),)
-            self._channel = grpc.aio.secure_channel(cln_grpc_url, creds, options=opts)
-            self.cln_stub = clnrpc.NodeStub(self._channel)
-        elif self.ln_node == "none":
-            # its ok to run raspiblitz also without lightning
-            pass
-        else:
-            raise NameError(
-                f'Node type "{self.ln_node}" is unknown. Use "lnd_grpc" or "cln_grpc" or "none"'
-            )
-
-
-lightning_config = LightningConfig()
 
 
 async def send_sse_message(id: str, json_data: Dict):

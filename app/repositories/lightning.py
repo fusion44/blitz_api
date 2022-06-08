@@ -22,19 +22,19 @@ from app.models.lightning import (
     SendCoinsResponse,
 )
 from app.models.system import APIPlatform
-from app.utils import SSE, lightning_config, redis_get, send_sse_message
+from app.utils import SSE, redis_get, send_sse_message
 
-if lightning_config.ln_node == "lnd_grpc":
+ln_node = config("ln_node")
+if ln_node == "lnd_grpc":
     import app.repositories.ln_impl.lnd_grpc as ln
-elif lightning_config.ln_node == "cln_grpc":
+elif ln_node == "cln_grpc":
     import app.repositories.ln_impl.cln_grpc as ln
-elif lightning_config.ln_node == "cln_unix_socket":
+elif ln_node == "cln_unix_socket":
     import app.repositories.ln_impl.cln_unix_socket as ln
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
 
 _CACHE = {"wallet_balance": None}
-_WALLET_UNLOCK_LISTENERS = []
 
 ENABLE_FWD_NOTIFICATIONS = config(
     "sse_notify_forward_successes", default=False, cast=bool
