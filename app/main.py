@@ -89,8 +89,7 @@ async def on_startup():
 
     loop = asyncio.get_event_loop()
     loop.create_task(_initialize_bitcoin())
-    if node_type != "none":
-        loop.create_task(_initialize_lightning())
+    loop.create_task(_initialize_lightning())
 
     await check_defer_register_handlers()
     handle_local_cookie()
@@ -112,6 +111,13 @@ async def _initialize_bitcoin():
 
 
 async def _initialize_lightning():
+    if node_type == "none":
+        api_startup_status.lightning = StartupState.DISABLED
+        api_startup_status.lightning_msg = ""
+        await send_sse_message(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+        logging.info("Lightning node is disabled, skipping initialization")
+        return
+
     try:
         async for u in initialize_ln_repo():
             changed = False
