@@ -9,6 +9,28 @@ from pydantic.types import conint
 import app.models.lightning_docs as docs
 
 
+class LnInitState(str, Enum):
+    OFFLINE = "offline"
+    BOOTSTRAPPING = "bootstrapping"
+    DONE = "done"
+    LOCKED = "locked"
+
+
+class InitLnRepoUpdate:
+    state: LnInitState
+    msg: Optional[str]
+
+    def __init__(self, state: LnInitState = LnInitState.OFFLINE, msg: str = ""):
+        self.state = state
+        self.msg = msg
+
+    def dict(self) -> dict:
+        return {
+            "state": self.state,
+            "msg": self.msg,
+        }
+
+
 class OnchainAddressType(str, Enum):
     P2WKH = "p2wkh"
     NP2WKH = "np2wkh"

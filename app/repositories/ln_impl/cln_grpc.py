@@ -12,15 +12,18 @@ from fastapi.exceptions import HTTPException
 from starlette import status
 
 import app.repositories.ln_impl.protos.cln.node_pb2 as ln
+import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
 import app.repositories.ln_impl.protos.cln.primitives_pb2 as lnp
 from app.models.lightning import (
     Channel,
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
+    InitLnRepoUpdate,
     Invoice,
     InvoiceState,
     LnInfo,
+    LnInitState,
     NewAddressInput,
     OnchainAddressType,
     OnChainTransaction,
@@ -31,9 +34,23 @@ from app.models.lightning import (
     TxStatus,
     WalletBalance,
 )
-from app.utils import bitcoin_rpc_async
-from app.utils import lightning_config as lncfg
+from app.repositories.bitcoin_utils import bitcoin_rpc_async
 from app.utils import next_push_id
+
+_cln_grpc_cert = bytes.fromhex(config("cln_grpc_cert"))
+_cln_grpc_key = bytes.fromhex(config("cln_grpc_key"))
+_cln_grpc_ca = bytes.fromhex(config("cln_grpc_ca"))
+_cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
+_creds = grpc.ssl_channel_credentials(
+    root_certificates=_cln_grpc_ca,
+    private_key=_cln_grpc_key,
+    certificate_chain=_cln_grpc_cert,
+)
+_opts = (("grpc.ssl_target_name_override", "cln"),)
+_channel = None
+_cln_stub: clnrpc.NodeStub = None
+
+_initialized = False
 
 
 async def _make_local_call(cmd: str):
@@ -54,9 +71,50 @@ def get_implementation_name() -> str:
     return "CLN_GRPC"
 
 
+async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    global _initialized
+    global _channel
+    global _cln_stub
+
+    if _initialized:
+        logging.warning(
+            "CLN gRPC connection already initialized. This function must not be called twice."
+        )
+        yield InitLnRepoUpdate(state=LnInitState.DONE)
+
+    while not _initialized:
+        try:
+            if _channel is None:
+                _channel = grpc.aio.secure_channel(_cln_grpc_url, _creds, options=_opts)
+                _cln_stub = clnrpc.NodeStub(_channel)
+
+            await _cln_stub.Getinfo(ln.GetinfoRequest())
+            _initialized = True
+            yield InitLnRepoUpdate(state=LnInitState.DONE)
+        except grpc.aio._call.AioRpcError as error:
+            details = error.details()
+            logging.debug(f"Waiting for CLN daemon... Details {details}")
+
+            if "failed to connect to all addresses" in details:
+                yield InitLnRepoUpdate(
+                    state=LnInitState.OFFLINE,
+                    msg="Unable to connect to CLN daemon, waiting...",
+                )
+
+                await _channel.close()
+                _channel = _cln_stub = None
+            else:
+                logging.error(f"Unknown error: {details}")
+                raise
+
+            await asyncio.sleep(2)
+
+    logging.info("CLN_GRPC: Initialization complete.")
+
+
 async def get_wallet_balance_impl() -> WalletBalance:
     req = ln.ListfundsRequest()
-    res = await lncfg.cln_stub.ListFunds(req)
+    res = await _cln_stub.ListFunds(req)
     onchain_confirmed = onchain_unconfirmed = onchain_total = 0
 
     for o in res.outputs:
@@ -129,9 +187,9 @@ async def list_all_tx_impl(
     try:
         res = await asyncio.gather(
             *[
-                lncfg.cln_stub.ListInvoices(list_invoice_req),
+                _cln_stub.ListInvoices(list_invoice_req),
                 list_on_chain_tx_impl(),
-                lncfg.cln_stub.ListPays(list_payments_req),
+                _cln_stub.ListPays(list_payments_req),
                 get_ln_info_impl(),
             ]
         )
@@ -194,7 +252,7 @@ async def list_invoices_impl(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
 ) -> List[Invoice]:
     req = ln.ListinvoicesRequest()
-    res = await lncfg.cln_stub.ListInvoices(req)
+    res = await _cln_stub.ListInvoices(req)
 
     tx = []
     for i in res.invoices:
@@ -266,7 +324,7 @@ async def list_payments_impl(
     include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
 ):
     req = ln.ListpaysRequest()
-    res = await lncfg.cln_stub.ListPays(req)
+    res = await _cln_stub.ListPays(req)
 
     pays = []
     for p in res.pays:
@@ -307,7 +365,7 @@ async def add_invoice_impl(
         expiry=expiry,
     )
 
-    res = await lncfg.cln_stub.Invoice(req)
+    res = await _cln_stub.Invoice(req)
 
     return Invoice(
         payment_request=res.bolt11,
@@ -347,7 +405,7 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
 async def get_fee_revenue_impl() -> FeeRevenue:
     # status 1 == "settled"
     req = ln.ListforwardsRequest(status=1)
-    res = await lncfg.cln_stub.ListForwards(req)
+    res = await _cln_stub.ListForwards(req)
 
     day = week = month = year = total = 0
 
@@ -384,11 +442,11 @@ async def get_fee_revenue_impl() -> FeeRevenue:
 async def new_address_impl(input: NewAddressInput) -> str:
     if input.type == OnchainAddressType.P2WKH:
         req = ln.NewaddrRequest(addresstype=2)
-        res = await lncfg.cln_stub.NewAddr(req)
+        res = await _cln_stub.NewAddr(req)
         return res.bech32
 
     req = ln.NewaddrRequest(addresstype=1)
-    res = await lncfg.cln_stub.NewAddr(req)
+    res = await _cln_stub.NewAddr(req)
     return res.p2sh_segwit
 
 
@@ -404,7 +462,7 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
         fee_rate = lnp.Feerate(slow=True)
 
     try:
-        funds = await lncfg.cln_stub.ListFunds(ln.ListfundsRequest())
+        funds = await _cln_stub.ListFunds(ln.ListfundsRequest())
         if len(funds.outputs) == 0:
             raise HTTPException(
                 status.HTTP_412_PRECONDITION_FAILED,
@@ -430,7 +488,7 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
             feerate=fee_rate,
             utxos=utxos,
         )
-        res = await lncfg.cln_stub.Withdraw(req)
+        res = await _cln_stub.Withdraw(req)
         return SendCoinsResponse.from_cln_grpc(res, input)
     except grpc.aio._call.AioRpcError as error:
         details = error.details()
@@ -468,13 +526,13 @@ async def send_payment_impl(
         maxfee=fee_limit,
         retry_for=timeout_seconds,
     )
-    res = await lncfg.cln_stub.Pay(req)
+    res = await _cln_stub.Pay(req)
     return Payment.from_cln_grpc(res)
 
 
 async def get_ln_info_impl() -> LnInfo:
     req = ln.GetinfoRequest()
-    res = await lncfg.cln_stub.Getinfo(req)
+    res = await _cln_stub.Getinfo(req)
     return LnInfo.from_cln_grpc(get_implementation_name(), res)
 
 
@@ -499,7 +557,7 @@ async def listen_invoices() -> AsyncGenerator[Invoice, None]:
 
     while True:
         req = ln.WaitanyinvoiceRequest(lastpay_index=lastpay_index)
-        i = await lncfg.cln_stub.WaitAnyInvoice(req)
+        i = await _cln_stub.WaitAnyInvoice(req)
         i = Invoice.from_cln_grpc(i)
         lastpay_index = i.settle_index
         yield i
@@ -515,10 +573,10 @@ async def listen_forward_events() -> ForwardSuccessEvent:
     # we need to calculate the difference between each iteration
     # status=1 == "settled"
     req = ln.ListforwardsRequest(status=1)
-    res = await lncfg.cln_stub.ListForwards(req)
+    res = await _cln_stub.ListForwards(req)
     num_fwd_last_poll = len(res.forwards)
     while True:
-        res = await lncfg.cln_stub.ListForwards(req)
+        res = await _cln_stub.ListForwards(req)
         if len(res.forwards) > num_fwd_last_poll:
             fwds = res.forwards[num_fwd_last_poll:]
             for fwd in fwds:
@@ -615,7 +673,7 @@ async def channel_list_impl() -> List[Channel]:
     try:
         i = await get_ln_info_impl()
         req = ln.ListchannelsRequest(source=bytes.fromhex(i.identity_pubkey))
-        res = await lncfg.cln_stub.ListChannels(req)
+        res = await _cln_stub.ListChannels(req)
 
         channels = []
         for c in res.channels:
@@ -639,7 +697,7 @@ async def channel_close_impl(channel_id: int, force_close: bool) -> str:
             unilateraltimeout=wait_time_before_unilateral_close,
             feerange=[lnp.Feerate(slow=True), lnp.Feerate(urgent=True)],
         )
-        res = await lncfg.cln_stub.Close(req)
+        res = await _cln_stub.Close(req)
 
         # “mutual”, “unilateral”, “unopened”
         t = res.item_type

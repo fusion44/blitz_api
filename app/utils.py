@@ -2,179 +2,13 @@ import array
 import asyncio
 import json
 import logging
-import os
 import random
 import re
 import time
-from types import coroutine
 from typing import Dict
 
-import aiohttp
-import grpc
-import requests
-from decouple import config
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
-from starlette import status
-
-node_type = config("ln_node")
-if node_type == "lnd_grpc":
-    import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
-    import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
-    import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
-elif node_type == "cln_grpc":
-    import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
-elif node_type == "cln_unix_socket":
-    from pyln.client import LightningRpc
-elif node_type == "" or node_type == "none":
-    logging.info("Running in bitcoin-only mode")
-else:
-    raise ValueError(f"Unknown node type: {node_type}")
-
-from app.models.bitcoind import BlockRpcFunc
-
-
-class BitcoinConfig:
-    def __init__(self) -> None:
-        self.network = config("network")
-        self.zmq_block_rpc = BlockRpcFunc.from_string(config("bitcoind_zmq_block_rpc"))
-
-        if self.network == "testnet":
-            self.ip = config("bitcoind_ip_testnet")
-            self.rpc_port = config("bitcoind_port_rpc_testnet")
-            self.zmq_port = config("bitcoind_zmq_block_port_testnet")
-        else:
-            self.ip = config("bitcoind_ip_mainnet")
-            self.rpc_port = config("bitcoind_port_rpc_mainnet")
-            self.zmq_port = config("bitcoind_zmq_block_port_mainnet")
-
-        self.rpc_url = f"http://{self.ip}:{self.rpc_port}"
-        self.zmq_url = f"tcp://{self.ip}:{self.zmq_port}"
-
-        self.username = config("bitcoind_user")
-        self.pw = config("bitcoind_pw")
-
-
-bitcoin_config = BitcoinConfig()
-
-
-class LightningConfig:
-    def __init__(self) -> None:
-        self.network = config("network")
-        self.ln_node = config("ln_node")
-        self.cln_sock: "LightningRpc" = None
-
-        if self.ln_node == "lnd_grpc":
-            # Due to updated ECDSA generated tls.cert we need to let gprc know that
-            # we need to use that cipher suite otherwise there will be a handshake
-            # error when we communicate with the lnd rpc server.
-            os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
-
-            # Uncomment to see full gRPC logs
-            # os.environ["GRPC_TRACE"] = "all"
-            # os.environ["GRPC_VERBOSITY"] = "DEBUG"
-
-            self.lnd_macaroon = config("lnd_macaroon")
-            self._lnd_cert = bytes.fromhex(config("lnd_cert"))
-            self._lnd_grpc_ip = config("lnd_grpc_ip")
-            self._lnd_grpc_port = config("lnd_grpc_port")
-            self._lnd_rest_port = config("lnd_rest_port")
-            self._lnd_grpc_url = self._lnd_grpc_ip + ":" + self._lnd_grpc_port
-
-            auth_creds = grpc.metadata_call_credentials(self.metadata_callback)
-            ssl_creds = grpc.ssl_channel_credentials(self._lnd_cert)
-            combined_creds = grpc.composite_channel_credentials(ssl_creds, auth_creds)
-
-            self._channel = grpc.aio.secure_channel(self._lnd_grpc_url, combined_creds)
-            self.lnd_stub = lnrpc.LightningStub(self._channel)
-            self.router_stub = routerrpc.RouterStub(self._channel)
-            self.wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
-        elif self.ln_node == "cln_unix_socket":
-            self._cln_socket_path = config("cln_socket_path")
-            self.cln_sock = LightningRpc(self._cln_socket_path)  # type: LightningRpc
-        elif self.ln_node == "cln_grpc":
-            cln_grpc_cert = bytes.fromhex(config("cln_grpc_cert"))
-            cln_grpc_key = bytes.fromhex(config("cln_grpc_key"))
-            cln_grpc_ca = bytes.fromhex(config("cln_grpc_ca"))
-            cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
-            creds = grpc.ssl_channel_credentials(
-                root_certificates=cln_grpc_ca,
-                private_key=cln_grpc_key,
-                certificate_chain=cln_grpc_cert,
-            )
-            opts = (("grpc.ssl_target_name_override", "cln"),)
-            self._channel = grpc.aio.secure_channel(cln_grpc_url, creds, options=opts)
-            self.cln_stub = clnrpc.NodeStub(self._channel)
-        elif self.ln_node == "none" or self.ln_node == "":
-            # its ok to run raspiblitz also without lightning
-            pass
-        else:
-            raise NameError(
-                f'Node type "{self.ln_node}" is unknown. Use "lnd_grpc" or "cln_grpc" or "none"'
-            )
-
-    def metadata_callback(self, context, callback):
-        # for more info see grpc docs
-        callback([("macaroon", self.lnd_macaroon)], None)
-
-
-lightning_config = LightningConfig()
-
-
-def bitcoin_rpc(method: str, params: list = []) -> requests.Response:
-    """Make an RPC request to the Bitcoin daemon
-
-    Connection parameters are read from the .env file.
-
-    Parameters
-    ----------
-    method : str
-        The method to call.
-    params : list, optional
-        Any parameters to include with the call
-    """
-    auth = (bitcoin_config.username, bitcoin_config.pw)
-    headers = {"Content-type": "text/plain"}
-    data = (
-        '{"jsonrpc": "2.0", "method": "'
-        + method
-        + '", "id":"0", "params":'
-        + json.dumps(params)
-        + "}"
-    )
-    return requests.post(bitcoin_config.rpc_url, auth=auth, headers=headers, data=data)
-
-
-async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
-    auth = aiohttp.BasicAuth(bitcoin_config.username, bitcoin_config.pw)
-    headers = {"Content-type": "text/plain"}
-    data = (
-        '{"jsonrpc": "2.0", "method": "'
-        + method
-        + '", "id":"0", "params":'
-        + json.dumps(params)
-        + "}"
-    )
-
-    async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
-        async with session.post(bitcoin_config.rpc_url, data=data) as resp:
-            if resp.status == status.HTTP_200_OK:
-                return await resp.json()
-            elif resp.status == status.HTTP_401_UNAUTHORIZED:
-                return {
-                    "error": "Access denied to Bitcoin Core RPC. Check if username and password is correct",
-                    "status": status.HTTP_403_FORBIDDEN,
-                }
-            elif resp.status == status.HTTP_403_FORBIDDEN:
-                return {
-                    "error": "Access denied to Bitcoin Core RPC. If this is a remote node, check if 'network.rpcallowip=0.0.0.0/0' is set.",
-                    "status": status.HTTP_403_FORBIDDEN,
-                }
-            else:
-                return {
-                    "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
-                    "status": resp.status,
-                }
 
 
 async def send_sse_message(id: str, json_data: Dict):
@@ -213,6 +47,7 @@ class SSE:
     SYSTEM_INFO = "system_info"
     SYSTEM_SHUTDOWN_NOTICE = "system_shutdown_initiated"
     SYSTEM_SHUTDOWN_ERROR = "system_shutdown_error"
+    SYSTEM_STARTUP_INFO = "system_startup_info"
     SYSTEM_REBOOT_NOTICE = "system_reboot_initiated"
     SYSTEM_REBOOT_ERROR = "system_reboot_error"
     HARDWARE_INFO = "hardware_info"
@@ -233,7 +68,6 @@ class SSE:
     LN_FEE_REVENUE = "ln_fee_revenue"
     LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
-    WALLET_LOCK_STATUS = "wallet_lock_status"
 
 
 async def call_script(scriptPath) -> str:

@@ -13,6 +13,7 @@ from app.models.lightning import (
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
+    InitLnRepoUpdate,
     Invoice,
     InvoiceState,
     LnInfo,
@@ -52,6 +53,10 @@ def force_async(fn):
 
 def get_implementation_name() -> str:
     return "CLN_UNIX_SOCKET"
+
+
+async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    return True
 
 
 async def get_wallet_balance_impl():

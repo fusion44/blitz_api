@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import List, Optional
+from typing import AsyncGenerator, List, Optional
 
 from decouple import config
 from fastapi import status
@@ -10,6 +10,7 @@ from app.models.lightning import (
     Channel,
     FeeRevenue,
     GenericTx,
+    InitLnRepoUpdate,
     Invoice,
     LightningInfoLite,
     LnInfo,
@@ -21,19 +22,19 @@ from app.models.lightning import (
     SendCoinsResponse,
 )
 from app.models.system import APIPlatform
-from app.utils import SSE, lightning_config, redis_get, send_sse_message
+from app.utils import SSE, redis_get, send_sse_message
 
-if lightning_config.ln_node == "lnd_grpc":
+ln_node = config("ln_node")
+if ln_node == "lnd_grpc":
     import app.repositories.ln_impl.lnd_grpc as ln
-elif lightning_config.ln_node == "cln_grpc":
+elif ln_node == "cln_grpc":
     import app.repositories.ln_impl.cln_grpc as ln
-elif lightning_config.ln_node == "cln_unix_socket":
+elif ln_node == "cln_unix_socket":
     import app.repositories.ln_impl.cln_unix_socket as ln
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
 
 _CACHE = {"wallet_balance": None}
-_WALLET_UNLOCK_LISTENERS = []
 
 ENABLE_FWD_NOTIFICATIONS = config(
     "sse_notify_forward_successes", default=False, cast=bool
@@ -45,6 +46,11 @@ PLATFORM = config("platform", cast=str)
 
 if FWD_GATHER_INTERVAL < 0.3:
     raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
+
+
+async def initialize_ln_repo() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    async for u in ln.initialize_impl():
+        yield u
 
 
 async def get_ln_info_lite() -> LightningInfoLite:
@@ -157,9 +163,6 @@ async def get_ln_info() -> LnInfo:
 
 async def unlock_wallet(password: str) -> bool:
     res = await ln.unlock_wallet_impl(password)
-    if res:
-        for l in _WALLET_UNLOCK_LISTENERS:
-            await l.put("unlocked")
     return res
 
 
@@ -178,8 +181,10 @@ async def register_lightning_listener():
 
     try:
 
-        if lightning_config.ln_node == "" or lightning_config.ln_node == "none":
-            logging.info("SKIPPING register_lightning_listener -> no lightning configured")
+        if ln_node == "" or ln_node == "none":
+            logging.info(
+                "SKIPPING register_lightning_listener -> no lightning configured"
+            )
             return
 
         await ln.get_ln_info_impl()
@@ -188,26 +193,6 @@ async def register_lightning_listener():
         loop.create_task(_handle_info_listener())
         loop.create_task(_handle_invoice_listener())
         loop.create_task(_handle_forward_event_listener())
-    except HTTPException as r:
-        if r.detail == "failed to connect to all addresses":
-            logging.error(
-                """
-Unable to connect to LND. Possible reasons:
-* Node is not reachable (ports, network down, ...)
-* Macaroon is not correct
-* IP is not included in LND tls certificate
-    Add tlsextraip=192.168.1.xxx to lnd.conf and restart LND.
-    This will recreate the TLS certificate. The .env must be adapted accordingly.
-* TLS certificate is wrong. (settings changed, ...)
-
-To Debug gRPC problems uncomment the following line in app.utils.LightningConfig._init():
-# os.environ["GRPC_VERBOSITY"] = "DEBUG"
-This will show more debug information.
-"""
-            )
-            exit(1)
-        else:
-            raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -289,43 +274,3 @@ def _schedule_wallet_balance_update():
     if not _wallet_balance_update_scheduled:
         loop = asyncio.get_event_loop()
         loop.create_task(_perform_update())
-
-
-def register_wallet_unlock_listener(q: asyncio.Queue):
-    if q not in _WALLET_UNLOCK_LISTENERS:
-        _WALLET_UNLOCK_LISTENERS.append(q)
-
-
-def unregister_wallet_unlock_listener(func):
-    if func in _WALLET_UNLOCK_LISTENERS:
-        _WALLET_UNLOCK_LISTENERS.remove(func)
-
-
-rpc_startup_error_msg = (
-    "RPC server is in the process of starting up, but not yet ready to accept calls"
-)
-
-
-def listen_for_ssh_unlock():
-    async def _do_check_unlock():
-        while True:
-            try:
-                _ = await ln.get_ln_info_impl()
-                for l in _WALLET_UNLOCK_LISTENERS:
-                    await l.put("unlocked")
-                break
-            except HTTPException as r:
-                if r.status_code == 423 or (
-                    r.status_code == 500 and rpc_startup_error_msg in r.detail
-                ):
-                    await asyncio.sleep(3)
-                else:
-                    print(
-                        f"Got {r.status_code} with message {r.detail} while watching for SSH wallet unlock. Stopping ..."
-                    )
-                    raise
-            except NotImplementedError as r:
-                raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
-
-    loop = asyncio.get_event_loop()
-    loop.create_task(_do_check_unlock())
