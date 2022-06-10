@@ -31,3 +31,9 @@ class ApiStartupStatus(BaseModel):
     bitcoin_msg: Optional[str]
     lightning: StartupState
     lightning_msg: Optional[str]
+
+    def is_fully_initialized(self):
+        return self.bitcoin == StartupState.DONE and (
+            self.lightning == StartupState.DONE
+            or self.lightning == StartupState.DISABLED
+        )

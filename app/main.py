@@ -98,46 +98,66 @@ async def on_startup():
 api_startup_status = ApiStartupStatus()
 
 
-async def _initialize_bitcoin():
-    api_startup_status.bitcoin = StartupState.OFFLINE
+async def _set_startup_status(
+    bitcoin: StartupState = None,
+    bitcoin_msg: str = None,
+    lightning: StartupState = None,
+    lightning_msg: str = None,
+):
+    # We must know when both bitcoin and lightning are initialized
+    # to trigger the warmup method for new SSE clients
+    if bitcoin is not None:
+        api_startup_status.bitcoin = bitcoin
+    if bitcoin_msg is not None:
+        api_startup_status.bitcoin_msg = bitcoin_msg
+    if lightning is not None:
+        api_startup_status.lightning = lightning
+    if lightning_msg is not None:
+        api_startup_status.lightning_msg = lightning_msg
     await send_sse_message(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
 
+    if api_startup_status.is_fully_initialized():
+        await warmup_new_connections()
+
+
+async def _initialize_bitcoin():
+    await _set_startup_status(bitcoin=StartupState.OFFLINE)
     await initialize_bitcoin_repo()
     await register_bitcoin_zmq_sub()
     await register_bitcoin_status_gatherer()
-
-    api_startup_status.bitcoin = StartupState.DONE
-    await send_sse_message(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+    await _set_startup_status(bitcoin=StartupState.DONE)
 
 
 async def _initialize_lightning():
     if node_type == "none":
         api_startup_status.lightning = StartupState.DISABLED
         api_startup_status.lightning_msg = ""
-        await send_sse_message(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+        await _set_startup_status(lightning=StartupState.DISABLED)
         logging.info("Lightning node is disabled, skipping initialization")
         return
 
     try:
         async for u in initialize_ln_repo():
+            ln_status = None
+            ln_msg = None
             changed = False
             if (
                 u.state == LnInitState.OFFLINE
                 and api_startup_status.lightning != StartupState.OFFLINE
             ):
-                api_startup_status.lightning = StartupState.OFFLINE
+                ln_status = StartupState.OFFLINE
                 changed = True
             elif (
                 u.state == LnInitState.BOOTSTRAPPING
                 and api_startup_status.lightning != StartupState.BOOTSTRAPPING
             ):
-                api_startup_status.lightning = StartupState.BOOTSTRAPPING
+                ln_status = StartupState.BOOTSTRAPPING
                 changed = True
             elif (
                 u.state == LnInitState.LOCKED
                 and api_startup_status.lightning != StartupState.LOCKED
             ):
-                api_startup_status.lightning = StartupState.LOCKED
+                ln_status = StartupState.LOCKED
                 changed = True
             elif (
                 u.state == LnInitState.DONE
@@ -146,18 +166,17 @@ async def _initialize_lightning():
                 # We've successfully connected to the lightning node
                 # We can now register all lightning listeners
                 await register_lightning_listener()
-                api_startup_status.lightning = StartupState.DONE
-                api_startup_status.lightning_msg = ""
+                ln_status = StartupState.DONE
+                ln_msg = ""
                 changed = True
 
             if api_startup_status.lightning_msg != u.msg:
-                api_startup_status.lightning_msg = u.msg
+                ln_msg = u.msg
                 changed = True
 
             if changed:
-                await send_sse_message(
-                    SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict()
-                )
+                await _set_startup_status(lightning=ln_status, lightning_msg=ln_msg)
+
     except HTTPException as r:
         logging.error(f"Exception {r.detail}.")
         raise
@@ -195,11 +214,7 @@ async def stream(request: Request):
 
     await q.put(_make_evt_data(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict()))
 
-    if (
-        api_startup_status.bitcoin == StartupState.DONE
-        and api_startup_status.lightning == StartupState.DONE
-        and len(new_connections) == 1
-    ):
+    if api_startup_status.is_fully_initialized() and len(new_connections) == 1:
         loop = asyncio.get_event_loop()
         loop.create_task(warmup_new_connections())
 
