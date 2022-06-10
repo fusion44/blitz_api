@@ -180,6 +180,15 @@ async def register_lightning_listener():
     """
 
     try:
+
+        if ln_node == "" or ln_node == "none":
+            logging.info(
+                "SKIPPING register_lightning_listener -> no lightning configured"
+            )
+            return
+
+        await ln.get_ln_info_impl()
+
         loop = asyncio.get_event_loop()
         loop.create_task(_handle_info_listener())
         loop.create_task(_handle_invoice_listener())
