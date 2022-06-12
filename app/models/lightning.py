@@ -1373,7 +1373,9 @@ class LightningInfoLite(BaseModel):
         ..., description="Lightning software implementation (LND, c-lightning)"
     )
     version: str = Query(..., description="Version of the implementation")
-    identity_pubkey: str = Query(..., description="The identity pubkey of the current node")
+    identity_pubkey: str = Query(
+        ..., description="The identity pubkey of the current node"
+    )
     num_pending_channels: int = Query(..., description="Number of pending channels")
     num_active_channels: int = Query(..., description="Number of active channels")
     num_inactive_channels: int = Query(..., description="Number of inactive channels")

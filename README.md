@@ -85,7 +85,7 @@ To test the backend API then call the SwaggerUI: `http://[LOCALIP]/api/v1/docs` 
 ```
 and then copy the JWT Auth string returned to `Authorize` in the top section of the SwaggerUI.
 
-*You can also now test the RaspiBlitz WebUI against the API by running it locally on your dev laptop when you configute it to use the backend AOPI of your RaspiBlitz.*
+*You can also now test the RaspiBlitz WebUI against the API by running it locally on your dev laptop when you configure it to use the backend API of your RaspiBlitz.*
 
 ### Installation
 
@@ -142,7 +142,7 @@ http://127.0.0.1:8000/latest/docs
 ## Useful cURL commands to test the API
 
 ```sh
-curl -N http://127.0.0.1:8000/v1/sse/subscribe
+curl -N http://127.0.0.1:8000/sse/subscribe
 ```
 
 ```sh
