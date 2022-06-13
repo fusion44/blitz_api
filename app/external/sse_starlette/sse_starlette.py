@@ -45,7 +45,6 @@ try:
         """
         Server.handle_exit = original_handler
 
-
 except ModuleNotFoundError as e:
     _log = logging.getLogger(__name__)
     # logging.basicConfig(level=logging.INFO)
