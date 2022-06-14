@@ -39,7 +39,7 @@ from app.repositories.utils import (
     get_full_client_warmup_data,
 )
 from app.routers import apps, bitcoin, lightning, setup, system
-from app.utils import SSE, redis_get, send_sse_message
+from app.utils import SSE, send_sse_message
 
 logging.basicConfig(level=logging.WARNING)
 
