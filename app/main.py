@@ -132,7 +132,7 @@ async def _initialize_bitcoin():
 
 
 async def _initialize_lightning():
-    if node_type == "none":
+    if node_type == "none" or node_type == "":
         api_startup_status.lightning = StartupState.DISABLED
         api_startup_status.lightning_msg = ""
         await _set_startup_status(lightning=StartupState.DISABLED)
@@ -334,14 +334,6 @@ async def check_defer_register_handlers():
         await register_all_handlers(redis_plugin.redis)
     else:
         # Handle Raspiblitz
-        setup_phase = await redis_get("setupPhase")
-
-        while setup_phase != "done":
-            f"Setup not finished. Deferring handler startup. Current phase: '{setup_phase}'"
-            await asyncio.sleep(1)
-            setup_phase = await redis_get("setupPhase")
-            print(f"Setup phase: '{setup_phase}'")
-
         await register_all_handlers(redis_plugin.redis)
 
 

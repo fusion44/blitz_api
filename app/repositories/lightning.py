@@ -29,6 +29,10 @@ if ln_node == "lnd_grpc":
     import app.repositories.ln_impl.lnd_grpc as ln
 elif ln_node == "cln_grpc":
     import app.repositories.ln_impl.cln_grpc as ln
+elif ln_node == "none":
+    logging.info(f"lightning was explicitly turned off")
+elif ln_node == "":
+    logging.info(f"lightning is not set yet")
 else:
     logging.error(f"unknown lightning node: {ln_node}")
 
