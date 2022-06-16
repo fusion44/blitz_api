@@ -277,7 +277,7 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     info = await get_ln_info_impl()
 
     # FIXME(#87): Once Core Lightnings accountability plugin is available
-    src = "/home/admin/.lightning/testnet/lightningd.sqlite3"
+    src = "/home/bitcoin/.lightning/bitcoin/lightningd.sqlite3"
     dest = "/tmp/lightningd.sqlite3"
     shutil.copyfile(src, dest)
 
