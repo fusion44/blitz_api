@@ -39,3 +39,16 @@ async def get_full_client_warmup_data() -> List:
         ]
     )
     return [*res]
+
+async def get_full_client_warmup_data_bitcoinonly() -> List:
+    """Get the full data set needed without Lightning available"""
+
+    res = await asyncio.gather(
+        *[
+            get_system_info(),
+            get_btc_info(),
+            get_app_status(),
+            get_hardware_info(),
+        ]
+    )
+    return [*res]

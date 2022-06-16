@@ -37,6 +37,7 @@ from app.repositories.system import get_hardware_info, register_hardware_info_ga
 from app.repositories.utils import (
     get_bitcoin_client_warmup_data,
     get_full_client_warmup_data,
+    get_full_client_warmup_data_bitcoinonly,
 )
 from app.routers import apps, bitcoin, lightning, setup, system
 from app.utils import SSE, send_sse_message
@@ -245,20 +246,38 @@ async def warmup_new_connections():
     is_ready = api_startup_status.is_fully_initialized()
 
     if is_ready:
-        res = await get_full_client_warmup_data()
-        for c in new_connections:
-            await asyncio.gather(
-                *[
-                    c.put(_make_evt_data(SSE.SYSTEM_INFO, res[0].dict())),
-                    c.put(_make_evt_data(SSE.BTC_INFO, res[1].dict())),
-                    c.put(_make_evt_data(SSE.LN_INFO, res[2].dict())),
-                    c.put(_make_evt_data(SSE.LN_INFO_LITE, res[3].dict())),
-                    c.put(_make_evt_data(SSE.LN_FEE_REVENUE, res[4])),
-                    c.put(_make_evt_data(SSE.WALLET_BALANCE, res[5].dict())),
-                    c.put(_make_evt_data(SSE.INSTALLED_APP_STATUS, res[6])),
-                    c.put(_make_evt_data(SSE.HARDWARE_INFO, res[7])),
-                ]
-            )
+
+        # when lightning is active
+        if node_type != "" and node_type != "none":
+
+            res = await get_full_client_warmup_data()
+            for c in new_connections:
+                await asyncio.gather(
+                    *[
+                        c.put(_make_evt_data(SSE.SYSTEM_INFO, res[0].dict())),
+                        c.put(_make_evt_data(SSE.BTC_INFO, res[1].dict())),
+                        c.put(_make_evt_data(SSE.LN_INFO, res[2].dict())),
+                        c.put(_make_evt_data(SSE.LN_INFO_LITE, res[3].dict())),
+                        c.put(_make_evt_data(SSE.LN_FEE_REVENUE, res[4])),
+                        c.put(_make_evt_data(SSE.WALLET_BALANCE, res[5].dict())),
+                        c.put(_make_evt_data(SSE.INSTALLED_APP_STATUS, res[6])),
+                        c.put(_make_evt_data(SSE.HARDWARE_INFO, res[7])),
+                    ]
+                )
+        
+        # when its bitcoin only
+        else:
+
+            res = await get_full_client_warmup_data_bitcoinonly()
+            for c in new_connections:
+                await asyncio.gather(
+                    *[
+                        c.put(_make_evt_data(SSE.SYSTEM_INFO, res[0].dict())),
+                        c.put(_make_evt_data(SSE.BTC_INFO, res[1].dict())),
+                        c.put(_make_evt_data(SSE.INSTALLED_APP_STATUS, res[2])),
+                        c.put(_make_evt_data(SSE.HARDWARE_INFO, res[3])),
+                    ]
+                )
 
         new_connections.clear()
 

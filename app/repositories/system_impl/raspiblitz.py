@@ -19,13 +19,25 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 
 
 async def get_system_info_impl() -> SystemInfo:
-    lninfo = await get_ln_info()
+
+    lightning = await redis_get("lightning")
+    if lightning=="" or lightning=="none":
+        data_chain = await redis_get("chain")
+        data_chain = f"{data_chain}net"
+        data_alias = await redis_get("hostname")
+        data_color = "#FF9900"
+    else:
+        lninfo = await get_ln_info()
+        data_chain = lninfo.chains[0].network
+        data_alias = lninfo.alias
+        data_color = lninfo.color
+
     lan = await redis_get("internet_localip")
     tor = await redis_get("tor_web_addr")
 
     return SystemInfo(
-        alias=lninfo.alias,
-        color=lninfo.color,
+        alias=data_alias,
+        color=data_color,
         platform=APIPlatform.RASPIBLITZ,
         platform_version=await redis_get("raspiBlitzVersion"),
         api_version=API_VERSION,
@@ -34,7 +46,7 @@ async def get_system_info_impl() -> SystemInfo:
         lan_web_ui=f"http://{lan}/",
         lan_api=f"http://{lan}/api",
         ssh_address=f"admin@{lan}",
-        chain=lninfo.chains[0].network,
+        chain=data_chain,
     )
 
 
