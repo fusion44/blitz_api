@@ -264,7 +264,7 @@ async def warmup_new_connections():
                         c.put(_make_evt_data(SSE.HARDWARE_INFO, res[7])),
                     ]
                 )
-        
+
         # when its bitcoin only
         else:
 
