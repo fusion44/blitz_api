@@ -14,6 +14,7 @@ from app.utils import SSE, call_script, parse_key_value_text, send_sse_message
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
+node_type = config("ln_node")
 
 async def get_app_status_single(app_iD):
 
@@ -105,7 +106,19 @@ async def get_app_status_single(app_iD):
 async def get_app_status():
     appStatusList: Array = []
     for appID in available_app_ids:
+
+        # skip app based on node running
+        if node_type=="" or node_type=="none":
+            if appID=="rtl": continue
+            if appID=="lnbits": continue
+            if appID=="thunderhub": continue
+        elif node_type=="cln_grpc":
+            if appID=="thunderhub": continue
+        #elif node_type="lnd_grpc":
+
+        # get status (installed, etc) and append
         appStatusList.append(await get_app_status_single(appID))
+
     return appStatusList
 
 
