@@ -45,6 +45,7 @@ from app.routers.lightning_docs import (
     open_channel_desc,
     send_coins_desc,
     send_payment_desc,
+    unlock_wallet_desc,
 )
 
 _PREFIX = "lightning"
@@ -450,7 +451,7 @@ async def get_decode_pay_request(
     name=f"{_PREFIX}.unlock-wallet",
     summary="Unlocks a locked wallet.",
     response_model=bool,
-    response_description="True if ok, False otherwise",
+    response_description=unlock_wallet_desc,
     dependencies=[Depends(JWTBearer())],
     responses={
         401: {

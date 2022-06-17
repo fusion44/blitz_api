@@ -66,6 +66,10 @@ def _metadata_callback(context, callback):
     callback([("macaroon", _lnd_macaroon)], None)
 
 
+# Will be used by unlock_wallet_impl() to notify _check_lnd_status()
+# that the wallet was unlocked via API
+_API_WALLET_UNLOCK_EVENT = "api_unlock_event"
+
 _lnd_macaroon = dconfig("lnd_macaroon")
 _lnd_cert = bytes.fromhex(dconfig("lnd_cert"))
 _lnd_grpc_ip = dconfig("lnd_grpc_ip")
@@ -81,77 +85,145 @@ _router_stub = None
 _wallet_unlocker = None
 
 
-def get_implementation_name() -> str:
-    return "LND_GRPC"
-
-
-async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
-    logging.info("LND_GRPC: Initializing...")
-
-    global _initialized
+def _create_stubs() -> None:
     global _channel
     global _lnd_stub
     global _router_stub
     global _wallet_unlocker
 
+    _channel = grpc.aio.secure_channel(_lnd_grpc_url, _combined_creds)
+    _lnd_stub = lnrpc.LightningStub(_channel)
+    _router_stub = routerrpc.RouterStub(_channel)
+    _wallet_unlocker = unlockerrpc.WalletUnlockerStub(_channel)
+
+
+def get_implementation_name() -> str:
+    return "LND_GRPC"
+
+
+init_queue = asyncio.Queue()
+
+
+async def _check_lnd_status(
+    sleep_time: float = 2,
+) -> AsyncGenerator[InitLnRepoUpdate, None]:
+    _lnd_connect_error_debug_msg_sent = False
+
+    # Create a temporary channel which will be destroyed at each iteration
+    # Reason is that gRPC seems to only try and connect every 5 seconds to
+    # the node if it is not running. To avoid the delay we create a new
+    # channel each iteration.
+
+    global _channel
+    global _lnd_stub
+
+    channel = None
+    lnd_stub = None
+    while True:
+        try:
+            if channel is None:
+                if _channel is not None:
+                    channel = _channel
+                    lnd_stub = _lnd_stub
+                else:
+                    channel = grpc.aio.secure_channel(_lnd_grpc_url, _combined_creds)
+                    lnd_stub = lnrpc.LightningStub(channel)
+            await lnd_stub.GetInfo(ln.GetInfoRequest())
+            await init_queue.put(InitLnRepoUpdate(state=LnInitState.DONE))
+        except grpc.aio._call.AioRpcError as error:
+            details = error.details()
+            logging.debug(f"Waiting for LND daemon... Details {details}")
+
+            if "failed to connect to all addresses" in details:
+                await init_queue.put(
+                    InitLnRepoUpdate(
+                        state=LnInitState.OFFLINE,
+                        msg="Unable to connect to LND daemon, waiting...",
+                    )
+                )
+
+                if not _lnd_connect_error_debug_msg_sent:
+                    logging.debug(_lnd_connect_error_debug_msg)
+                    _lnd_connect_error_debug_msg_sent = True
+
+                await channel.close()
+                channel = None
+            elif "waiting to start, RPC services not available" in details:
+                await init_queue.put(
+                    InitLnRepoUpdate(
+                        state=LnInitState.BOOTSTRAPPING,
+                        msg="Connected but waiting to start, RPC services not available",
+                    )
+                )
+                await channel.close()
+                channel = None
+            elif "wallet locked, unlock it to enable full RPC access" in details:
+                await init_queue.put(
+                    InitLnRepoUpdate(
+                        state=LnInitState.LOCKED,
+                        msg="Wallet locked, unlock it to enable full RPC access",
+                    )
+                )
+                if channel != _channel:
+                    await channel.close()
+                    channel = None
+            elif (
+                "the RPC server is in the process of starting up, but not yet ready to accept calls"
+                in details
+            ):
+                # message from LND AFTER unlocking the wallet
+                await init_queue.put(
+                    InitLnRepoUpdate(
+                        state=LnInitState.BOOTSTRAPPING_AFTER_UNLOCK,
+                        msg="The RPC server is in the process of starting up, but not yet ready to accept calls",
+                    )
+                )
+            else:
+                logging.error(f"Unknown error: {details}")
+                raise
+
+            print(f"Waiting {sleep_time} seconds...")
+            await asyncio.sleep(sleep_time)
+
+
+async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    global _initialized
     if _initialized:
         logging.warning(
             "LND gRPC connection already initialized. This function must not be called twice."
         )
         yield InitLnRepoUpdate(state=LnInitState.DONE)
 
-    _lnd_connect_error_debug_msg_sent = False
+    logging.info("LND_GRPC: Unable to connect to LND daemon, waiting...")
+
+    global _channel
+    global _lnd_stub
+    global _router_stub
+    global _wallet_unlocker
+
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(_check_lnd_status(sleep_time=2))
 
     while not _initialized:
-        try:
-            if _channel is None:
-                _channel = grpc.aio.secure_channel(_lnd_grpc_url, _combined_creds)
-                _lnd_stub = lnrpc.LightningStub(_channel)
-                _router_stub = routerrpc.RouterStub(_channel)
-                _wallet_unlocker = unlockerrpc.WalletUnlockerStub(_channel)
+        res = await init_queue.get()  # type: InitLnRepoUpdate
+        if (
+            (res is str and res == _API_WALLET_UNLOCK_EVENT)
+            or res.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+        ) and _channel is None:
+            task.cancel()
 
-            await _lnd_stub.GetInfo(ln.GetInfoRequest())
+            if _channel == None:
+                # if res == _API_WALLET_UNLOCK_EVENT the endpoint function will have
+                # created the channel for us.
+                _create_stubs()
+
+            task = loop.create_task(_check_lnd_status(sleep_time=0.5))
+        elif res.state == LnInitState.DONE:
             _initialized = True
-            yield InitLnRepoUpdate(state=LnInitState.DONE)
-        except grpc.aio._call.AioRpcError as error:
-            details = error.details()
-            logging.debug(f"Waiting for LND daemon... Details {details}")
-            if not _lnd_connect_error_debug_msg_sent:
-                logging.debug(_lnd_connect_error_debug_msg)
-                _lnd_connect_error_debug_msg_sent = True
+            if not task.cancelled():
+                task.cancel()
 
-            if "failed to connect to all addresses" in details:
-                yield InitLnRepoUpdate(
-                    state=LnInitState.OFFLINE,
-                    msg="Unable to connect to LND daemon, waiting...",
-                )
-
-                await _channel.close()
-                _channel = _lnd_stub = _router_stub = _wallet_unlocker = None
-            elif "waiting to start, RPC services not available" in details:
-                yield InitLnRepoUpdate(
-                    state=LnInitState.BOOTSTRAPPING,
-                    msg="Connected but waiting to start, RPC services not available",
-                )
-            elif "wallet locked, unlock it to enable full RPC access" in details:
-                yield InitLnRepoUpdate(
-                    state=LnInitState.LOCKED,
-                    msg="Wallet locked, unlock it to enable full RPC access",
-                )
-            elif (
-                "the RPC server is in the process of starting up, but not yet ready to accept calls"
-                in details
-            ):
-                # message from LND AFTER unlocking the wallet
-                yield InitLnRepoUpdate(
-                    state=LnInitState.BOOTSTRAPPING,
-                    msg="The RPC server is in the process of starting up, but not yet ready to accept calls",
-                )
-            else:
-                logging.error(f"Unknown error: {details}")
-                raise
-
-            await asyncio.sleep(2)
+        yield res
 
     logging.info("LND_GRPC: Initialization complete.")
 
@@ -458,6 +530,11 @@ async def send_payment_impl(
 
 
 async def get_ln_info_impl() -> LnInfo:
+    if not _initialized:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, detail="LND not fully initialized"
+        )
+
     try:
         req = ln.GetInfoRequest()
         response = await _lnd_stub.GetInfo(req)
@@ -469,10 +546,40 @@ async def get_ln_info_impl() -> LnInfo:
         )
 
 
+async def _wait_wallet_fully_ready():
+    # This must only be called after unlocking the wallet.
+
+    while True:
+        try:
+            await _lnd_stub.GetInfo(ln.GetInfoRequest())
+        except grpc.aio._call.AioRpcError as error:
+            details = error.details()
+            if (
+                "the RPC server is in the process of starting up, but not yet ready to accept calls"
+                in details
+            ):
+                # message from LND AFTER unlocking the wallet
+                await init_queue.put(
+                    InitLnRepoUpdate(
+                        state=LnInitState.BOOTSTRAPPING_AFTER_UNLOCK,
+                        msg="The RPC server is in the process of starting up, but not yet ready to accept calls",
+                    )
+                )
+                await asyncio.sleep(0.1)
+            else:
+                logging.error(f"Unknown error: {details}")
+                raise
+
+
 async def unlock_wallet_impl(password: str) -> bool:
     try:
+        if _channel is None:
+            _create_stubs()
+
         req = unlocker.UnlockWalletRequest(wallet_password=bytes(password, "utf-8"))
         await _wallet_unlocker.UnlockWallet(req)
+        await _wait_wallet_fully_ready()
+        await init_queue.put(_API_WALLET_UNLOCK_EVENT)
         return True
     except grpc.aio._call.AioRpcError as error:
         if error.details().find("invalid passphrase") > -1:

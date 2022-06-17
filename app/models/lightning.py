@@ -12,6 +12,7 @@ import app.models.lightning_docs as docs
 class LnInitState(str, Enum):
     OFFLINE = "offline"
     BOOTSTRAPPING = "bootstrapping"
+    BOOTSTRAPPING_AFTER_UNLOCK = "bootstrapping_after_unlock"
     DONE = "done"
     LOCKED = "locked"
 

@@ -55,3 +55,16 @@ __target_conf__: The target number of blocks that the funding transaction should
 
 > 👉 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)
 """
+
+unlock_wallet_desc = """
+`True` if ok, `False` otherwise
+
+### LND:
+This call will wait until the LND daemon is fully ready to accept calls. Internally it'll call GetInfo every
+0.1 seconds and returns True for the first successful call.
+
+> ℹ️ _After the unlock the LND-gRPC server takes a bit of time to boot up._
+
+### Core Lightning:
+Core Lightning doesn't support wallet locking and will return True immediately.
+"""
