@@ -16,6 +16,7 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 
 node_type = config("ln_node")
 
+
 async def get_app_status_single(app_iD):
 
     if app_iD not in available_app_ids:
@@ -108,13 +109,17 @@ async def get_app_status():
     for appID in available_app_ids:
 
         # skip app based on node running
-        if node_type=="" or node_type=="none":
-            if appID=="rtl": continue
-            if appID=="lnbits": continue
-            if appID=="thunderhub": continue
-        elif node_type=="cln_grpc":
-            if appID=="thunderhub": continue
-        #elif node_type="lnd_grpc":
+        if node_type == "" or node_type == "none":
+            if appID == "rtl":
+                continue
+            if appID == "lnbits":
+                continue
+            if appID == "thunderhub":
+                continue
+        elif node_type == "cln_grpc":
+            if appID == "thunderhub":
+                continue
+        # elif node_type="lnd_grpc":
 
         # get status (installed, etc) and append
         appStatusList.append(await get_app_status_single(appID))

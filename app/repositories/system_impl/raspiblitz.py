@@ -21,7 +21,7 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 async def get_system_info_impl() -> SystemInfo:
 
     lightning = await redis_get("lightning")
-    if lightning=="" or lightning=="none":
+    if lightning == "" or lightning == "none":
         data_chain = await redis_get("chain")
         data_chain = f"{data_chain}net"
         data_alias = await redis_get("hostname")
