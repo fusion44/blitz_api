@@ -71,7 +71,7 @@ class SSE:
 
 
 async def call_script(scriptPath) -> str:
-    cmd = f"bash {scriptPath}"
+    cmd = f"sudo bash {scriptPath}"
     proc = await asyncio.create_subprocess_shell(
         cmd,
         stdout=asyncio.subprocess.PIPE,
