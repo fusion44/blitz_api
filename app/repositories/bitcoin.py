@@ -39,10 +39,13 @@ async def initialize_bitcoin_repo() -> bool:
         except client_exceptions.ClientConnectorError:
             logging.debug("Unable to connect to Bitcoin Core, waiting...")
             await asyncio.sleep(2)
-        except HTTPException:
-            logging.debug(
-                "Connected to Bitcoin Core but it seems to be initializing, waiting..."
-            )
+        except HTTPException as e:
+            if e.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
+                logging.error(e.detail)
+            else:
+                logging.debug(
+                    f"Connected to Bitcoin Core but it seems to be initializing, waiting... \n{e.detail}"
+                )
 
             await asyncio.sleep(2)
 

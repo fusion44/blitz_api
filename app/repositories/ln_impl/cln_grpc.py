@@ -72,13 +72,15 @@ def get_implementation_name() -> str:
 
 
 async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    logging.debug("CLN_GRPC: Unable to connect to CLN daemon, waiting...")
+
     global _initialized
     global _channel
     global _cln_stub
 
     if _initialized:
         logging.warning(
-            "CLN gRPC connection already initialized. This function must not be called twice."
+            "CLN_GRPC: Connection already initialized. This function must not be called twice."
         )
         yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -93,7 +95,7 @@ async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
             yield InitLnRepoUpdate(state=LnInitState.DONE)
         except grpc.aio._call.AioRpcError as error:
             details = error.details()
-            logging.debug(f"Waiting for CLN daemon... Details {details}")
+            logging.debug(f"CLN_GRPC: Waiting for CLN daemon... Details {details}")
 
             if "failed to connect to all addresses" in details:
                 yield InitLnRepoUpdate(
@@ -104,7 +106,7 @@ async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
                 await _channel.close()
                 _channel = _cln_stub = None
             else:
-                logging.error(f"Unknown error: {details}")
+                logging.error(f"CLN_GRPC: Unknown error: {details}")
                 raise
 
             await asyncio.sleep(2)
@@ -113,6 +115,8 @@ async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
 
 
 async def get_wallet_balance_impl() -> WalletBalance:
+    logging.debug("CLN_GRPC: get_wallet_balance_impl() ")
+
     req = ln.ListfundsRequest()
     res = await _cln_stub.ListFunds(req)
     onchain_confirmed = onchain_unconfirmed = onchain_total = 0
@@ -160,6 +164,8 @@ block_cache = {}
 
 
 async def _get_block_time(block_height: int) -> tuple:
+    logging.debug(f"CLN_GRPC: _get_block_time(block_height={block_height}) ")
+
     if block_height is None or block_height < 0:
         raise ValueError("block_height cannot be None or negative")
 
@@ -181,6 +187,10 @@ memo_cache = {}
 async def list_all_tx_impl(
     successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
+    logging.debug(
+        f"CLN_GRPC: list_all_tx_impl(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+    )
+
     list_invoice_req = ln.ListinvoicesRequest()
     list_payments_req = ln.ListpaysRequest()
 
@@ -251,6 +261,8 @@ async def list_all_tx_impl(
 async def list_invoices_impl(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
 ) -> List[Invoice]:
+    logging.debug("CLN_GRPC: list_invoices_impl() ")
+
     req = ln.ListinvoicesRequest()
     res = await _cln_stub.ListInvoices(req)
 
@@ -272,6 +284,8 @@ async def list_invoices_impl(
 
 
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
+    logging.debug("CLN_GRPC: list_on_chain_tx_impl() ")
+
     # Make a temporary copy of the file to avoid locking the db.
     # CLN might want to write while we read.
     info = await get_ln_info_impl()
@@ -323,6 +337,10 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
 async def list_payments_impl(
     include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
 ):
+    logging.debug(
+        f"CLN_GRPC: list_payments_impl(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
+    )
+
     req = ln.ListpaysRequest()
     res = await _cln_stub.ListPays(req)
 
@@ -348,6 +366,10 @@ async def list_payments_impl(
 async def add_invoice_impl(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
+    logging.debug(
+        f"CLN_GRPC: add_invoice_impl(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
+    )
+
     if value_msat < 0:
         raise ValueError("value_msat cannot be negative")
 
@@ -378,6 +400,8 @@ async def add_invoice_impl(
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
+    logging.debug(f"CLN_GRPC: decode_pay_request_impl(pay_req={pay_req})")
+
     res = await _make_local_call(f"decodepay bolt11={pay_req}")
 
     if not res:
@@ -403,6 +427,8 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
 
 
 async def get_fee_revenue_impl() -> FeeRevenue:
+    logging.debug(f"CLN_GRPC: get_fee_revenue_impl()")
+
     # status 1 == "settled"
     req = ln.ListforwardsRequest(status=1)
     res = await _cln_stub.ListForwards(req)
@@ -440,6 +466,8 @@ async def get_fee_revenue_impl() -> FeeRevenue:
 
 
 async def new_address_impl(input: NewAddressInput) -> str:
+    logging.debug(f"CLN_GRPC: new_address_impl(input={input})")
+
     if input.type == OnchainAddressType.P2WKH:
         req = ln.NewaddrRequest(addresstype=2)
         res = await _cln_stub.NewAddr(req)
@@ -451,6 +479,8 @@ async def new_address_impl(input: NewAddressInput) -> str:
 
 
 async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
+    logging.debug(f"CLN_GRPC: send_coins_impl(input={input})")
+
     fee_rate: lnp.Feerate = None
     if input.sat_per_vbyte != None and input.sat_per_vbyte > 0:
         fee_rate = lnp.Feerate(perkw=input.sat_per_vbyte)
@@ -518,6 +548,10 @@ async def send_payment_impl(
     fee_limit_msat: int,
     amount_msat: Optional[int] = None,
 ) -> Payment:
+    logging.debug(
+        f"CLN_GRPC: send_payment_impl(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
+    )
+
     amt = lnp.Amount(msat=amount_msat)
     fee_limit = lnp.Amount(msat=fee_limit_msat)
     req = ln.PayRequest(
@@ -531,18 +565,24 @@ async def send_payment_impl(
 
 
 async def get_ln_info_impl() -> LnInfo:
+    logging.debug(f"CLN_GRPC: get_ln_info_impl()")
+
     req = ln.GetinfoRequest()
     res = await _cln_stub.Getinfo(req)
     return LnInfo.from_cln_grpc(get_implementation_name(), res)
 
 
 async def unlock_wallet_impl(password: str) -> bool:
+    logging.debug(f"CLN_GRPC: unlock_wallet_impl(password=wedontlogpasswords)")
+
     # Core Lightning doesn't lock wallets,
     # so we don't need to do anything here
     return True
 
 
 async def listen_invoices() -> AsyncGenerator[Invoice, None]:
+    logging.debug(f"CLN_GRPC: listen_invoices()")
+
     lastpay_index = 0
     invoices = await list_invoices_impl(
         pending_only=False,
@@ -564,6 +604,8 @@ async def listen_invoices() -> AsyncGenerator[Invoice, None]:
 
 
 async def listen_forward_events() -> ForwardSuccessEvent:
+    logging.debug(f"CLN_GRPC: listen_forward_events()")
+
     # CLN has no subscription to forwarded events.
     # We must poll instead.
 
@@ -587,6 +629,8 @@ async def listen_forward_events() -> ForwardSuccessEvent:
 
 
 async def connect_peer_impl(node_URI: str) -> bool:
+    logging.debug(f"CLN_GRPC: peer_resolve_alias(node_URI={node_URI})")
+
     try:
         id = node_URI.split("@")[0]
         stdout, stderr = await _make_local_call(f"connect id={node_URI}")
@@ -604,7 +648,7 @@ async def connect_peer_impl(node_URI: str) -> bool:
                     detail="Connection establishment: Connection refused.",
                 )
         if stderr:
-            logging.error(stderr.decode())
+            logging.error(f"CLN_GRPC: {stderr.decode()}")
 
         return False
 
@@ -617,6 +661,10 @@ async def connect_peer_impl(node_URI: str) -> bool:
 async def channel_open_impl(
     local_funding_amount: int, node_URI: str, target_confs: int
 ) -> str:
+    logging.debug(
+        f"CLN_GRPC: channel_open_impl(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
+    )
+
     fee_rate = None
     if target_confs == 1:
         fee_rate = "urgent"
@@ -660,7 +708,7 @@ async def channel_open_impl(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=j["message"]
             )
         if stderr:
-            logging.error(stderr.decode())
+            logging.error(f"CLN_GRPC: {stderr.decode()}")
 
         return False
     except grpc.aio._call.AioRpcError as error:
@@ -670,6 +718,8 @@ async def channel_open_impl(
 
 
 async def channel_list_impl() -> List[Channel]:
+    logging.debug(f"CLN_GRPC: channel_list_impl()")
+
     try:
         i = await get_ln_info_impl()
         req = ln.ListchannelsRequest(source=bytes.fromhex(i.identity_pubkey))
@@ -688,6 +738,10 @@ async def channel_list_impl() -> List[Channel]:
 
 
 async def channel_close_impl(channel_id: int, force_close: bool) -> str:
+    logging.debug(
+        f"CLN_GRPC: channel_close_impl(channel_id={channel_id}, force_close={force_close})"
+    )
+
     try:
         # on CLN we wait for 2 minutes to negotiate a channel close
         # if peer doesn't respond we force close

@@ -36,7 +36,7 @@ from app.models.lightning import (
 from app.utils import SSE, send_sse_message
 
 _lnd_connect_error_debug_msg = """
-Unable to connect to LND. Possible reasons:
+LND_GRPC: Unable to connect to LND. Possible reasons:
 * Node is not reachable (ports, network down, ...)
 * Macaroon is not correct
 * IP is not included in LND tls certificate
@@ -91,10 +91,16 @@ def _create_stubs() -> None:
     global _router_stub
     global _wallet_unlocker
 
+    if _channel is not None:
+        logging.warning("LND_GRPC: gRPC channel already created.")
+        return
+
     _channel = grpc.aio.secure_channel(_lnd_grpc_url, _combined_creds)
     _lnd_stub = lnrpc.LightningStub(_channel)
     _router_stub = routerrpc.RouterStub(_channel)
     _wallet_unlocker = unlockerrpc.WalletUnlockerStub(_channel)
+
+    logging.debug("LND_GRPC: Created LND gRPC stubs")
 
 
 def get_implementation_name() -> str:
@@ -107,6 +113,8 @@ init_queue = asyncio.Queue()
 async def _check_lnd_status(
     sleep_time: float = 2,
 ) -> AsyncGenerator[InitLnRepoUpdate, None]:
+    logging.debug("LND_GRPC: _check_lnd_status() start")
+
     _lnd_connect_error_debug_msg_sent = False
 
     # Create a temporary channel which will be destroyed at each iteration
@@ -137,7 +145,7 @@ async def _check_lnd_status(
             break
         except grpc.aio._call.AioRpcError as error:
             details = error.details()
-            logging.debug(f"Waiting for LND daemon... Details {details}")
+            logging.debug(f"LND_GRPC: Waiting for LND daemon... Details {details}")
 
             if "failed to connect to all addresses" in details:
                 await init_queue.put(
@@ -184,18 +192,23 @@ async def _check_lnd_status(
                     )
                 )
             else:
-                logging.error(f"Unknown error: {details}")
+                logging.error(f"LND_GRPC: Unknown error: {details}")
                 raise
 
-            print(f"Waiting {sleep_time} seconds...")
+            logging.debug(
+                f"LND_GRPC: _check_lnd_status() sleeping {sleep_time} seconds..."
+            )
             await asyncio.sleep(sleep_time)
+
+    logging.debug("LND_GRPC: _check_lnd_status() done")
 
 
 async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
+    logging.debug("LND_GRPC: Unable to connect to LND daemon, waiting...")
     global _initialized
     if _initialized:
         logging.warning(
-            "LND gRPC connection already initialized. This function must not be called twice."
+            "LND_GRPC: Connection already initialized. This function must not be called twice."
         )
         yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -234,6 +247,8 @@ async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
 
 
 async def get_wallet_balance_impl() -> WalletBalance:
+    logging.debug("LND_GRPC: get_wallet_balance_impl() ")
+
     try:
         w_req = ln.WalletBalanceRequest()
         onchain = await _lnd_stub.WalletBalance(w_req)
@@ -257,6 +272,10 @@ memo_cache = {}
 async def list_all_tx_impl(
     successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
+    logging.debug(
+        f"LND_GRPC: list_all_tx_impl(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+    )
+
     # TODO: find a better caching strategy
     list_invoice_req = ln.ListInvoiceRequest(
         pending_only=successful_only,
@@ -325,6 +344,8 @@ async def list_all_tx_impl(
 async def list_invoices_impl(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
 ):
+    logging.debug("LND_GRPC: list_invoices_impl() ")
+
     try:
         req = ln.ListInvoiceRequest(
             pending_only=pending_only,
@@ -342,6 +363,8 @@ async def list_invoices_impl(
 
 
 async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
+    logging.debug("LND_GRPC: list_on_chain_tx_impl() ")
+
     try:
         req = ln.GetTransactionsRequest()
         response = await _lnd_stub.GetTransactions(req)
@@ -356,6 +379,10 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
 async def list_payments_impl(
     include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
 ):
+    logging.debug(
+        f"LND_GRPC: list_payments_impl(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
+    )
+
     try:
         req = ln.ListPaymentsRequest(
             include_incomplete=include_incomplete,
@@ -375,6 +402,10 @@ async def list_payments_impl(
 async def add_invoice_impl(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
+    logging.debug(
+        f"LND_GRPC: add_invoice_impl(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
+    )
+
     try:
         i = ln.Invoice(
             memo=memo,
@@ -407,6 +438,8 @@ async def add_invoice_impl(
 
 
 async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
+    logging.debug(f"LND_GRPC: decode_pay_request_impl(pay_req={pay_req})")
+
     try:
         req = ln.PayReqString(pay_req=pay_req)
         res = await _lnd_stub.DecodePayReq(req)
@@ -424,12 +457,16 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
 
 
 async def get_fee_revenue_impl() -> FeeRevenue:
+    logging.debug(f"LND_GRPC: get_fee_revenue_impl()")
+
     req = ln.FeeReportRequest()
     res = await _lnd_stub.FeeReport(req)
     return FeeRevenue.from_lnd_grpc(res)
 
 
 async def new_address_impl(input: NewAddressInput) -> str:
+    logging.debug(f"LND_GRPC: new_address_impl(input={input})")
+
     t = 1 if input.type == OnchainAddressType.NP2WKH else 2
     try:
         req = ln.NewAddressRequest(type=t)
@@ -443,6 +480,8 @@ async def new_address_impl(input: NewAddressInput) -> str:
 
 
 async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
+    logging.debug(f"LND_GRPC: send_coins_impl(input={input})")
+
     try:
         r = ln.SendCoinsRequest(
             addr=input.address,
@@ -477,6 +516,10 @@ async def send_payment_impl(
     fee_limit_msat: int,
     amount_msat: Optional[int] = None,
 ) -> Payment:
+    logging.debug(
+        f"LND_GRPC: send_payment_impl(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
+    )
+
     try:
         r = router.SendPaymentRequest(
             payment_request=pay_req,
@@ -498,6 +541,14 @@ async def send_payment_impl(
         ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
+            )
+        elif (
+            error.details() != None
+            and error.details().find("OPENSSL_internal:CERTIFICATE_VERIFY_FAILED.") > -1
+        ):
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid LND credentials. SSL certificate verify failed.",
             )
         elif (
             error.details() != None
@@ -535,6 +586,8 @@ async def send_payment_impl(
 
 
 async def get_ln_info_impl() -> LnInfo:
+    logging.debug(f"LND_GRPC: get_ln_info_impl()")
+
     if not _initialized:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, detail="LND not fully initialized"
@@ -552,6 +605,8 @@ async def get_ln_info_impl() -> LnInfo:
 
 
 async def _wait_wallet_fully_ready():
+    logging.debug(f"LND_GRPC: _wait_wallet_fully_ready()")
+
     # This must only be called after unlocking the wallet.
 
     while True:
@@ -578,11 +633,13 @@ async def _wait_wallet_fully_ready():
                 )
                 await asyncio.sleep(0.1)
             else:
-                logging.error(f"Unknown error: {details}")
+                logging.error(f"LND_GRPC: Unknown error: {details}")
                 raise
 
 
 async def unlock_wallet_impl(password: str) -> bool:
+    logging.debug(f"LND_GRPC: unlock_wallet_impl(password=wedontlogpasswords)")
+
     try:
         if _channel is None:
             _create_stubs()
@@ -606,6 +663,8 @@ async def unlock_wallet_impl(password: str) -> bool:
 
 
 async def listen_invoices() -> Invoice:
+    logging.debug(f"LND_GRPC: listen_invoices()")
+
     request = ln.InvoiceSubscription()
     try:
         async for r in _lnd_stub.SubscribeInvoices(request):
@@ -618,6 +677,8 @@ async def listen_invoices() -> Invoice:
 
 
 async def listen_forward_events() -> ForwardSuccessEvent:
+    logging.debug(f"LND_GRPC: listen_forward_events()")
+
     request = router.SubscribeHtlcEventsRequest()
     try:
         _fwd_cache = {}
@@ -656,6 +717,8 @@ async def listen_forward_events() -> ForwardSuccessEvent:
 
 
 def _check_if_locked(error):
+    logging.debug(f"LND_GRPC: _check_if_locked()")
+
     if error.details() != None and error.details().find("wallet locked") > -1:
         raise HTTPException(
             status.HTTP_423_LOCKED,
@@ -666,6 +729,9 @@ def _check_if_locked(error):
 async def channel_open_impl(
     local_funding_amount: int, node_URI: str, target_confs: int
 ) -> str:
+    logging.debug(
+        f"LND_GRPC: channel_open_impl(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
+    )
 
     try:
 
@@ -708,6 +774,7 @@ async def channel_open_impl(
 
 
 async def peer_resolve_alias(node_pub: str) -> str:
+    logging.debug(f"LND_GRPC: peer_resolve_alias(node_pub={node_pub})")
 
     # get fresh list of peers and their aliases
     try:
@@ -723,6 +790,7 @@ async def peer_resolve_alias(node_pub: str) -> str:
 
 
 async def channel_list_impl() -> List[Channel]:
+    logging.debug(f"LND_GRPC: channel_list_impl()")
 
     try:
 
@@ -751,6 +819,9 @@ async def channel_list_impl() -> List[Channel]:
 
 
 async def channel_close_impl(channel_id: int, force_close: bool) -> str:
+    logging.debug(
+        f"LND_GRPC: channel_close_impl(channel_id={channel_id}, force_close={force_close})"
+    )
 
     if not ":" in channel_id:
         raise ValueError("channel_id must contain : for lnd")
