@@ -129,7 +129,12 @@ async def _check_lnd_status(
                     channel = grpc.aio.secure_channel(_lnd_grpc_url, _combined_creds)
                     lnd_stub = lnrpc.LightningStub(channel)
             await lnd_stub.GetInfo(ln.GetInfoRequest())
+
+            if _channel is None:
+                _create_stubs()
+
             await init_queue.put(InitLnRepoUpdate(state=LnInitState.DONE))
+            break
         except grpc.aio._call.AioRpcError as error:
             details = error.details()
             logging.debug(f"Waiting for LND daemon... Details {details}")
@@ -551,7 +556,13 @@ async def _wait_wallet_fully_ready():
 
     while True:
         try:
-            await _lnd_stub.GetInfo(ln.GetInfoRequest())
+            info = await _lnd_stub.GetInfo(ln.GetInfoRequest())
+
+            if info != None:
+                logging.debug(
+                    f"LND_GRPC: _wait_wallet_fully_ready() breaking out of loop"
+                )
+                break
         except grpc.aio._call.AioRpcError as error:
             details = error.details()
             if (
