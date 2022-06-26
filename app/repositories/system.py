@@ -6,7 +6,13 @@ from decouple import config
 from fastapi import HTTPException, Request, status
 
 from app.models.system import APIPlatform, ConnectionInfo, RawDebugLogData, SystemInfo
-from app.utils import SSE, call_script, call_sudo_script, parse_key_value_text, send_sse_message
+from app.utils import (
+    SSE,
+    call_script,
+    call_sudo_script,
+    parse_key_value_text,
+    send_sse_message,
+)
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
