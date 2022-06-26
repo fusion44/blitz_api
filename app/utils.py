@@ -85,6 +85,21 @@ async def call_script(scriptPath) -> str:
     return ""
 
 
+async def call_sudo_script(scriptPath) -> str:
+    cmd = f"sudo bash {scriptPath}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return stdout.decode()
+    if stderr:
+        logging.error(stderr.decode())
+    return ""
+
+
 def parse_key_value_lines(lines: list) -> dict:
     Dict = {}
     for line in lines:

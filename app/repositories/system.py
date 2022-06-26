@@ -6,7 +6,13 @@ from decouple import config
 from fastapi import HTTPException, Request, status
 
 from app.models.system import APIPlatform, ConnectionInfo, RawDebugLogData, SystemInfo
-from app.utils import SSE, call_script, parse_key_value_text, send_sse_message
+from app.utils import (
+    SSE,
+    call_script,
+    call_sudo_script,
+    parse_key_value_text,
+    send_sse_message,
+)
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
@@ -99,7 +105,7 @@ async def password_change(type: str, old_password: str, new_password: str):
         if type == "c":
             # will set password c of both lnd & core lightning if installed/activated
             script_call = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'
-        result = await call_script(script_call)
+        result = await call_sudo_script(script_call)
         data = parse_key_value_text(result)
         print(str(data))
         if "error" in data.keys() and len(data["error"]) > 0:

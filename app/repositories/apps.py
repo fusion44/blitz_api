@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 
 from app.constants import available_app_ids
-from app.utils import SSE, call_script, parse_key_value_text, send_sse_message
+from app.utils import SSE, call_sudo_script, parse_key_value_text, send_sse_message
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -30,7 +30,7 @@ async def get_app_status_single(app_iD):
     )
 
     try:
-        result = await call_script(script_call)
+        result = await call_sudo_script(script_call)
     except:
         # script had error or was not able to deliver all requested data fields
         logging.warning(f"error on calling: {script_call}")
