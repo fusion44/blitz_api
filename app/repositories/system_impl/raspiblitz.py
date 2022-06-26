@@ -134,7 +134,7 @@ async def get_connection_info_impl() -> ConnectionInfo:
     data_cl_rest_macaroon = ""
     data_cl_rest_onion = ""
     if lightning == "cl":
-        key_value_text = await call_script(
+        key_value_text = await call_sudo_script(
             "/home/admin/config.scripts/cl.rest.sh connect mainnet key-value"
         )
         key_value = parse_key_value_text(key_value_text)
