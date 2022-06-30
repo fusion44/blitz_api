@@ -40,7 +40,7 @@ if [ "$?" != "0" ]; then
 fi
 
 local=.
-remoteRepoPath="/root/blitz_api"
+remoteRepoPath="/home/blitzapi/blitz_api"
 remote="admin@$localIP:${remoteRepoPath}"
 
 # clean pycache just in case the code was compiled locally before
