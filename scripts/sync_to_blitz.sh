@@ -78,6 +78,9 @@ if [ "$result" != "0" ]; then
     exit 1
 fi
 
+# make sure uploaded/synced files belog again to the correct raspiblitz user to run
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP "sudo chown -R blitzapi:blitzapi ${remoteRepoPath}"
+
 # Restart the blitz service to activate changes
 echo "# restarting blitzapi.service"
 sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo systemctl restart blitzapi.service'
