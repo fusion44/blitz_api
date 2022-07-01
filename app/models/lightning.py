@@ -1472,6 +1472,9 @@ class PaymentRequest(BaseModel):
     payment_addr: str = Query("", description="The payment address in hex format")
     num_msat: Optional[int]
     features: List[FeaturesEntry] = Query([])
+    currency: Optional[str] = Query(
+        "", description="Optional requested currency of the payment. "
+    )
 
     @classmethod
     def from_lnd_grpc(cls, r):
@@ -1511,6 +1514,7 @@ class PaymentRequest(BaseModel):
         #     ]
 
         return cls(
+            currency="" if "currency" not in r else r["currency"],
             destination=r["payee"],
             payment_hash=r["payment_hash"],
             num_satoshis=msat / 1000,
