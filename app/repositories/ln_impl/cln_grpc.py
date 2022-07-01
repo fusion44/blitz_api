@@ -222,12 +222,14 @@ async def list_all_tx_impl(
         for pay in res[2].pays:
             comment = ""
 
-            if pay.bolt11 in memo_cache:
-                comment = memo_cache[pay.bolt11]
-            else:
-                pr = await decode_pay_request_impl(pay.bolt11)
-                comment = pr.description
-                memo_cache[pay.bolt11] = pr.description
+            if pay.bolt11 is not None and len(pay.bolt11) > 0:
+                if pay.bolt11 in memo_cache:
+                    comment = memo_cache[pay.bolt11]
+                else:
+                    pr = await decode_pay_request_impl(pay.bolt11)
+                    comment = pr.description
+                    memo_cache[pay.bolt11] = pr.description
+
             p = GenericTx.from_cln_grpc_payment(pay, comment)
 
             if successful_only and p.status == TxStatus.SUCCEEDED:
