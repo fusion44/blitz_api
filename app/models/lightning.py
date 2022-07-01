@@ -1105,11 +1105,11 @@ class Payment(BaseModel):
             payment_hash=p.payment_hash.hex(),
             payment_preimage="",  # CLN currently doesn't return the preimage
             value_msat=p.amount_sent_msat.msat,
-            payment_request=p.bolt11,
+            payment_request="" if not hasattr(p, "bolt11") else p.bolt11,
             status=PaymentStatus.from_cln_grpc(p.status),
             fee_msat=p.amount_sent_msat.msat - p.amount_msat.msat,
             creation_time_ns=p.created_at,
-            label=p.label,
+            label="" if not hasattr(p, "label") else p.label,
             failure_reason=PaymentFailureReason.from_cln_grpc(p),
         )
 
