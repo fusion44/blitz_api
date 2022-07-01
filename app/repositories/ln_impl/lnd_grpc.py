@@ -66,10 +66,6 @@ def _metadata_callback(context, callback):
     callback([("macaroon", _lnd_macaroon)], None)
 
 
-# Will be used by unlock_wallet_impl() to notify _check_lnd_status()
-# that the wallet was unlocked via API
-_API_WALLET_UNLOCK_EVENT = "api_unlock_event"
-
 _lnd_macaroon = dconfig("lnd_macaroon")
 _lnd_cert = bytes.fromhex(dconfig("lnd_cert"))
 _lnd_grpc_ip = dconfig("lnd_grpc_ip")
@@ -224,10 +220,8 @@ async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
 
     while not _initialized:
         res = await init_queue.get()  # type: InitLnRepoUpdate
-        if (
-            (res is str and res == _API_WALLET_UNLOCK_EVENT)
-            or res.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
-        ) and _channel is None:
+
+        if res.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK and _channel is None:
             task.cancel()
 
             if _channel == None:
@@ -240,6 +234,14 @@ async def initialize_impl() -> AsyncGenerator[InitLnRepoUpdate, None]:
             _initialized = True
             if not task.cancelled():
                 task.cancel()
+        elif (
+            res.state == LnInitState.OFFLINE
+            or res.state == LnInitState.LOCKED
+            or res.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+        ):
+            pass  # do nothing here
+        else:
+            logging.warning(f"LND_GRPC: Unhandled initialization event: {res.dict()}")
 
         yield res
 
@@ -647,7 +649,6 @@ async def unlock_wallet_impl(password: str) -> bool:
         req = unlocker.UnlockWalletRequest(wallet_password=bytes(password, "utf-8"))
         await _wallet_unlocker.UnlockWallet(req)
         await _wait_wallet_fully_ready()
-        await init_queue.put(_API_WALLET_UNLOCK_EVENT)
         return True
     except grpc.aio._call.AioRpcError as error:
         if error.details().find("invalid passphrase") > -1:
