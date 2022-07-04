@@ -695,11 +695,11 @@ class PaymentStatus(str, Enum):
     @classmethod
     def from_cln_grpc(cls, id) -> "PaymentStatus":
         if id == 0:
-            return PaymentStatus.IN_FLIGHT
-        elif id == 1:
-            return PaymentStatus.FAILED
-        elif id == 2:
             return PaymentStatus.SUCCEEDED
+        elif id == 1:
+            return PaymentStatus.IN_FLIGHT
+        elif id == 2:
+            return PaymentStatus.FAILED
         else:
             raise NotImplementedError(f"PaymentStatus {id} is not implemented")
 

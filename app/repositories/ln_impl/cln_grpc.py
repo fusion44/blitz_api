@@ -554,7 +554,7 @@ async def send_payment_impl(
         f"CLN_GRPC: send_payment_impl(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
     )
 
-    amt = lnp.Amount(msat=amount_msat)
+    amt = lnp.Amount(msat=amount_msat) if amount_msat != None else None
     fee_limit = lnp.Amount(msat=fee_limit_msat)
     req = ln.PayRequest(
         bolt11=pay_req,
@@ -562,7 +562,34 @@ async def send_payment_impl(
         maxfee=fee_limit,
         retry_for=timeout_seconds,
     )
-    res = await _cln_stub.Pay(req)
+
+    try:
+        res = await _cln_stub.Pay(req)
+    except grpc.aio._call.AioRpcError as error:
+        details = error.details()
+
+        if "Ran out of routes to try after" in details:
+            attempts = details.split("Ran out of routes to try after ")[1]
+            attempts = attempts.split(" attempts")[0]
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Ran out of routes to try after {attempts} attempts.",
+            )
+
+        if "msatoshi parameter required" in details:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="amount must be specified when paying a zero amount invoice",
+            )
+
+        if "msatoshi parameter unnecessary" in details:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="amount must not be specified when paying a non-zero amount invoice",
+            )
+
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
+
     return Payment.from_cln_grpc(res)
 
 

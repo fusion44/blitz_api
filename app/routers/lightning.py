@@ -372,7 +372,9 @@ Possible error messages:
 * amount must not be specified when paying a non-zero amount invoice
 """
         },
-        409: {"description": "When attempting to pay an already paid invoice."},
+        409: {
+            "description": "[LND only] When attempting to pay an already paid invoice. CLN will return the payment object of the previously paid invoice. Info: [GitHub](https://github.com/fusion44/blitz_api/issues/131)",
+        },
         423: responses[423],
     },
 )
