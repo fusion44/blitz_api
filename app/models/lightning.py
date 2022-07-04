@@ -334,7 +334,7 @@ class HopHint(BaseModel):
         ..., description="The public key of the node at the start of the channel."
     )
 
-    chan_id: int = Query(..., description="The unique identifier of the channel.")
+    chan_id: str = Query(..., description="The unique identifier of the channel.")
 
     fee_base_msat: int = Query(
         ..., description="The base fee of the channel denominated in msat."
@@ -383,7 +383,7 @@ class RouteHint(BaseModel):
 
     @classmethod
     def from_cln_json(cls, h) -> "RouteHint":
-        hop_hints = [HopHint.from_cln_json(hh) for hh in h.hop_hints]
+        hop_hints = [HopHint.from_cln_json(hop_hint) for hop_hint in h]
         return cls(hop_hints=hop_hints)
 
 
