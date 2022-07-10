@@ -66,5 +66,8 @@ This call will wait until the LND daemon is fully ready to accept calls. Interna
 > ℹ️ _After the unlock the LND-gRPC server takes a bit of time to boot up._
 
 ### Core Lightning:
-Core Lightning doesn't support wallet locking and will return True immediately.
+
+> ℹ️ _Platform: Native_ CLN doesn't support wallet locking and will return True immediately.
+
+> ℹ️ _Platform: RaspiBlitz_ RaspiBlitz has its own locking implementation on top of CLN. Will unlock and return True if successful. Might take a few seconds. If it takes longer than 60 seconds it'll return an error.
 """
