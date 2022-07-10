@@ -24,7 +24,7 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.utils import redis_get
+from app.utils import call_script2, redis_get
 
 # RaspiBlitz implements a lock function on top of CLN, so we need to implement this on Blitz only.
 
@@ -188,9 +188,52 @@ async def get_ln_info_impl() -> LnInfo:
 
 
 async def unlock_wallet_impl(password: str) -> bool:
-    # TODO RaspiBlitz implements a password-protected wallet, so we need to implement this on Blitz only
-    raise NotImplementedError()
-    # return True
+    # RaspiBlitz implements a wallet lock functionality on top of CLN,
+    # so we need to implement this on Blitz only
+
+    # /home/admin/config.scripts/cl.hsmtool.sh unlock mainnet PASSWORD_C
+    # cl.hsmtool.sh [unlock] <mainnet|testnet|signet> <password>
+
+    res = await call_script2(
+        f"/home/admin/config.scripts/cl.hsmtool.sh unlock {_NETWORK} {password}"
+    )
+
+    key = f"ln_cl_{_NETWORK}_locked"
+    logging.debug(
+        f"CLN_GRPC_BLITZ: Unlock script successfully called via API. Waiting for Redis {key} to be set."
+    )
+
+    if res.return_code == 0:
+        # success: exit 0
+        INTERVAL = 1
+        total_wait_time = 0
+        while total_wait_time < 60:
+            res = await redis_get(key)
+            if res == "0":
+                return True
+
+            await asyncio.sleep(INTERVAL)
+            total_wait_time += INTERVAL
+
+        logging.debug(
+            f"CLN_GRPC_BLITZ: Unlock script called successfully but redis key {key} indicates that RaspiBlitz is still locked. Stopped watching after polling for 60s for an unlock signal."
+        )
+
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unknown error while trying to unlock.",
+        )
+    elif res.return_code == 2:
+        # wrong password: exit 2
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid passphrase")
+    elif res.return_code == 3:
+        # fail to unlock after 1 minute + show logs: exit 3
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=res)
+
+    raise HTTPException(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Unknown error while trying to unlock.",
+    )
 
 
 async def listen_invoices() -> AsyncGenerator[Invoice, None]:
