@@ -24,11 +24,15 @@ from app.models.lightning import (
 from app.models.system import APIPlatform
 from app.utils import SSE, redis_get, send_sse_message
 
+PLATFORM = config("platform", cast=str)
+
 ln_node = config("ln_node")
 if ln_node == "lnd_grpc":
     import app.repositories.ln_impl.lnd_grpc as ln
-elif ln_node == "cln_grpc":
+elif ln_node == "cln_grpc" and PLATFORM != APIPlatform.RASPIBLITZ:
     import app.repositories.ln_impl.cln_grpc as ln
+elif ln_node == "cln_grpc" and PLATFORM == APIPlatform.RASPIBLITZ:
+    import app.repositories.ln_impl.specializations.cln_grpc_blitz as ln
 elif ln_node == "none":
     logging.info(f"lightning was explicitly turned off")
 elif ln_node == "":
@@ -46,7 +50,6 @@ ENABLE_FWD_NOTIFICATIONS = config(
 
 FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float)
 
-PLATFORM = config("platform", cast=str)
 
 if FWD_GATHER_INTERVAL < 0.3:
     raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
