@@ -194,11 +194,17 @@ async def unlock_wallet_impl(password: str) -> bool:
     # /home/admin/config.scripts/cl.hsmtool.sh unlock mainnet PASSWORD_C
     # cl.hsmtool.sh [unlock] <mainnet|testnet|signet> <password>
 
+    key = f"ln_cl_{_NETWORK}_locked"
+    res = await redis_get(key)
+    if res == "0":
+        raise HTTPException(
+            status.HTTP_412_PRECONDITION_FAILED, detail="wallet already unlocked"
+        )
+
     res = await call_script2(
         f"/home/admin/config.scripts/cl.hsmtool.sh unlock {_NETWORK} {password}"
     )
 
-    key = f"ln_cl_{_NETWORK}_locked"
     logging.debug(
         f"CLN_GRPC_BLITZ: Unlock script successfully called via API. Waiting for Redis {key} to be set."
     )
