@@ -86,6 +86,7 @@ async def get_wallet_balance_impl() -> WalletBalance:
     try:
         return await cln_main.get_wallet_balance_impl()
     except:
+        _check_if_locked()
         raise
 
 
@@ -97,6 +98,7 @@ async def list_all_tx_impl(
             successful_only, index_offset, max_tx, reversed
         )
     except:
+        _check_if_locked()
         raise
 
 
@@ -108,6 +110,7 @@ async def list_invoices_impl(
             pending_only, index_offset, num_max_invoices, reversed
         )
     except:
+        _check_if_locked()
         raise
 
 
@@ -115,6 +118,7 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
     try:
         return await cln_main.list_on_chain_tx_impl()
     except:
+        _check_if_locked()
         raise
 
 
@@ -126,6 +130,7 @@ async def list_payments_impl(
             include_incomplete, index_offset, max_payments, reversed
         )
     except:
+        _check_if_locked()
         raise
 
 
@@ -135,6 +140,7 @@ async def add_invoice_impl(
     try:
         return await cln_main.add_invoice_impl(value_msat, memo, expiry, is_keysend)
     except:
+        _check_if_locked()
         raise
 
 
@@ -142,6 +148,7 @@ async def decode_pay_request_impl(pay_req: str) -> PaymentRequest:
     try:
         return await cln_main.decode_pay_request_impl(pay_req)
     except:
+        _check_if_locked()
         raise
 
 
@@ -149,6 +156,7 @@ async def get_fee_revenue_impl() -> FeeRevenue:
     try:
         return await cln_main.get_fee_revenue_impl()
     except:
+        _check_if_locked()
         raise
 
 
@@ -156,6 +164,7 @@ async def new_address_impl(input: NewAddressInput) -> str:
     try:
         return await cln_main.new_address_impl(input)
     except:
+        _check_if_locked()
         raise
 
 
@@ -163,6 +172,7 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
     try:
         return await cln_main.send_coins_impl(input)
     except:
+        _check_if_locked()
         raise
 
 
@@ -177,6 +187,7 @@ async def send_payment_impl(
             pay_req, timeout_seconds, fee_limit_msat, amount_msat
         )
     except:
+        _check_if_locked()
         raise
 
 
@@ -184,6 +195,7 @@ async def get_ln_info_impl() -> LnInfo:
     try:
         return await cln_main.get_ln_info_impl()
     except:
+        _check_if_locked()
         raise
 
 
@@ -194,6 +206,7 @@ async def unlock_wallet_impl(password: str) -> bool:
     # /home/admin/config.scripts/cl.hsmtool.sh unlock mainnet PASSWORD_C
     # cl.hsmtool.sh [unlock] <mainnet|testnet|signet> <password>
 
+    global _unlocked
     key = f"ln_cl_{_NETWORK}_locked"
     res = await redis_get(key)
     if res == "0":
@@ -205,17 +218,18 @@ async def unlock_wallet_impl(password: str) -> bool:
         f"/home/admin/config.scripts/cl.hsmtool.sh unlock {_NETWORK} {password}"
     )
 
-    logging.debug(
-        f"CLN_GRPC_BLITZ: Unlock script successfully called via API. Waiting for Redis {key} to be set."
-    )
-
     if res.return_code == 0:
+        logging.debug(
+            f"CLN_GRPC_BLITZ: Unlock script successfully called via API. Waiting for Redis {key} to be set."
+        )
+
         # success: exit 0
         INTERVAL = 1
         total_wait_time = 0
         while total_wait_time < 60:
             res = await redis_get(key)
             if res == "0":
+                _unlocked = True
                 return True
 
             await asyncio.sleep(INTERVAL)
@@ -229,6 +243,14 @@ async def unlock_wallet_impl(password: str) -> bool:
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unknown error while trying to unlock.",
         )
+    elif res.return_code == 1:
+        logging.error("CLN_GRPC_BLITZ: Unknown error while trying to unlock.")
+        logging.error(f"CLN_GRPC_BLITZ: {res.__str__()}")
+
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unknown error while trying to unlock. See the API logs for more info.",
+        )
     elif res.return_code == 2:
         # wrong password: exit 2
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid passphrase")
@@ -238,7 +260,7 @@ async def unlock_wallet_impl(password: str) -> bool:
 
     raise HTTPException(
         status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Unknown error while trying to unlock.",
+        detail=f"Unknown error while trying to unlock.\n{res}",
     )
 
 
@@ -247,6 +269,7 @@ async def listen_invoices() -> AsyncGenerator[Invoice, None]:
         async for i in cln_main.listen_invoices():
             yield i
     except:
+        _check_if_locked()
         raise
 
 
@@ -255,6 +278,7 @@ async def listen_forward_events() -> ForwardSuccessEvent:
         async for e in cln_main.listen_forward_events():
             yield e
     except:
+        _check_if_locked()
         raise
 
 
@@ -262,6 +286,7 @@ async def connect_peer_impl(node_URI: str) -> bool:
     try:
         return await cln_main.connect_peer_impl(node_URI)
     except:
+        _check_if_locked()
         raise
 
 
@@ -273,6 +298,7 @@ async def channel_open_impl(
             local_funding_amount, node_URI, target_confs
         )
     except:
+        _check_if_locked()
         raise
 
 
@@ -280,6 +306,7 @@ async def channel_list_impl() -> List[Channel]:
     try:
         return await cln_main.channel_list_impl()
     except:
+        _check_if_locked()
         raise
 
 
@@ -287,4 +314,15 @@ async def channel_close_impl(channel_id: int, force_close: bool) -> str:
     try:
         return await cln_main.channel_close_impl(channel_id, force_close)
     except:
+        _check_if_locked()
         raise
+
+
+def _check_if_locked():
+    logging.debug(f"CLN_GRPC_BLITZ: _check_if_locked()")
+
+    if not _unlocked:
+        raise HTTPException(
+            status.HTTP_423_LOCKED,
+            detail="Wallet is locked. Unlock via /lightning/unlock-wallet",
+        )

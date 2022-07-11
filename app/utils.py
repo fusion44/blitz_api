@@ -22,6 +22,9 @@ class ProcessResult:
         self.stdout = stdout
         self.stderr = stderr
 
+    def __str__(self) -> str:
+        return f"ProcessResult: \nreturn_code: {self.return_code} \nstdout: {self.stdout} \nstderr: {self.stderr}"
+
 
 async def send_sse_message(id: str, json_data: Dict):
     """Send a message to any SSE connections
