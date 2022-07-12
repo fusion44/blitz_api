@@ -86,10 +86,7 @@ class SSE:
 
 
 async def call_script(scriptPath) -> str:
-    warnings.warn(
-        "call_script is deprecated. Use call_script2 instead.",
-        warnings.DeprecationWarning,
-    )
+    warnings.warn("call_script is deprecated. Use call_script2 instead.")
 
     cmd = f"bash {scriptPath}"
     proc = await asyncio.create_subprocess_shell(

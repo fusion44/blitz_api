@@ -193,6 +193,9 @@ async def send_payment_impl(
 
 async def get_ln_info_impl() -> LnInfo:
     try:
+        # This will return "CLN_GRPC" and not "CLN_GRPC_BLITZ" to
+        # not to complicate things further.
+        # res.implementation = get_implementation_name()
         return await cln_main.get_ln_info_impl()
     except:
         _check_if_locked()
