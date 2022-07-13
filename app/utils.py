@@ -5,10 +5,25 @@ import logging
 import random
 import re
 import time
+import warnings
 from typing import Dict
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+
+
+class ProcessResult:
+    return_code: int
+    stdout: str
+    stderr: str
+
+    def __init__(self, return_code, stdout, stderr) -> None:
+        self.return_code = return_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __str__(self) -> str:
+        return f"ProcessResult: \nreturn_code: {self.return_code} \nstdout: {self.stdout} \nstderr: {self.stderr}"
 
 
 async def send_sse_message(id: str, json_data: Dict):
@@ -71,6 +86,8 @@ class SSE:
 
 
 async def call_script(scriptPath) -> str:
+    warnings.warn("call_script is deprecated. Use call_script2 instead.")
+
     cmd = f"bash {scriptPath}"
     proc = await asyncio.create_subprocess_shell(
         cmd,
@@ -83,6 +100,30 @@ async def call_script(scriptPath) -> str:
     if stderr:
         logging.error(stderr.decode())
     return ""
+
+
+async def call_script2(script_path) -> ProcessResult:
+    """
+    Call a local bash script and return the results
+
+    :param str script_path: full path with arguments
+    :return: The process result
+    :rtype: ProcessResult
+    """
+
+    cmd = f"bash {script_path}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+
+    return ProcessResult(
+        proc.returncode,
+        stdout.decode() if stdout else "",
+        stderr.decode() if stderr else "",
+    )
 
 
 async def call_sudo_script(scriptPath) -> str:
