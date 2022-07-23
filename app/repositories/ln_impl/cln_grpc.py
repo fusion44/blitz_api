@@ -122,7 +122,7 @@ async def get_wallet_balance_impl() -> WalletBalance:
     onchain_confirmed = onchain_unconfirmed = onchain_total = 0
 
     for o in res.outputs:
-        sat = o.amount_msat.msat
+        sat = o.amount_msat.msat / 1000
         onchain_total += sat
         if o.status == 0:
             onchain_unconfirmed += sat
