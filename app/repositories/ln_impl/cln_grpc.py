@@ -64,7 +64,23 @@ async def _make_local_call(cmd: str):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    return await proc.communicate()
+    stdout, stderr = await proc.communicate()
+
+    if (
+        stderr != None
+        and "lightning-cli: Connecting to 'lightning-rpc': Permission denied"
+        in stderr.decode()
+    ):
+        logging.critical(
+            "CLN_GRPC: Unable to connect to lightning-cli: Permission denied. Is the lightning-rpc socket readable for the API user?"
+        )
+
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CLN_GRPC: Unable to connect to lightning-cli: Permission denied.",
+        )
+
+    return stdout, stderr
 
 
 def get_implementation_name() -> str:
