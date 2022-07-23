@@ -1519,9 +1519,11 @@ class PaymentRequest(BaseModel):
             payment_hash=r["payment_hash"],
             num_satoshis=msat / 1000,
             timestamp=r["created_at"],
-            expiry=r["expiry"],
-            description=r["description"],
-            description_hash="" if "payment_hash" not in r else r["payment_hash"],
+            expiry=0 if "expiry" not in r else r["expiry"],
+            description="" if "description" not in r else r["description"],
+            description_hash=""
+            if "description_hash" not in r
+            else r["description_hash"],
             fallback_addr="" if "fallbacks" not in r else r["fallbacks"][0],
             cltv_expiry=r["min_final_cltv_expiry"],
             route_hints=routes,
