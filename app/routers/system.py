@@ -172,7 +172,7 @@ async def hw_info_sub(request: Request):
     dependencies=[Depends(JWTBearer())],
 )
 async def reboot_system() -> bool:
-    return await shutdown(False)
+    return await shutdown(reboot=True)
 
 
 @router.post(
