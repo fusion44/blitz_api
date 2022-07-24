@@ -207,7 +207,11 @@ connections = {}
 new_connections = []
 
 
-@app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
+@app.get(
+    "/sse/subscribe",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(JWTBearer())],
+)
 async def stream(request: Request):
 
     global num_connections
