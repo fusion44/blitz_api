@@ -4,7 +4,7 @@ import logging
 
 from aioredis import Channel, Redis
 from decouple import config as dconfig
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
 from fastapi_plugins import (
@@ -17,6 +17,7 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
+from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import (
     handle_local_cookie,
     register_cookie_updater,
