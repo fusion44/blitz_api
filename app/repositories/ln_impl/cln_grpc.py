@@ -66,20 +66,34 @@ async def _make_local_call(cmd: str):
     )
     stdout, stderr = await proc.communicate()
 
-    if (
-        stderr != None
-        and "lightning-cli: Connecting to 'lightning-rpc': Permission denied"
-        in stderr.decode()
-    ):
-        logging.critical(
-            "CLN_GRPC: Unable to connect to lightning-cli: Permission denied. Is the lightning-rpc socket readable for the API user?"
-        )
+    if stderr != None:
+        err = stderr.decode()
+        if "lightning-cli: Connecting to 'lightning-rpc': Permission denied" in err:
+            logging.critical(
+                "CLN_GRPC: Unable to connect to lightning-cli: Permission denied. Is the lightning-rpc socket readable for the API user?"
+            )
+
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="CLN_GRPC: Unable to connect to lightning-cli: Permission denied.",
+            )
+
+        if "lightning-cli: Moving into" in err and "No such file or directory" in err:
+            logging.critical(
+                "CLN_GRPC: Unable to connect to lightning-cli: No such file or directory. Is the lightning-rpc socket available to the API user?"
+            )
+
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="CLN_GRPC: Unable to connect to lightning-cli: API Can't access lightning-cli.",
+            )
+
+        logging.critical(f"CLN_GRPC: Unable to connect to lightning-cli: {err}")
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CLN_GRPC: Unable to connect to lightning-cli: Permission denied.",
+            detail="CLN_GRPC: Unable to connect to lightning-cli: Unknown error. Please consult the logs.",
         )
-
     return stdout, stderr
 
 
