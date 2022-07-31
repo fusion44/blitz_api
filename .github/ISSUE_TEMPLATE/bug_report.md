@@ -21,7 +21,7 @@ A clear and concise description of what you expected to happen.
 
 **Desktop (please complete the following information):**
  - OS: [e.g. Linux, MacOS, Windows]
- - LN implementation: [e.g. LND, Core Lightning] 
+ - LN implementation: [e.g. LND, Core Lightning]
  - Platform: [e.g. native_python, RaspliBlitz]
 
 **Additional context**
