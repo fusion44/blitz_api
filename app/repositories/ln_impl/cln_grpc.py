@@ -325,11 +325,20 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
         conf_block = o[9]
         spent_block = o[10]
         conf_time = (await _get_block_time(conf_block))[0]
+        tx_hash = f"prev_out_tx {prev_out_tx}"
+
+        confs = info.block_height - conf_block
+        if confs < 0:
+            confs = 0
+            logging.error(
+                f"Got negative confirmation count of for {tx_hash}\nCalc:{info.block_height} - {conf_block} = {confs}"
+            )
+
         txs.append(
             OnChainTransaction(
-                tx_hash=f"prev_out_tx {prev_out_tx}",
+                tx_hash=tx_hash,
                 amount=amount,
-                num_confirmations=info.block_height - conf_block,
+                num_confirmations=confs,
                 block_height=conf_block,
                 time_stamp=conf_time,
                 total_fees=0,
@@ -340,9 +349,9 @@ async def list_on_chain_tx_impl() -> List[OnChainTransaction]:
             spent_time = (await _get_block_time(spent_block))[0]
             txs.append(
                 OnChainTransaction(
-                    tx_hash=f"prev_out_tx {prev_out_tx}",
+                    tx_hash=tx_hash,
                     amount=-amount,
-                    num_confirmations=info.block_height - spent_block,
+                    num_confirmations=confs,
                     block_height=spent_block,
                     time_stamp=spent_time,
                     total_fees=0,

@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from typing import List, Optional, Union
 
@@ -1644,8 +1645,8 @@ class GenericTx(BaseModel):
         None,
         description="Block height, if included in a block. Only applicable for category **onchain**.",
     )
-    num_confs: int = Query(
-        None,
+    num_confs: Union[int, None] = Query(
+        ge=0,
         description="Number of confirmations. Only applicable for category **onchain**.",
     )
     total_fees: int = Query(None, description="Total fees paid for this transaction")
@@ -1745,6 +1746,12 @@ class GenericTx(BaseModel):
     @classmethod
     def from_cln_json_onchain_tx(cls, tx, current_block_height: int) -> "GenericTx":
         confs = current_block_height - tx["blockheight"]
+        if confs < 0:
+            confs = 0
+            logging.error(
+                f"Got negative confirmation count of for {tx.tx_hash}\nCalc:{current_block_height} - {tx['blockheight']} = {confs}"
+            )
+
         s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
 
         print(tx["hash"])
@@ -1825,6 +1832,12 @@ class GenericTx(BaseModel):
         cls, tx: OnChainTransaction, current_block_height: int
     ) -> "GenericTx":
         confs = current_block_height - tx.block_height
+        if confs < 0:
+            confs = 0
+            logging.error(
+                f"Got negative confirmation count of for {tx.tx_hash}\nCalc:{current_block_height} - {tx.block_height} = {confs}"
+            )
+
         s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
 
         t = TxType.SEND
