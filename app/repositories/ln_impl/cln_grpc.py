@@ -66,7 +66,7 @@ async def _make_local_call(cmd: str):
     )
     stdout, stderr = await proc.communicate()
 
-    if stderr != None:
+    if stderr != None and stderr != b"":
         err = stderr.decode()
         if "lightning-cli: Connecting to 'lightning-rpc': Permission denied" in err:
             logging.critical(
