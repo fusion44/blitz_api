@@ -304,7 +304,9 @@ async def send_coins_path(input: SendCoinsInput):
         504: {"description": "When the peer is not reachable."},
     },
 )
-async def channelopen(local_funding_amount: int, node_URI: str, target_confs: int = 3):
+async def open_channel_path(
+    local_funding_amount: int, node_URI: str, target_confs: int = 3
+):
     try:
         return await channel_open(local_funding_amount, node_URI, target_confs)
     except HTTPException as r:
@@ -316,15 +318,15 @@ async def channelopen(local_funding_amount: int, node_URI: str, target_confs: in
 
 
 @router.get(
-    "/list-channel",
-    name=f"{_PREFIX}.list-channel",
+    "/list-channels",
+    name=f"{_PREFIX}.list-channels",
     summary="Returns a list of open channels",
     response_model=List[Channel],
     response_description="A list of all open channels.",
     dependencies=[Depends(JWTBearer())],
     responses=responses,
 )
-async def channellist():
+async def list_channels_path():
     try:
         return await channel_list()
     except HTTPException as r:
@@ -337,14 +339,14 @@ async def channellist():
 
 @router.post(
     "/close-channel",
-    name=f"{_PREFIX}.channel-close",
+    name=f"{_PREFIX}.close-channel",
     summary="close a channel",
     description="For additional information see [LND docs](https://api.lightning.community/#closechannel)",
     dependencies=[Depends(JWTBearer())],
     response_model=str,
     responses=responses,
 )
-async def channelclose(channel_id: str, force_close: bool):
+async def close_channel_path(channel_id: str, force_close: bool):
     try:
         return await channel_close(channel_id, force_close)
     except HTTPException as r:
