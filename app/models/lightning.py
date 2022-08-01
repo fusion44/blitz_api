@@ -1677,6 +1677,11 @@ class GenericTx(BaseModel):
 
     @classmethod
     def from_lnd_grpc_onchain_tx(cls, tx) -> "GenericTx":
+        if tx.num_confirmations < 0:
+            logging.warning(
+                f"Got negative confirmation count of from LND {tx.num_confirmations}"
+            )
+
         s = TxStatus.SUCCEEDED if tx.num_confirmations > 0 else TxStatus.IN_FLIGHT
 
         t = TxType.UNKNOWN
@@ -1748,7 +1753,7 @@ class GenericTx(BaseModel):
         confs = current_block_height - tx["blockheight"]
         if confs < 0:
             confs = 0
-            logging.error(
+            logging.warning(
                 f"Got negative confirmation count of for {tx.tx_hash}\nCalc:{current_block_height} - {tx['blockheight']} = {confs}"
             )
 
@@ -1834,7 +1839,7 @@ class GenericTx(BaseModel):
         confs = current_block_height - tx.block_height
         if confs < 0:
             confs = 0
-            logging.error(
+            logging.warning(
                 f"Got negative confirmation count of for {tx.tx_hash}\nCalc:{current_block_height} - {tx.block_height} = {confs}"
             )
 
