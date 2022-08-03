@@ -425,15 +425,15 @@ class Channel(BaseModel):
         )
 
     @classmethod
-    def from_cln_grpc(cls, c) -> "Channel":
+    def from_cln_grpc(cls, c, peer_alias="n/a") -> "Channel":
         # TODO: get alias and balance of the channel
         return cls(
-            active=c.active,
+            active=c.connected,
             channel_id=c.short_channel_id,  # use channel point as id because thats needed for closing the channel with lnd
-            peer_publickey=c.destination.hex(),
-            peer_alias="n/a",
-            balance_local=-1,
-            balance_remote=-1,
+            peer_publickey=c.peer_id.hex(),
+            peer_alias=peer_alias,
+            balance_local=c.our_amount_msat.msat,
+            balance_remote=c.amount_msat.msat - c.our_amount_msat.msat,
             balance_capacity=c.amount_msat.msat,
         )
 

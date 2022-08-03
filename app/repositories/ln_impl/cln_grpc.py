@@ -697,7 +697,7 @@ async def listen_forward_events() -> ForwardSuccessEvent:
 
 
 async def connect_peer_impl(node_URI: str) -> bool:
-    logging.debug(f"CLN_GRPC: peer_resolve_alias(node_URI={node_URI})")
+    logging.debug(f"CLN_GRPC: connect_peer_impl(node_URI={node_URI})")
 
     try:
         id = node_URI.split("@")[0]
@@ -719,6 +719,24 @@ async def connect_peer_impl(node_URI: str) -> bool:
             logging.error(f"CLN_GRPC: {stderr.decode()}")
 
         return False
+
+    except grpc.aio._call.AioRpcError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+        )
+
+
+async def peer_resolve_alias(node_pub: str) -> str:
+    logging.debug(f"CLN_GRPC: peer_resolve_alias(node_pub={node_pub})")
+
+    try:
+        request = ln.ListnodesRequest(id=node_pub)
+        response = await _cln_stub.ListNodes(request)
+
+        if len(response.nodes) == 0:
+            return ""
+
+        return str(response.nodes[0].alias)
 
     except grpc.aio._call.AioRpcError as error:
         raise HTTPException(
@@ -789,15 +807,10 @@ async def channel_list_impl() -> List[Channel]:
     logging.debug(f"CLN_GRPC: channel_list_impl()")
 
     try:
-        i = await get_ln_info_impl()
-        req = ln.ListchannelsRequest(source=bytes.fromhex(i.identity_pubkey))
-        res = await _cln_stub.ListChannels(req)
-
-        channels = []
-        for c in res.channels:
-            chan = Channel.from_cln_grpc(c)
-            channels.append(chan)
-
+        res = await _cln_stub.ListFunds(ln.ListfundsRequest())
+        peer_ids = [c.peer_id for c in res.channels]
+        peer_res = await asyncio.gather(*[peer_resolve_alias(p) for p in peer_ids])
+        channels = [Channel.from_cln_grpc(c, p) for c, p in zip(res.channels, peer_res)]
         return channels
     except grpc.aio._call.AioRpcError as error:
         raise HTTPException(
