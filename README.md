@@ -2,6 +2,9 @@
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 
+### Beta Disclaimer
+This software is still considered BETA. Don't expose it to the open internet or use with lots of funds.
+
 ## Configuration
 
 Create a `.env` file with your `bitcoind` and `lnd` configuration. See the `.env_sample` file for all configuration options.
