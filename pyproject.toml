@@ -4,6 +4,9 @@ version = "0.5.1"
 description = "A backend for the Raspiblitz project"
 authors = ["fusion44 <some.fusion@gmail.com>"]
 license = "MIT"
+packages = [
+    { include = "app" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -38,6 +41,7 @@ isort = "5.10.1"
 pytest-asyncio = "^0.19.0"
 ruff = "^0.0.267"
 debugpy = "^1.6.7"
+click = "^8.1.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -45,7 +49,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-
 
 [tool.ruff]
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
@@ -94,3 +97,6 @@ target-version = "py39"
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
+
+[tool.poetry.scripts]
+api = "app.server:main"
