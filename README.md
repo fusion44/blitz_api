@@ -112,6 +112,26 @@ poetry export -f requirements.txt --output requirements.txt
 > :information_source: This will skip all dev dependencies by default.\
 > This step is required to avoid having to install poetry for final deployment.
 
+### Generating the client libraries
+
+> ℹ️ The client library live in an extra repository:
+https://github.com/fusion44/blitz_api_client_libraries
+
+Install [OpenAPI Generator](https://openapi-generator.tech) and Java:
+
+
+```sh
+npm install @openapitools/openapi-generator-cli -g
+sudo apt install default-jre
+```
+
+
+Clone https://github.com/fusion44/blitz_api_client_libraries next to the blitz_api folder.
+
+```sh
+make generate-client-libs
+```
+> ⚠️ The first run requires `sudo` as it must download a Java .jar file to the system npm package folder.
 ### Testing
 
 Make sure to include tests for important pieces of submitted code.
