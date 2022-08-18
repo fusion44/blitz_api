@@ -16,6 +16,20 @@ from app.utils import (
 )
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
+GET_DEBUG_LOG_SCRIPT = os.path.join(
+    SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh"
+)
+
+
+def _check_shell_scripts_status():
+    if not os.path.exists(SHELL_SCRIPT_PATH):
+        raise Exception(f"invalid shell script path: {SHELL_SCRIPT_PATH}")
+
+    if not os.path.isfile(GET_DEBUG_LOG_SCRIPT):
+        raise Exception(f"Required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
+
+
+_check_shell_scripts_status()
 
 
 async def get_system_info_impl() -> SystemInfo:

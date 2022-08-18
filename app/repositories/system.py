@@ -1,6 +1,5 @@
 import asyncio
 import re
-from os import path
 
 from decouple import config
 from fastapi import HTTPException, Request, status
@@ -37,20 +36,6 @@ elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     )
 else:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
-
-SHELL_SCRIPT_PATH = config("shell_script_path")
-GET_DEBUG_LOG_SCRIPT = path.join(SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh")
-
-
-def _check_shell_scripts_status():
-    if not path.exists(SHELL_SCRIPT_PATH):
-        raise Exception(f"invalid shell script path: {SHELL_SCRIPT_PATH}")
-
-    if not path.isfile(GET_DEBUG_LOG_SCRIPT):
-        raise Exception(f"Required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
-
-
-_check_shell_scripts_status()
 
 
 def password_valid(password: str):
