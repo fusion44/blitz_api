@@ -18,6 +18,10 @@ class _BitcoinConfig:
             self.ip = config("bitcoind_ip_testnet")
             self.rpc_port = config("bitcoind_port_rpc_testnet")
             self.zmq_port = config("bitcoind_zmq_block_port_testnet")
+        elif self.network == "regtest":
+            self.ip = config("bitcoind_ip_regtest")
+            self.rpc_port = config("bitcoind_port_rpc_regtest")
+            self.zmq_port = config("bitcoind_zmq_block_port_regtest")
         else:
             self.ip = config("bitcoind_ip_mainnet")
             self.rpc_port = config("bitcoind_port_rpc_mainnet")
