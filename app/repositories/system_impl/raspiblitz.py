@@ -1,15 +1,17 @@
 import asyncio
 import logging
 import os
+import re
 
 from decouple import config
 
 from app.constants import API_VERSION
-from app.models.system import APIPlatform, ConnectionInfo, SystemInfo
+from app.models.system import APIPlatform, ConnectionInfo, LoginInput, SystemInfo
 from app.repositories.lightning import get_ln_info
 from app.utils import (
     SSE,
     call_script,
+    call_sudo_script,
     parse_key_value_text,
     redis_get,
     send_sse_message,
@@ -19,6 +21,14 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 GET_DEBUG_LOG_SCRIPT = os.path.join(
     SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh"
 )
+
+
+def _password_valid(password: str):
+    if len(password) < 8:
+        return False
+    if password.find(" ") >= 0:
+        return False
+    return re.match("^[a-zA-Z0-9]*$", password)
 
 
 def _check_shell_scripts_status():
@@ -185,3 +195,15 @@ async def get_connection_info_impl() -> ConnectionInfo:
         cl_rest_macaroon=data_cl_rest_macaroon,
         cl_rest_onion=data_cl_rest_onion,
     )
+
+
+async def match_password(i: LoginInput) -> bool:
+    if _password_valid(i.password):
+        result = await call_script(
+            f'/home/admin/config.scripts/blitz.passwords.sh check a "{i.password}"'
+        )
+        data = parse_key_value_text(result)
+        if data["correct"] == "1":
+            return True
+
+    return False

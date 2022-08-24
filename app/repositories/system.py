@@ -1,10 +1,19 @@
 import asyncio
 import re
+from typing import Dict
 
 from decouple import config
 from fastapi import HTTPException, Request, status
 
-from app.models.system import APIPlatform, ConnectionInfo, RawDebugLogData, SystemInfo
+from app.auth.auth_handler import sign_jwt
+from app.models.system import (
+    APIPlatform,
+    ConnectionInfo,
+    LoginInput,
+    RawDebugLogData,
+    SystemInfo,
+)
+from app.repositories.system_impl.native_python import match_password
 from app.utils import (
     SSE,
     call_script,
@@ -22,6 +31,7 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
     from app.repositories.system_impl.raspiblitz import (
         get_connection_info_impl,
         get_system_info_impl,
+        match_password,
         shutdown_impl,
     )
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
@@ -32,6 +42,7 @@ elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.system_impl.native_python import (
         get_connection_info_impl,
         get_system_info_impl,
+        match_password,
         shutdown_impl,
     )
 else:
@@ -39,6 +50,9 @@ else:
 
 
 def password_valid(password: str):
+    # TODO: remove this once RaspiBlitz is fully refactored
+    #       into its own implementation file
+
     if len(password) < 8:
         return False
     if password.find(" ") >= 0:
@@ -181,3 +195,11 @@ async def _handle_gather_hardware_info():
 async def register_hardware_info_gatherer():
     loop = asyncio.get_event_loop()
     loop.create_task(_handle_gather_hardware_info())
+
+
+async def login(i: LoginInput) -> Dict[str, str]:
+    matches = await match_password(i)
+    if matches:
+        return sign_jwt()
+
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is incorrect")

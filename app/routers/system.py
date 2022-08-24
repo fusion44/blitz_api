@@ -1,7 +1,3 @@
-import logging
-import secrets
-
-from decouple import config
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.params import Depends
 
@@ -15,8 +11,8 @@ from app.repositories.system import (
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
+    login,
     password_change,
-    password_valid,
     shutdown,
     subscribe_hardware_info,
 )
@@ -26,7 +22,7 @@ from app.routers.system_docs import (
     get_debug_logs_raw_summary,
     get_hw_info_json,
 )
-from app.utils import SSE, call_script, parse_key_value_text
+from app.utils import SSE
 
 _PREFIX = "system"
 
@@ -40,29 +36,13 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     response_description="JWT token for the current session.",
     status_code=status.HTTP_200_OK,
 )
-async def login(i: LoginInput):
-
-    platform = ""
+async def login_path(i: LoginInput):
     try:
-        platform = config("platform", cast=str)
-    except:
-        logging.warning(f"please set platform in env config file")
-
-    if platform == "raspiblitz":
-        # script does not work when called from api yet
-        if password_valid(i.password):
-            result = await call_script(
-                f'/home/admin/config.scripts/blitz.passwords.sh check a "{i.password}"'
-            )
-            data = parse_key_value_text(result)
-            if data["correct"] == "1":
-                return sign_jwt()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
-    else:
-        match = secrets.compare_digest(i.password, config("login_password", cast=str))
-        if match:
-            return sign_jwt()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
+        return await login(i)
+    except HTTPException as r:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
 @router.post(

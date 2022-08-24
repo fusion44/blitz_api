@@ -1,9 +1,10 @@
 import logging
+import secrets
 
 from decouple import config
 
 from app.constants import API_VERSION
-from app.models.system import APIPlatform, ConnectionInfo, SystemInfo
+from app.models.system import APIPlatform, ConnectionInfo, LoginInput, SystemInfo
 from app.repositories.lightning import get_ln_info
 
 
@@ -44,3 +45,7 @@ async def get_connection_info_impl() -> ConnectionInfo:
 
     # return an empty connection info object for now
     return ConnectionInfo()
+
+
+async def match_password(i: LoginInput) -> bool:
+    return secrets.compare_digest(i.password, config("login_password", cast=str))
