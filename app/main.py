@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-import async_timeout
 from decouple import config as dconfig
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -23,7 +22,7 @@ from app.auth.auth_handler import (
     remove_local_cookie,
 )
 from app.external.fastapi_versioning import VersionedFastAPI
-from app.external.sse_starlette import EventSourceResponse, ServerSentEvent
+from app.external.sse_starlette import ServerSentEvent
 from app.models.api import ApiStartupStatus, StartupState
 from app.models.lightning import LnInitState
 from app.repositories.bitcoin import (
@@ -39,7 +38,7 @@ from app.repositories.utils import (
     get_full_client_warmup_data_bitcoinonly,
 )
 from app.routers import apps, bitcoin, lightning, setup, system
-from app.utils import SSE, send_sse_message, sse_queue
+from app.utils import SSE, send_sse_message, build_sse_event, sse_mgr
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -201,9 +200,11 @@ def index(req: Request):
     )
 
 
-num_connections = 0
-connections = {}
 new_connections = []
+
+
+def _send_sse_event(id, event, data):
+    return sse_mgr.send_to_single(id, build_sse_event(event, data))
 
 
 @app.get(
@@ -212,24 +213,17 @@ new_connections = []
     dependencies=[Depends(JWTBearer())],
 )
 async def stream(request: Request):
+    event_source, id = sse_mgr.add_connection(request)
+    new_connections.append(id)
 
-    global num_connections
-    q = asyncio.Queue()
-    connections[num_connections] = q
-    num_connections += 1
-    new_connections.append(q)
-
-    await q.put(
-        ServerSentEvent(
-            event=SSE.SYSTEM_STARTUP_INFO,
-            data=jsonable_encoder(api_startup_status.dict()),
-        )
+    await _send_sse_event(
+        id, SSE.SYSTEM_STARTUP_INFO, jsonable_encoder(api_startup_status.dict())
     )
 
     loop = asyncio.get_event_loop()
     loop.create_task(warmup_new_connections())
 
-    return EventSourceResponse(subscribe(request, num_connections - 1, q))
+    return event_source
 
 
 warmup_running = False
@@ -259,17 +253,16 @@ async def warmup_new_connections():
         if node_type != "" and node_type != "none":
 
             res = await get_full_client_warmup_data()
-            for c in new_connections:
+            for id in new_connections:
                 await asyncio.gather(
                     *[
-                        c.put(send_sse_message(SSE.SYSTEM_INFO, res[0].dict())),
-                        c.put(send_sse_message(SSE.BTC_INFO, res[1].dict())),
-                        c.put(send_sse_message(SSE.LN_INFO, res[2].dict())),
-                        c.put(send_sse_message(SSE.LN_INFO_LITE, res[3].dict())),
-                        c.put(send_sse_message(SSE.LN_FEE_REVENUE, res[4])),
-                        c.put(send_sse_message(SSE.WALLET_BALANCE, res[5].dict())),
-                        c.put(send_sse_message(SSE.INSTALLED_APP_STATUS, res[6])),
-                        c.put(send_sse_message(SSE.HARDWARE_INFO, res[7])),
+                        _send_sse_event(id, SSE.SYSTEM_INFO, res[0].dict()),
+                        _send_sse_event(id, SSE.BTC_INFO, res[1].dict()),
+                        _send_sse_event(id, SSE.LN_INFO, res[2].dict()),
+                        _send_sse_event(id, SSE.LN_INFO_LITE, res[3].dict()),
+                        _send_sse_event(id, SSE.LN_FEE_REVENUE, res[4]),
+                        _send_sse_event(id, SSE.WALLET_BALANCE, res[5].dict()),
+                        _send_sse_event(id, SSE.HARDWARE_INFO, res[6]),
                     ]
                 )
 
@@ -277,13 +270,12 @@ async def warmup_new_connections():
         else:
 
             res = await get_full_client_warmup_data_bitcoinonly()
-            for c in new_connections:
+            for id in new_connections:
                 await asyncio.gather(
                     *[
-                        c.put(send_sse_message(SSE.SYSTEM_INFO, res[0].dict())),
-                        c.put(send_sse_message(SSE.BTC_INFO, res[1].dict())),
-                        c.put(send_sse_message(SSE.INSTALLED_APP_STATUS, res[2])),
-                        c.put(send_sse_message(SSE.HARDWARE_INFO, res[3])),
+                        _send_sse_event(id, SSE.SYSTEM_INFO, res[0].dict()),
+                        _send_sse_event(id, SSE.BTC_INFO, res[1].dict()),
+                        _send_sse_event(id, SSE.HARDWARE_INFO, res[2]),
                     ]
                 )
 
@@ -294,11 +286,11 @@ async def warmup_new_connections():
         and api_startup_status.lightning != StartupState.DONE
     ):
         res = await get_bitcoin_client_warmup_data()
-        for c in new_connections:
+        for id in new_connections:
             await asyncio.gather(
                 *[
-                    c.put(send_sse_message(SSE.BTC_INFO, res[0].dict())),
-                    c.put(send_sse_message(SSE.HARDWARE_INFO, res[1])),
+                    _send_sse_event(id, SSE.BTC_INFO, res[0].dict()),
+                    _send_sse_event(id, SSE.HARDWARE_INFO, res[1]),
                 ]
             )
 
@@ -310,27 +302,12 @@ async def warmup_new_connections():
     ):
         # send only the most minimal available data without Bitcoin Core and Lightning running
         res = await get_hardware_info()
-        for c in new_connections:
-            await c.put(send_sse_message(SSE.HARDWARE_INFO, res)),
+        for id in new_connections:
+            await _send_sse_event(id, SSE.HARDWARE_INFO, res),
 
         # don't clear new_connections, we'll try again later when api is initialized
 
     warmup_running = False
-
-
-async def subscribe(request: Request, id: int, q: asyncio.Queue):
-    try:
-        while True:
-            if await request.is_disconnected():
-                connections.pop(id)
-                await request.close()
-                break
-            else:
-                data = await q.get()
-                yield data
-    except asyncio.CancelledError as e:
-        connections.pop(id)
-        await request.close()
 
 
 register_handlers_finished = False
@@ -344,23 +321,4 @@ async def register_all_handlers():
 
     await register_hardware_info_gatherer()
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(broadcast_data_sse())
     register_handlers_finished = True
-
-
-# TODO: Add a SSE manager class that handles all connections and
-#       sending of messages. Currently functions are distributed
-#       between main.py and utils.py with cross calls
-async def broadcast_data_sse():
-    while True:
-        try:
-            async with async_timeout.timeout(1):
-                message = await sse_queue.get()
-                if message is not None:
-                    for k in connections.keys():
-                        if connections.get(k):
-                            await connections.get(k).put(message)
-                await asyncio.sleep(0.01)
-        except asyncio.TimeoutError:
-            pass

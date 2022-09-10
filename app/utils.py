@@ -8,13 +8,15 @@ import re
 import time
 import warnings
 from typing import Dict, Optional
+from app.sse_manager import SSEManager
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 
 from app.external.sse_starlette import ServerSentEvent
 
-sse_queue = asyncio.Queue()
+sse_mgr = SSEManager()
+sse_mgr.setup()
 
 
 class ProcessResult:
@@ -31,6 +33,13 @@ class ProcessResult:
         return f"ProcessResult: \nreturn_code: {self.return_code} \nstdout: {self.stdout} \nstderr: {self.stderr}"
 
 
+def build_sse_event(event: str, json_data: Optional[Dict]):
+    return ServerSentEvent(
+        event=event,
+        data=json.dumps(jsonable_encoder(json_data)),
+    )
+
+
 async def send_sse_message(event: str, json_data: Optional[Dict]):
     """Send a message to any SSE connections
 
@@ -42,12 +51,7 @@ async def send_sse_message(event: str, json_data: Optional[Dict]):
         The data to include
     """
 
-    await sse_queue.put(
-        ServerSentEvent(
-            event=event,
-            data=json.dumps(jsonable_encoder(json_data)),
-        )
-    )
+    await sse_mgr.broadcast_to_all(build_sse_event(event, json_data))
 
 
 async def redis_get(key: str) -> str:
