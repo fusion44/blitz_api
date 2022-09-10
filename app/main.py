@@ -21,8 +21,8 @@ from app.auth.auth_handler import (
     register_cookie_updater,
     remove_local_cookie,
 )
+from app.core_utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
 from app.external.fastapi_versioning import VersionedFastAPI
-from app.external.sse_starlette import ServerSentEvent
 from app.models.api import ApiStartupStatus, StartupState
 from app.models.lightning import LnInitState
 from app.repositories.bitcoin import (
@@ -32,13 +32,12 @@ from app.repositories.bitcoin import (
 )
 from app.repositories.lightning import initialize_ln_repo, register_lightning_listener
 from app.repositories.system import get_hardware_info, register_hardware_info_gatherer
-from app.repositories.utils import (
+from app.routers import apps, bitcoin, lightning, setup, system
+from app.warmup import (
     get_bitcoin_client_warmup_data,
     get_full_client_warmup_data,
     get_full_client_warmup_data_bitcoinonly,
 )
-from app.routers import apps, bitcoin, lightning, setup, system
-from app.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
 
 logging.basicConfig(level=logging.WARNING)
 

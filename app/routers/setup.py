@@ -1,18 +1,14 @@
 import logging
-from pickle import FALSE
-from xmlrpc.client import boolean
 
-from aioredis import Redis
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
-from fastapi_plugins import depends_redis
 from pydantic import BaseModel
-from setuptools import setup
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
+from app.core_utils import redis_get
 from app.repositories.system import name_valid, password_valid, shutdown
-from app.utils import call_script, parse_key_value_lines, redis_get
+from app.repositories.utils.raspiblitz import call_script, parse_key_value_lines
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 

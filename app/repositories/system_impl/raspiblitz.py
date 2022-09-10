@@ -6,9 +6,7 @@ import re
 from decouple import config
 
 from app.constants import API_VERSION
-from app.models.system import APIPlatform, ConnectionInfo, LoginInput, SystemInfo
-from app.repositories.lightning import get_ln_info
-from app.utils import (
+from app.core_utils import (
     SSE,
     broadcast_sse_msg,
     call_script,
@@ -16,6 +14,8 @@ from app.utils import (
     parse_key_value_text,
     redis_get,
 )
+from app.models.system import APIPlatform, ConnectionInfo, LoginInput, SystemInfo
+from app.repositories.lightning import get_ln_info
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 GET_DEBUG_LOG_SCRIPT = os.path.join(

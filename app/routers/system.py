@@ -3,6 +3,7 @@ from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
+from app.core_utils import SSE
 from app.external.sse_starlette import EventSourceResponse
 from app.models.system import ConnectionInfo, LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
@@ -22,7 +23,6 @@ from app.routers.system_docs import (
     get_debug_logs_raw_summary,
     get_hw_info_json,
 )
-from app.utils import SSE
 
 _PREFIX = "system"
 

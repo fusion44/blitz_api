@@ -14,6 +14,7 @@ from starlette import status
 import app.repositories.ln_impl.protos.cln.node_pb2 as ln
 import app.repositories.ln_impl.protos.cln.node_pb2_grpc as clnrpc
 import app.repositories.ln_impl.protos.cln.primitives_pb2 as lnp
+from app.core_utils import config_get_hex_str, next_push_id
 from app.models.lightning import (
     Channel,
     FeeRevenue,
@@ -34,8 +35,7 @@ from app.models.lightning import (
     TxStatus,
     WalletBalance,
 )
-from app.repositories.bitcoin_utils import bitcoin_rpc_async
-from app.utils import config_get_hex_str, next_push_id
+from app.repositories.utils.bitcoin import bitcoin_rpc_async
 
 _cln_grpc_cert = bytes.fromhex(
     config_get_hex_str(config("cln_grpc_cert"), name="cln_grpc_cert")

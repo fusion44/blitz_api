@@ -6,20 +6,13 @@ from decouple import config
 from fastapi import HTTPException, Request, status
 
 from app.auth.auth_handler import sign_jwt
+from app.core_utils import SSE, broadcast_sse_msg
 from app.models.system import (
     APIPlatform,
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
     SystemInfo,
-)
-from app.repositories.system_impl.native_python import match_password
-from app.utils import (
-    SSE,
-    broadcast_sse_msg,
-    call_script,
-    call_sudo_script,
-    parse_key_value_text,
 )
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
@@ -34,6 +27,7 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
         match_password,
         shutdown_impl,
     )
+    from app.repositories.utils.raspiblitz import call_script, parse_key_value_text
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
         HW_INFO_YIELD_TIME,

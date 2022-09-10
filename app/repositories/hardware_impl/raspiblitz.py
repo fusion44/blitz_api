@@ -1,11 +1,8 @@
 import time
 
-from app.utils import redis_get
+from app.core_utils import redis_get
 
 HW_INFO_YIELD_TIME = 2
-
-
-from fastapi_plugins import redis_plugin as r
 
 
 async def get_hardware_info_impl() -> map:

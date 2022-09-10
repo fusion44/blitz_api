@@ -10,6 +10,7 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from starlette import status
 
+from app.core_utils import SSE, broadcast_sse_msg
 from app.models.bitcoind import (
     BlockchainInfo,
     BlockRpcFunc,
@@ -17,8 +18,7 @@ from app.models.bitcoind import (
     FeeEstimationMode,
     NetworkInfo,
 )
-from app.repositories.bitcoin_utils import bitcoin_config, bitcoin_rpc_async
-from app.utils import SSE, broadcast_sse_msg
+from app.repositories.utils.bitcoin import bitcoin_config, bitcoin_rpc_async
 
 _initialized = False
 

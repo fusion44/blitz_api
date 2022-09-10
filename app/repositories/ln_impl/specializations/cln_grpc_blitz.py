@@ -7,6 +7,7 @@ from fastapi.exceptions import HTTPException
 from starlette import status
 
 import app.repositories.ln_impl.cln_grpc as cln_main
+from app.core_utils import call_script2, redis_get
 from app.models.lightning import (
     Channel,
     FeeRevenue,
@@ -24,7 +25,6 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.utils import call_script2, redis_get
 
 # RaspiBlitz implements a lock function on top of CLN, so we need to implement this on Blitz only.
 

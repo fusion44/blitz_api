@@ -14,6 +14,7 @@ import app.repositories.ln_impl.protos.lnd.router_pb2 as router
 import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
 import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2 as unlocker
 import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
+from app.core_utils import SSE, broadcast_sse_msg, config_get_hex_str
 from app.models.lightning import (
     Channel,
     FeeRevenue,
@@ -33,7 +34,6 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.utils import SSE, broadcast_sse_msg, config_get_hex_str
 
 _lnd_connect_error_debug_msg = """
 LND_GRPC: Unable to connect to LND. Possible reasons:

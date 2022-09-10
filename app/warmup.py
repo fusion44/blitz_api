@@ -1,7 +1,6 @@
 import asyncio
 from typing import List
 
-from app.repositories.apps import get_app_status
 from app.repositories.bitcoin import get_btc_info
 from app.repositories.lightning import (
     get_fee_revenue,

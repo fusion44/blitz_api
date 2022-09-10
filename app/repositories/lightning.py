@@ -6,6 +6,7 @@ from decouple import config
 from fastapi import status
 from fastapi.exceptions import HTTPException
 
+from app.core_utils import SSE, broadcast_sse_msg, redis_get
 from app.models.lightning import (
     Channel,
     FeeRevenue,
@@ -22,7 +23,6 @@ from app.models.lightning import (
     SendCoinsResponse,
 )
 from app.models.system import APIPlatform
-from app.utils import SSE, broadcast_sse_msg, redis_get
 
 PLATFORM = config("platform", cast=str)
 
