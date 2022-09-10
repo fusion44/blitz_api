@@ -7,10 +7,10 @@ from fastapi import HTTPException, Request, status
 from app.models.system import APIPlatform, ConnectionInfo, RawDebugLogData, SystemInfo
 from app.utils import (
     SSE,
+    broadcast_sse_msg,
     call_script,
     call_sudo_script,
     parse_key_value_text,
-    send_sse_message,
 )
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
@@ -123,9 +123,9 @@ async def get_connection_info() -> ConnectionInfo:
 
 async def shutdown(reboot: bool) -> bool:
     if reboot:
-        await send_sse_message(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
+        await broadcast_sse_msg(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
     else:
-        await send_sse_message(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
+        await broadcast_sse_msg(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
 
     return await shutdown_impl(reboot=reboot)
 
@@ -172,7 +172,7 @@ async def _handle_gather_hardware_info():
     while True:
         info = await get_hardware_info()
         if last_info != info:
-            await send_sse_message(SSE.HARDWARE_INFO, info)
+            await broadcast_sse_msg(SSE.HARDWARE_INFO, info)
             last_info = info
 
         await asyncio.sleep(HW_INFO_YIELD_TIME)

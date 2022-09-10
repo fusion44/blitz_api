@@ -8,12 +8,12 @@ import re
 import time
 import warnings
 from typing import Dict, Optional
-from app.sse_manager import SSEManager
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 
 from app.external.sse_starlette import ServerSentEvent
+from app.sse_manager import SSEManager
 
 sse_mgr = SSEManager()
 sse_mgr.setup()
@@ -40,8 +40,8 @@ def build_sse_event(event: str, json_data: Optional[Dict]):
     )
 
 
-async def send_sse_message(event: str, json_data: Optional[Dict]):
-    """Send a message to any SSE connections
+async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
+    """Broadcasts a message to all connected clients
 
     Parameters
     ----------

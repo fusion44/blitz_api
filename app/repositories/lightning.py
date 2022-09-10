@@ -22,7 +22,7 @@ from app.models.lightning import (
     SendCoinsResponse,
 )
 from app.models.system import APIPlatform
-from app.utils import SSE, redis_get, send_sse_message
+from app.utils import SSE, broadcast_sse_msg, redis_get
 
 PLATFORM = config("platform", cast=str)
 
@@ -211,13 +211,13 @@ async def _handle_info_listener():
         info = await ln.get_ln_info_impl()
 
         if last_info != info:
-            await send_sse_message(SSE.LN_INFO, info.dict())
+            await broadcast_sse_msg(SSE.LN_INFO, info.dict())
             last_info = info
 
         info_lite = LightningInfoLite.from_lninfo(info)
 
         if last_info_lite != info_lite:
-            await send_sse_message(SSE.LN_INFO_LITE, info_lite.dict())
+            await broadcast_sse_msg(SSE.LN_INFO_LITE, info_lite.dict())
             last_info_lite = info_lite
 
         await asyncio.sleep(GATHER_INFO_INTERVALL)
@@ -225,7 +225,7 @@ async def _handle_info_listener():
 
 async def _handle_invoice_listener():
     async for i in ln.listen_invoices():
-        await send_sse_message(SSE.LN_INVOICE_STATUS, i.dict())
+        await broadcast_sse_msg(SSE.LN_INVOICE_STATUS, i.dict())
         _schedule_wallet_balance_update()
 
 
@@ -245,11 +245,11 @@ async def _handle_forward_event_listener():
         if len(_fwd_successes) > 0:
             l = _fwd_successes
             _fwd_successes = []
-            await send_sse_message(SSE.LN_FORWARD_SUCCESSES, l)
+            await broadcast_sse_msg(SSE.LN_FORWARD_SUCCESSES, l)
 
         _schedule_wallet_balance_update()
         rev = await get_fee_revenue()
-        await send_sse_message(SSE.LN_FEE_REVENUE, rev.dict())
+        await broadcast_sse_msg(SSE.LN_FEE_REVENUE, rev.dict())
 
         _fwd_update_scheduled = False
 
@@ -272,7 +272,7 @@ def _schedule_wallet_balance_update():
         await asyncio.sleep(1.1)
         wb = await ln.get_wallet_balance_impl()
         if _CACHE["wallet_balance"] != wb:
-            await send_sse_message(SSE.WALLET_BALANCE, wb.dict())
+            await broadcast_sse_msg(SSE.WALLET_BALANCE, wb.dict())
             _CACHE["wallet_balance"] = wb
 
         _wallet_balance_update_scheduled = False

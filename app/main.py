@@ -38,7 +38,7 @@ from app.repositories.utils import (
     get_full_client_warmup_data_bitcoinonly,
 )
 from app.routers import apps, bitcoin, lightning, setup, system
-from app.utils import SSE, send_sse_message, build_sse_event, sse_mgr
+from app.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -87,7 +87,7 @@ async def on_startup():
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
     register_cookie_updater()
-    await send_sse_message(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
 
     loop = asyncio.get_event_loop()
     loop.create_task(_initialize_bitcoin())
@@ -119,7 +119,7 @@ async def _set_startup_status(
 
     loop = asyncio.get_event_loop()
     loop.create_task(warmup_new_connections())
-    await send_sse_message(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
 
 
 async def _initialize_bitcoin():

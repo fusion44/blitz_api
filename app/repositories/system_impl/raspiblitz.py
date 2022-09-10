@@ -9,10 +9,10 @@ from app.models.system import APIPlatform, ConnectionInfo, SystemInfo
 from app.repositories.lightning import get_ln_info
 from app.utils import (
     SSE,
+    broadcast_sse_msg,
     call_script,
     parse_key_value_text,
     redis_get,
-    send_sse_message,
 )
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
@@ -89,9 +89,9 @@ async def shutdown_impl(reboot: bool) -> bool:
     if proc.returncode > 0:
         err = stderr.decode()
         if reboot:
-            await send_sse_message(SSE.SYSTEM_REBOOT_ERROR, {"error_message": err})
+            await broadcast_sse_msg(SSE.SYSTEM_REBOOT_ERROR, {"error_message": err})
         else:
-            await send_sse_message(SSE.SYSTEM_SHUTDOWN_ERROR, {"error_message": err})
+            await broadcast_sse_msg(SSE.SYSTEM_SHUTDOWN_ERROR, {"error_message": err})
 
         return False
 

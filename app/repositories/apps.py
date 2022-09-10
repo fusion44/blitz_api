@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 
 from app.constants import available_app_ids
-from app.utils import SSE, call_sudo_script, parse_key_value_text, send_sse_message
+from app.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
@@ -153,7 +153,7 @@ async def install_app_sub(app_id: str):
             detail=app_id + "install script does not exist / is not supported",
         )
 
-    await send_sse_message(
+    await broadcast_sse_msg(
         SSE.INSTALL_APP,
         {"id": app_id, "mode": "on", "result": "running", "details": ""},
     )
@@ -170,7 +170,7 @@ async def uninstall_app_sub(app_id: str, delete_data: bool):
             status.HTTP_400_BAD_REQUEST, detail="script not exist/supported"
         )
 
-    await send_sse_message(
+    await broadcast_sse_msg(
         SSE.INSTALL_APP,
         {"id": app_id, "mode": "off", "result": "running", "details": ""},
     )
@@ -235,7 +235,7 @@ async def run_bonus_script(app_id: str, params: str):
         # when there is a defined error message (if multiple it wil lbe the last one)
         if "error" in stdoutData:
             logging.error(f"FOUND `error=` returned by script: {stdoutData['error']}")
-            await send_sse_message(
+            await broadcast_sse_msg(
                 SSE.INSTALL_APP,
                 {
                     "id": app_id,
@@ -247,7 +247,7 @@ async def run_bonus_script(app_id: str, params: str):
         # when there is no result (e.g. result="OK") at the end of install script stdout - consider also script had error
         elif not "result" in stdoutData:
             logging.error(f"NO `result=` returned by script:")
-            await send_sse_message(
+            await broadcast_sse_msg(
                 SSE.INSTALL_APP,
                 {
                     "id": app_id,
@@ -266,7 +266,7 @@ async def run_bonus_script(app_id: str, params: str):
             if updatedAppData["error"] != "":
                 logging.warning(f"Error Detected ...")
                 logging.warning(f"updatedAppData: {updatedAppData}")
-                await send_sse_message(
+                await broadcast_sse_msg(
                     SSE.INSTALL_APP,
                     {
                         "id": app_id,
@@ -280,7 +280,7 @@ async def run_bonus_script(app_id: str, params: str):
             elif mode == "on":
                 if updatedAppData["installed"]:
                     logging.info(f"WIN - install was effective")
-                    await send_sse_message(
+                    await broadcast_sse_msg(
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
@@ -295,7 +295,7 @@ async def run_bonus_script(app_id: str, params: str):
                     logging.error(f"FAIL - was not installed")
                     logging.warning(f"DEBUG - updatedAppData: {updatedAppData}")
                     logging.warning(f"DEBUG - params: {params}")
-                    await send_sse_message(
+                    await broadcast_sse_msg(
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
@@ -312,7 +312,7 @@ async def run_bonus_script(app_id: str, params: str):
                     logging.error(f"FAIL - is still installed")
                     logging.warning(f"DEBUG - updatedAppData: {updatedAppData}")
                     logging.warning(f"DEBUG - params: {params}")
-                    await send_sse_message(
+                    await broadcast_sse_msg(
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
@@ -323,7 +323,7 @@ async def run_bonus_script(app_id: str, params: str):
                     )
                 else:
                     logging.info(f"WIN - uninstall was effective")
-                    await send_sse_message(
+                    await broadcast_sse_msg(
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
@@ -334,10 +334,10 @@ async def run_bonus_script(app_id: str, params: str):
                     )
 
             # send an updated state if that app
-            await send_sse_message(SSE.INSTALLED_APP_STATUS, [updatedAppData])
+            await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
     else:
         logging.warning(f"Install Feedback Event: fail no stdout")
-        await send_sse_message(
+        await broadcast_sse_msg(
             SSE.INSTALL_APP,
             {"id": app_id, "mode": params, "result": "fail", "details": "no stdout"},
         )

@@ -18,7 +18,7 @@ from app.models.bitcoind import (
     NetworkInfo,
 )
 from app.repositories.bitcoin_utils import bitcoin_config, bitcoin_rpc_async
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, broadcast_sse_msg
 
 _initialized = False
 
@@ -136,7 +136,7 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
             )
 
         r = await bitcoin_rpc_async("getblock", [hash, verbosity])
-        await send_sse_message(SSE.BTC_NEW_BLOC, r["result"])
+        await broadcast_sse_msg(SSE.BTC_NEW_BLOC, r["result"])
 
 
 async def register_bitcoin_zmq_sub():
@@ -157,7 +157,7 @@ async def _handle_gather_bitcoin_status():
 
         if last_info != info:
             # only send data if anything has changed
-            await send_sse_message(SSE.BTC_INFO, info.dict())
+            await broadcast_sse_msg(SSE.BTC_INFO, info.dict())
             last_info = info
 
         await asyncio.sleep(2)

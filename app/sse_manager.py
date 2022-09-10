@@ -1,8 +1,8 @@
 import asyncio
 from asyncio.log import logger
 from typing import Tuple
-import async_timeout
 
+import async_timeout
 from fastapi import Request
 
 from app.external.sse_starlette import EventSourceResponse, ServerSentEvent
