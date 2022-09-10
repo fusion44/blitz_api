@@ -2,14 +2,21 @@ import array
 import asyncio
 import json
 import logging
+import os
 import random
 import re
 import time
 import warnings
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+
+from app.external.sse_starlette import ServerSentEvent
+from app.sse_manager import SSEManager
+
+sse_mgr = SSEManager()
+sse_mgr.setup()
 
 
 class ProcessResult:
@@ -26,20 +33,25 @@ class ProcessResult:
         return f"ProcessResult: \nreturn_code: {self.return_code} \nstdout: {self.stdout} \nstderr: {self.stderr}"
 
 
-async def send_sse_message(id: str, json_data: Dict):
-    """Send a message to any SSE connections
+def build_sse_event(event: str, json_data: Optional[Dict]):
+    return ServerSentEvent(
+        event=event,
+        data=json.dumps(jsonable_encoder(json_data)),
+    )
+
+
+async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
+    """Broadcasts a message to all connected clients
 
     Parameters
     ----------
-    id : str
-        ID String von SSE class
-    data : list, optional
+    event : str
+        The SSE event
+    data : dictionary, optional
         The data to include
     """
 
-    await redis_plugin.redis.publish_json(
-        "default", {"event": id, "data": json.dumps(jsonable_encoder(json_data))}
-    )
+    await sse_mgr.broadcast_to_all(build_sse_event(event, json_data))
 
 
 async def redis_get(key: str) -> str:
@@ -231,3 +243,17 @@ def next_push_id() -> str:
       but "incrementing" them by 1 (only in the case of a timestamp collision).
     """
     return pid_gen.next_id()
+
+
+def config_get_hex_str(value: str, name: str = "") -> str:
+    if value is None or len(value) == 0:
+        raise ValueError(f"{name} cannot be null or empty")
+
+    isPath = os.path.exists(value)
+    if isPath:
+        with open(value, "rb") as f:
+            m = f.read()
+            m = m.hex()
+            return m
+
+    return value

@@ -35,11 +35,17 @@ from app.models.lightning import (
     WalletBalance,
 )
 from app.repositories.bitcoin_utils import bitcoin_rpc_async
-from app.utils import next_push_id
+from app.utils import config_get_hex_str, next_push_id
 
-_cln_grpc_cert = bytes.fromhex(config("cln_grpc_cert"))
-_cln_grpc_key = bytes.fromhex(config("cln_grpc_key"))
-_cln_grpc_ca = bytes.fromhex(config("cln_grpc_ca"))
+_cln_grpc_cert = bytes.fromhex(
+    config_get_hex_str(config("cln_grpc_cert"), name="cln_grpc_cert")
+)
+_cln_grpc_key = bytes.fromhex(
+    config_get_hex_str(config("cln_grpc_key"), name="cln_grpc_key")
+)
+_cln_grpc_ca = bytes.fromhex(
+    config_get_hex_str(config("cln_grpc_ca"), name="cln_grpc_ca")
+)
 _cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
 _creds = grpc.ssl_channel_credentials(
     root_certificates=_cln_grpc_ca,

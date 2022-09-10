@@ -33,7 +33,7 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, broadcast_sse_msg, config_get_hex_str
 
 _lnd_connect_error_debug_msg = """
 LND_GRPC: Unable to connect to LND. Possible reasons:
@@ -66,8 +66,8 @@ def _metadata_callback(context, callback):
     callback([("macaroon", _lnd_macaroon)], None)
 
 
-_lnd_macaroon = dconfig("lnd_macaroon")
-_lnd_cert = bytes.fromhex(dconfig("lnd_cert"))
+_lnd_macaroon = config_get_hex_str(dconfig("lnd_macaroon"), name="lnd_macaroon")
+_lnd_cert = bytes.fromhex(config_get_hex_str(dconfig("lnd_cert"), name="lnd_cert"))
 _lnd_grpc_ip = dconfig("lnd_grpc_ip")
 _lnd_grpc_port = dconfig("lnd_grpc_port")
 _lnd_grpc_url = _lnd_grpc_ip + ":" + _lnd_grpc_port
@@ -496,7 +496,7 @@ async def send_coins_impl(input: SendCoinsInput) -> SendCoinsResponse:
 
         response = await _lnd_stub.SendCoins(r)
         r = SendCoinsResponse.from_lnd_grpc(response, input)
-        await send_sse_message(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
+        await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
         return r
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked()
@@ -533,7 +533,7 @@ async def send_payment_impl(
         p = None
         async for response in _router_stub.SendPaymentV2(r):
             p = Payment.from_lnd_grpc(response)
-            await send_sse_message(SSE.LN_PAYMENT_STATUS, p.dict())
+            await broadcast_sse_msg(SSE.LN_PAYMENT_STATUS, p.dict())
         return p
     except grpc.aio._call.AioRpcError as error:
         _check_if_locked(error)
