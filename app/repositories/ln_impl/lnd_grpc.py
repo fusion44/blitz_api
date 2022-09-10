@@ -33,7 +33,7 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.utils import SSE, send_sse_message
+from app.utils import SSE, config_get_hex_str, send_sse_message
 
 _lnd_connect_error_debug_msg = """
 LND_GRPC: Unable to connect to LND. Possible reasons:
@@ -66,8 +66,8 @@ def _metadata_callback(context, callback):
     callback([("macaroon", _lnd_macaroon)], None)
 
 
-_lnd_macaroon = dconfig("lnd_macaroon")
-_lnd_cert = bytes.fromhex(dconfig("lnd_cert"))
+_lnd_macaroon = config_get_hex_str(dconfig("lnd_macaroon"), name="lnd_macaroon")
+_lnd_cert = bytes.fromhex(config_get_hex_str(dconfig("lnd_cert"), name="lnd_cert"))
 _lnd_grpc_ip = dconfig("lnd_grpc_ip")
 _lnd_grpc_port = dconfig("lnd_grpc_port")
 _lnd_grpc_url = _lnd_grpc_ip + ":" + _lnd_grpc_port

@@ -2,6 +2,7 @@ import array
 import asyncio
 import json
 import logging
+import os
 import random
 import re
 import time
@@ -231,3 +232,17 @@ def next_push_id() -> str:
       but "incrementing" them by 1 (only in the case of a timestamp collision).
     """
     return pid_gen.next_id()
+
+
+def config_get_hex_str(value: str, name: str = "") -> str:
+    if value is None or len(value) == 0:
+        raise ValueError(f"{name} cannot be null or empty")
+
+    isPath = os.path.exists(value)
+    if isPath:
+        with open(value, "rb") as f:
+            m = f.read()
+            m = m.hex()
+            return m
+
+    return value
