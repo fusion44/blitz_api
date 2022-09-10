@@ -7,10 +7,14 @@ import random
 import re
 import time
 import warnings
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+
+from app.external.sse_starlette import ServerSentEvent
+
+sse_queue = asyncio.Queue()
 
 
 class ProcessResult:
@@ -27,19 +31,22 @@ class ProcessResult:
         return f"ProcessResult: \nreturn_code: {self.return_code} \nstdout: {self.stdout} \nstderr: {self.stderr}"
 
 
-async def send_sse_message(id: str, json_data: Dict):
+async def send_sse_message(event: str, json_data: Optional[Dict]):
     """Send a message to any SSE connections
 
     Parameters
     ----------
-    id : str
-        ID String von SSE class
-    data : list, optional
+    event : str
+        The SSE event
+    data : dictionary, optional
         The data to include
     """
 
-    await redis_plugin.redis.publish_json(
-        "default", {"event": id, "data": json.dumps(jsonable_encoder(json_data))}
+    await sse_queue.put(
+        ServerSentEvent(
+            event=event,
+            data=json.dumps(jsonable_encoder(json_data)),
+        )
     )
 
 
