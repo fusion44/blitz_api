@@ -421,6 +421,7 @@ async def add_invoice_impl(
         # Can't use Invoice.from_lnd_grpc() here because
         # the response is not a standard invoice
         invoice = Invoice(
+            value_msat=value_msat,
             memo=memo,
             expiry=expiry,
             r_hash=response.r_hash.hex(),
