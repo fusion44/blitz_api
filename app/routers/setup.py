@@ -7,8 +7,8 @@ from pydantic import BaseModel
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.core_utils import call_script, parse_key_value_lines, redis_get
-from app.repositories.utils.raspiblitz import name_valid, password_valid
 from app.repositories.system_impl.raspiblitz import RaspiBlitzSystem
+from app.repositories.utils.raspiblitz import name_valid, password_valid
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 
