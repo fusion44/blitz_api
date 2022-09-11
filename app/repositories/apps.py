@@ -6,11 +6,11 @@ PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 apps = None
 
 if PLATFORM == APIPlatform.RASPIBLITZ:
-    from .apps_impl.raspiblitz import RaspiBlitzAppsImpl as AppsImpl
+    from .apps_impl.raspiblitz import RaspiBlitzApps as Apps
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
-    from .apps_impl.native_python import NativePythonAppsImpl as AppsImpl
+    from .apps_impl.native_python import NativePythonApps as Apps
 
-apps = AppsImpl()
+apps = Apps()
 
 if apps is None:
     raise RuntimeError(f"Unknown platform {PLATFORM}")

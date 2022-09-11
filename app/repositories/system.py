@@ -20,17 +20,17 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
         get_hardware_info_impl,
     )
 
-    from .system_impl.raspiblitz import RaspiBlitzSystem as SystemImpl
+    from .system_impl.raspiblitz import RaspiBlitzSystem as System
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
     )
 
-    from .system_impl.native_python import NativePythonSystem as SystemImpl
+    from .system_impl.native_python import NativePythonSystem as System
 
 
-system = SystemImpl()
+system = System()
 
 if system is None:
     raise RuntimeError(f"Unknown platform {PLATFORM}")

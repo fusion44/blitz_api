@@ -23,7 +23,7 @@ SHELL_SCRIPT_PATH = config("shell_script_path")
 node_type = config("ln_node")
 
 
-class RaspiBlitzAppsImpl(AppsBase):
+class RaspiBlitzApps(AppsBase):
     async def get_app_status_single(self, app_id):
 
         if app_id not in available_app_ids:
