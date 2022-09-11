@@ -17,6 +17,7 @@ from app.models.system import (
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
+    from app.core_utils import call_script, call_sudo_script, parse_key_value_text
     from app.repositories.hardware_impl.raspiblitz import (
         HW_INFO_YIELD_TIME,
         get_hardware_info_impl,
@@ -27,7 +28,6 @@ if PLATFORM == APIPlatform.RASPIBLITZ:
         match_password,
         shutdown_impl,
     )
-    from app.repositories.utils.raspiblitz import call_script, parse_key_value_text
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.repositories.hardware_impl.native_python import (
         HW_INFO_YIELD_TIME,

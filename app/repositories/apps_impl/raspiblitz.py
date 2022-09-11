@@ -9,10 +9,14 @@ from decouple import config
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 
-from app.constants import available_app_ids
-from app.core_utils import SSE, broadcast_sse_msg
+from app.core_utils import (
+    SSE,
+    broadcast_sse_msg,
+    call_sudo_script,
+    parse_key_value_text,
+)
 from app.repositories.apps_impl.apps_base import AppsBase
-from app.repositories.utils.raspiblitz import call_sudo_script, parse_key_value_text
+from app.repositories.utils.raspiblitz import available_app_ids
 
 SHELL_SCRIPT_PATH = config("shell_script_path")
 
