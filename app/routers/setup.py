@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.core_utils import call_script, parse_key_value_lines, redis_get
-from app.repositories.system import name_valid, password_valid, shutdown
+from app.repositories.utils.raspiblitz import name_valid, password_valid
+from app.repositories.system_impl.raspiblitz import RaspiBlitzSystem
 
 router = APIRouter(prefix="/setup", tags=["Setup"])
 
@@ -285,7 +286,8 @@ async def get_shutdown():
         return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # do the shutdown
-    return await shutdown(False)
+    system = RaspiBlitzSystem()
+    return await system.shutdown(False)
 
 
 # When WebUI displayed seed words & user confirmed write the calls:
