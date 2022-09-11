@@ -1,5 +1,7 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
@@ -8,12 +10,12 @@ from app.external.sse_starlette import EventSourceResponse
 from app.models.system import ConnectionInfo, LoginInput, RawDebugLogData, SystemInfo
 from app.repositories.system import (
     HW_INFO_YIELD_TIME,
+    change_password,
     get_connection_info,
     get_debug_logs_raw,
     get_hardware_info,
     get_system_info,
     login,
-    password_change,
     shutdown,
     subscribe_hardware_info,
 )
@@ -59,12 +61,19 @@ def refresh_token():
 @router.post(
     "/change-password",
     name=f"{_PREFIX}.change-password",
-    summary="Endpoint to change your password a, b or c",
+    summary="Endpoint to change your password",
     response_description="if 200 OK - password change worked",
     dependencies=[Depends(JWTBearer())],
 )
-async def change_password(type: str, old_password: str, new_password: str):
-    return await password_change(type, old_password, new_password)
+async def change_password(
+    old_password: str,
+    new_password: str,
+    type: Optional[str] = Query(
+        None,
+        description=' ℹ️ Used in **RaspiBlitz only**. Password A, B or C. Must be one of `["a", "b", "c"]`',
+    ),
+):
+    return await change_password(type, old_password, new_password)
 
 
 @router.get(
