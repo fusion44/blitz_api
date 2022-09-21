@@ -210,9 +210,17 @@ def _send_sse_event(id, event, data):
 @app.get(
     "/sse/subscribe",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(JWTBearer())],
 )
 async def stream(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(401)
+
+    print(JWTBearer().verify_jwt(jwtoken=token))
+
+    if not JWTBearer().verify_jwt(jwtoken=token):
+        raise HTTPException(401)
+
     event_source, id = sse_mgr.add_connection(request)
     new_connections.append(id)
 
