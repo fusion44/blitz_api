@@ -2,7 +2,7 @@ import logging
 import secrets
 
 from decouple import config
-from fastapi import APIRouter, HTTPException, Request, status, Response
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
