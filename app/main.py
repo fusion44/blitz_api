@@ -214,7 +214,7 @@ def _send_sse_event(id, event, data):
 async def stream(request: Request):
     token = request.cookies.get("access_token")
     if not token:
-        token = request.headers.get('authorization').replace("Bearer ", "")
+        token = request.headers.get("authorization").replace("Bearer ", "")
         if not JWTBearer().verify_jwt(jwtoken=token):
             raise HTTPException(401)
 
