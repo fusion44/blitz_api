@@ -3,7 +3,6 @@ from decouple import config
 
 from app.repositories.hardware_impl.hardware_base import HardwareBase
 
-
 _SLEEP_TIME = config("gather_hw_info_interval", default=2, cast=float)
 _CPU_AVG_PERIOD = config("cpu_usage_averaging_period", default=0.5, cast=float)
 _HW_INFO_YIELD_TIME = _SLEEP_TIME + _CPU_AVG_PERIOD
