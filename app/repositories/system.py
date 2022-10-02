@@ -15,25 +15,20 @@ from app.models.system import (
 
 PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
-    from app.repositories.hardware_impl.raspiblitz import (
-        HW_INFO_YIELD_TIME,
-        get_hardware_info_impl,
-    )
-
+    from .hardware_impl.raspiblitz import RaspiBlitzHardware as Hardware
     from .system_impl.raspiblitz import RaspiBlitzSystem as System
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
-    from app.repositories.hardware_impl.native_python import (
-        HW_INFO_YIELD_TIME,
-        get_hardware_info_impl,
-    )
-
+    from .hardware_impl.native_python import NativePythonHardware as Hardware
     from .system_impl.native_python import NativePythonSystem as System
 
 
 system = System()
+hw = Hardware()
 
-if system is None:
+if hw is None or system is None:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
+
+HW_INFO_YIELD_TIME = hw.get_hardware_info_yield_time()
 
 
 async def change_password(type: Optional[str], old_password: str, new_password: str):
@@ -56,7 +51,7 @@ async def get_system_info() -> SystemInfo:
 
 async def get_hardware_info() -> map:
     try:
-        return await get_hardware_info_impl()
+        return await hw.get_hardware_info()
     except HTTPException as r:
         raise
     except NotImplementedError as r:
