@@ -2,7 +2,7 @@ import pytest
 from pydantic import AnyStrMinLengthError, ValidationError
 
 import app.repositories.system_impl.native_python as npy
-from app.models.system import LoginInput
+from app.system.models import LoginInput
 
 
 @pytest.mark.asyncio

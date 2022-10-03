@@ -1,4 +1,4 @@
-from app.models.bitcoind import *
+from app.bitcoind.models import *
 
 blockhain_info = {
     "chain": "main",

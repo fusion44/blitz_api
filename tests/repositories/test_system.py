@@ -1,8 +1,8 @@
 import pytest
 from fastapi import HTTPException, status
 
-import app.repositories.system as sys
-from app.models.system import LoginInput
+import app.system.service as sys
+from app.system.models import LoginInput
 
 
 @pytest.mark.asyncio

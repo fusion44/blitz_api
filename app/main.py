@@ -15,29 +15,34 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
+from app.api.models import ApiStartupStatus, StartupState
+from app.api.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
+from app.api.warmup import (
+    get_bitcoin_client_warmup_data,
+    get_full_client_warmup_data,
+    get_full_client_warmup_data_bitcoinonly,
+)
+from app.apps import router
+from app.apps.router import router as app_router
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import (
     handle_local_cookie,
     register_cookie_updater,
     remove_local_cookie,
 )
-from app.core_utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
-from app.external.fastapi_versioning import VersionedFastAPI
-from app.models.api import ApiStartupStatus, StartupState
-from app.models.lightning import LnInitState
-from app.repositories.bitcoin import (
+from app.bitcoind.router import router as bitcoin_router
+from app.bitcoind.service import (
     initialize_bitcoin_repo,
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
-from app.repositories.lightning import initialize_ln_repo, register_lightning_listener
-from app.repositories.system import get_hardware_info, register_hardware_info_gatherer
-from app.routers import apps, bitcoin, lightning, setup, system
-from app.warmup import (
-    get_bitcoin_client_warmup_data,
-    get_full_client_warmup_data,
-    get_full_client_warmup_data_bitcoinonly,
-)
+from app.external.fastapi_versioning import VersionedFastAPI
+from app.lightning.models import LnInitState
+from app.lightning.router import router as ln_router
+from app.lightning.service import initialize_ln_repo, register_lightning_listener
+from app.setup.router import router as setup_router
+from app.system.router import router as system_router
+from app.system.service import get_hardware_info, register_hardware_info_gatherer
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -52,13 +57,13 @@ class AppSettings(RedisSettings):
 unversioned_app = FastAPI()
 config = get_config()
 
-unversioned_app.include_router(apps.router)
-unversioned_app.include_router(bitcoin.router)
+unversioned_app.include_router(app_router)
+unversioned_app.include_router(bitcoin_router)
 if node_type != "none":
-    unversioned_app.include_router(lightning.router)
-unversioned_app.include_router(system.router)
-if setup.router is not None:
-    unversioned_app.include_router(setup.router)
+    unversioned_app.include_router(ln_router)
+unversioned_app.include_router(system_router)
+if setup_router is not None:
+    unversioned_app.include_router(setup_router)
 
 
 app = VersionedFastAPI(
