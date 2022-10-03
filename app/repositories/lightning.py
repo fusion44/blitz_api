@@ -28,11 +28,13 @@ PLATFORM = config("platform", cast=str)
 
 ln_node = config("ln_node")
 if ln_node == "lnd_grpc":
-    import app.repositories.ln_impl.lnd_grpc as ln
+    from app.repositories.ln_impl.lnd_grpc import LnNodeLNDgRPC as LnNode
 elif ln_node == "cln_grpc" and PLATFORM != APIPlatform.RASPIBLITZ:
-    import app.repositories.ln_impl.cln_grpc as ln
+    from app.repositories.ln_impl.cln_grpc import LnNodeCLNgRPC as LnNode
 elif ln_node == "cln_grpc" and PLATFORM == APIPlatform.RASPIBLITZ:
-    import app.repositories.ln_impl.specializations.cln_grpc_blitz as ln
+    from app.repositories.ln_impl.specializations.cln_grpc_blitz import (
+        LnNodeCLNgRPCBlitz as LnNode,
+    )
 elif ln_node == "none":
     logging.info(f"lightning was explicitly turned off")
 elif ln_node == "":
@@ -54,31 +56,33 @@ FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float
 if FWD_GATHER_INTERVAL < 0.3:
     raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
 
+ln = LnNode()
+
 
 async def initialize_ln_repo() -> AsyncGenerator[InitLnRepoUpdate, None]:
-    async for u in ln.initialize_impl():
+    async for u in ln.initialize():
         yield u
 
 
 async def get_ln_info_lite() -> LightningInfoLite:
-    ln_info = await ln.get_ln_info_impl()
+    ln_info = await ln.get_ln_info()
     return LightningInfoLite.from_lninfo(ln_info)
 
 
 async def get_wallet_balance():
-    return await ln.get_wallet_balance_impl()
+    return await ln.get_wallet_balance()
 
 
 async def list_all_tx(
     successful_only: bool, index_offset: int, max_tx: int, reversed: bool
 ) -> List[GenericTx]:
-    return await ln.list_all_tx_impl(successful_only, index_offset, max_tx, reversed)
+    return await ln.list_all_tx(successful_only, index_offset, max_tx, reversed)
 
 
 async def list_invoices(
     pending_only: bool, index_offset: int, num_max_invoices: int, reversed: bool
 ) -> List[Invoice]:
-    return await ln.list_invoices_impl(
+    return await ln.list_invoices(
         pending_only,
         index_offset,
         num_max_invoices,
@@ -87,13 +91,13 @@ async def list_invoices(
 
 
 async def list_on_chain_tx() -> List[OnChainTransaction]:
-    return await ln.list_on_chain_tx_impl()
+    return await ln.list_on_chain_tx()
 
 
 async def list_payments(
     include_incomplete: bool, index_offset: int, max_payments: int, reversed: bool
 ) -> List[Payment]:
-    return await ln.list_payments_impl(
+    return await ln.list_payments(
         include_incomplete, index_offset, max_payments, reversed
     )
 
@@ -101,19 +105,19 @@ async def list_payments(
 async def add_invoice(
     value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ) -> Invoice:
-    return await ln.add_invoice_impl(memo, value_msat, expiry, is_keysend)
+    return await ln.add_invoice(memo, value_msat, expiry, is_keysend)
 
 
 async def decode_pay_request(pay_req: str) -> PaymentRequest:
-    return await ln.decode_pay_request_impl(pay_req)
+    return await ln.decode_pay_request(pay_req)
 
 
 async def new_address(input: NewAddressInput) -> str:
-    return await ln.new_address_impl(input)
+    return await ln.new_address(input)
 
 
 async def send_coins(input: SendCoinsInput) -> SendCoinsResponse:
-    res = await ln.send_coins_impl(input)
+    res = await ln.send_coins(input)
     _schedule_wallet_balance_update()
     return res
 
@@ -124,9 +128,7 @@ async def send_payment(
     fee_limit_msat: int,
     amount_msat: Optional[int] = None,
 ) -> Payment:
-    res = await ln.send_payment_impl(
-        pay_req, timeout_seconds, fee_limit_msat, amount_msat
-    )
+    res = await ln.send_payment(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
     _schedule_wallet_balance_update()
     return res
 
@@ -147,41 +149,41 @@ async def channel_open(
     if not "@" in node_URI:
         raise ValueError("node_URI must contain @ with node physical address")
 
-    res = await ln.channel_open_impl(local_funding_amount, node_URI, target_confs)
+    res = await ln.channel_open(local_funding_amount, node_URI, target_confs)
     return res
 
 
 async def channel_list() -> List[Channel]:
-    res = await ln.channel_list_impl()
+    res = await ln.channel_list()
     return res
 
 
 async def channel_close(channel_id: int, force_close: bool) -> str:
-    res = await ln.channel_close_impl(channel_id, force_close)
+    res = await ln.channel_close(channel_id, force_close)
     return res
 
 
 async def get_ln_info() -> LnInfo:
-    ln_info = await ln.get_ln_info_impl()
+    ln_info = await ln.get_ln_info()
     if PLATFORM == APIPlatform.RASPIBLITZ:
         ln_info.identity_uri = await redis_get("ln_default_address")
     return ln_info
 
 
 async def unlock_wallet(password: str) -> bool:
-    res = await ln.unlock_wallet_impl(password)
+    res = await ln.unlock_wallet(password)
     return res
 
 
 async def get_fee_revenue() -> FeeRevenue:
-    return await ln.get_fee_revenue_impl()
+    return await ln.get_fee_revenue()
 
 
 async def register_lightning_listener():
     """
     Registers all lightning listeners
 
-    By calling get_ln_info_impl() once, we ensure that wallet is unlocked.
+    By calling get_ln_info() once, we ensure that wallet is unlocked.
     Implementation will throw HTTPException with status_code 423_LOCKED if otherwise.
     It is the task of the caller to call register_lightning_listener() again
     """
@@ -194,7 +196,7 @@ async def register_lightning_listener():
             )
             return
 
-        await ln.get_ln_info_impl()
+        await ln.get_ln_info()
 
         loop = asyncio.get_event_loop()
         loop.create_task(_handle_info_listener())
@@ -208,7 +210,7 @@ async def _handle_info_listener():
     last_info = None
     last_info_lite = None
     while True:
-        info = await ln.get_ln_info_impl()
+        info = await ln.get_ln_info()
 
         if last_info != info:
             await broadcast_sse_msg(SSE.LN_INFO, info.dict())
@@ -270,7 +272,7 @@ def _schedule_wallet_balance_update():
         global _wallet_balance_update_scheduled
         _wallet_balance_update_scheduled = True
         await asyncio.sleep(1.1)
-        wb = await ln.get_wallet_balance_impl()
+        wb = await ln.get_wallet_balance()
         if _CACHE["wallet_balance"] != wb:
             await broadcast_sse_msg(SSE.WALLET_BALANCE, wb.dict())
             _CACHE["wallet_balance"] = wb
