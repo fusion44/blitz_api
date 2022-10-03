@@ -249,11 +249,21 @@ def config_get_hex_str(value: str, name: str = "") -> str:
     if value is None or len(value) == 0:
         raise ValueError(f"{name} cannot be null or empty")
 
-    isPath = os.path.exists(value)
-    if isPath:
-        with open(value, "rb") as f:
-            m = f.read()
-            m = m.hex()
-            return m
+    if _is_hex(value):
+        return value
 
-    return value
+    if not os.path.exists(value):
+        raise ValueError(f"{name} is not a valid path")
+
+    with open(value, "rb") as f:
+        m = f.read()
+        m = m.hex()
+        return m
+
+
+def _is_hex(s):
+    try:
+        int(s, 16)
+        return True
+    except ValueError:
+        return False
