@@ -57,7 +57,8 @@ unversioned_app.include_router(bitcoin.router)
 if node_type != "none":
     unversioned_app.include_router(lightning.router)
 unversioned_app.include_router(system.router)
-unversioned_app.include_router(setup.router)
+if setup.router is not None:
+    unversioned_app.include_router(setup.router)
 
 
 app = VersionedFastAPI(
