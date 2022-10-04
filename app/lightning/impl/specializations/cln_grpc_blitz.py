@@ -24,7 +24,7 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.repositories.ln_impl.cln_grpc import LnNodeCLNgRPC
+from app.lightning.impl.cln_grpc import LnNodeCLNgRPC
 
 
 class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
@@ -71,7 +71,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
 
             await asyncio.sleep(2)
 
-        async for u in super().initialize_impl():
+        async for u in super().initialize():
             yield u
             if u.state == LnInitState.DONE:
                 break

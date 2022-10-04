@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 
 from app.api.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
-from app.apps.impl import AppsBase
+from app.apps.impl.apps_base import AppsBase
 
 available_app_ids = {
     "btc-rpc-explorer",

@@ -34,7 +34,7 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.repositories.ln_impl.ln_base import LightningNodeBase
+from app.lightning.impl.ln_base import LightningNodeBase
 
 
 def _check_if_locked(error):
@@ -625,7 +625,7 @@ This will show more debug information.
 
         while True:
             try:
-                info = await self.__lnd_stub.GetInfo(ln.GetInfoRequest())
+                info = await self._lnd_stub.GetInfo(ln.GetInfoRequest())
 
                 if info != None:
                     logging.debug(
