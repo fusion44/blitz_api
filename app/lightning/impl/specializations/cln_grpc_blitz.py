@@ -7,7 +7,8 @@ from fastapi.exceptions import HTTPException
 from starlette import status
 
 from app.api.utils import call_script2, redis_get
-from app.models.lightning import (
+from app.lightning.impl.cln_grpc import LnNodeCLNgRPC
+from app.lightning.models import (
     Channel,
     FeeRevenue,
     ForwardSuccessEvent,
@@ -24,7 +25,6 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.lightning.impl.cln_grpc import LnNodeCLNgRPC
 
 
 class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):

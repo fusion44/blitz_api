@@ -8,7 +8,7 @@ from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import enum_type_wrapper
 
-import app.repositories.ln_impl.protos.lnd.lightning_pb2 as lightning__pb2
+import app.lightning.impl.protos.lnd.lightning_pb2 as lightning__pb2
 
 # @@protoc_insertion_point(imports)
 

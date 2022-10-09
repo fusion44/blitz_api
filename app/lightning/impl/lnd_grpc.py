@@ -8,14 +8,15 @@ from decouple import config as dconfig
 from fastapi.exceptions import HTTPException
 from starlette import status
 
-import app.repositories.ln_impl.protos.lnd.lightning_pb2 as ln
-import app.repositories.ln_impl.protos.lnd.lightning_pb2_grpc as lnrpc
-import app.repositories.ln_impl.protos.lnd.router_pb2 as router
-import app.repositories.ln_impl.protos.lnd.router_pb2_grpc as routerrpc
-import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2 as unlocker
-import app.repositories.ln_impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
+import app.lightning.impl.protos.lnd.lightning_pb2 as ln
+import app.lightning.impl.protos.lnd.lightning_pb2_grpc as lnrpc
+import app.lightning.impl.protos.lnd.router_pb2 as router
+import app.lightning.impl.protos.lnd.router_pb2_grpc as routerrpc
+import app.lightning.impl.protos.lnd.walletunlocker_pb2 as unlocker
+import app.lightning.impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str
-from app.models.lightning import (
+from app.lightning.impl.ln_base import LightningNodeBase
+from app.lightning.models import (
     Channel,
     FeeRevenue,
     ForwardSuccessEvent,
@@ -34,7 +35,6 @@ from app.models.lightning import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.lightning.impl.ln_base import LightningNodeBase
 
 
 def _check_if_locked(error):
@@ -67,7 +67,7 @@ LND_GRPC: Unable to connect to LND. Possible reasons:
     This will recreate the TLS certificate. The .env must be adapted accordingly.
 * TLS certificate is wrong. (settings changed, ...)
 
-To Debug gRPC problems uncomment the following line in app.repositories.ln_impl.lnd_grpc.py
+To Debug gRPC problems uncomment the following line in app.lightning.impl.lnd_grpc.py
 # os.environ["GRPC_VERBOSITY"] = "DEBUG"
 This will show more debug information.
     """
