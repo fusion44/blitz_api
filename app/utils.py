@@ -58,8 +58,7 @@ async def redis_get(key: str) -> str:
     v = await redis_plugin.redis.get(key)
 
     if not v:
-        if not "tor_web_addr" in key:
-            logging.warning(f"Key '{key}' not found in Redis DB.")
+        logging.info(f"Key '{key}' not found in Redis DB.")
         return ""
 
     return v.decode("utf-8")
