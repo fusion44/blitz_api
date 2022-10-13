@@ -56,9 +56,10 @@ async def login(i: LoginInput, response: Response):
             )
             data = parse_key_value_text(result)
             if data["correct"] == "1":
-                token = sign_jwt().get("access_token")
+                tokenObj = sign_jwt()
+                token = tokenObj.get("access_token")
                 response.set_cookie("access_token", token)
-                return token
+                return tokenObj
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
     else:
         match = secrets.compare_digest(i.password, config("login_password", cast=str))
