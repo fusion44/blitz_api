@@ -2,7 +2,7 @@ import logging
 import secrets
 
 from decouple import config
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.params import Depends
 
 from app.auth.auth_bearer import JWTBearer
@@ -40,7 +40,7 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     response_description="JWT token for the current session.",
     status_code=status.HTTP_200_OK,
 )
-async def login(i: LoginInput):
+async def login(i: LoginInput, response: Response):
 
     platform = ""
     try:
@@ -56,12 +56,17 @@ async def login(i: LoginInput):
             )
             data = parse_key_value_text(result)
             if data["correct"] == "1":
-                return sign_jwt()
+                tokenObj = sign_jwt()
+                token = tokenObj.get("access_token")
+                response.set_cookie("access_token", token)
+                return tokenObj
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
     else:
         match = secrets.compare_digest(i.password, config("login_password", cast=str))
         if match:
-            return sign_jwt()
+            token = sign_jwt().get("access_token")
+            response.set_cookie("access_token", token)
+            return token
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Password is wrong")
 
 
