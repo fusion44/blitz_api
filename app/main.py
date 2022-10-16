@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from decouple import config as dconfig
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
 from fastapi_plugins import (
