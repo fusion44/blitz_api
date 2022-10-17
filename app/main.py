@@ -22,7 +22,6 @@ from app.auth.auth_handler import (
     remove_local_cookie,
 )
 from app.external.fastapi_versioning import VersionedFastAPI
-from app.external.sse_starlette import ServerSentEvent
 from app.models.api import ApiStartupStatus, StartupState
 from app.models.lightning import LnInitState
 from app.repositories.bitcoin import (
@@ -214,9 +213,15 @@ def _send_sse_event(id, event, data):
 async def stream(request: Request):
     token = request.cookies.get("access_token")
     if not token:
+        # No token in cookies found, try to get it from the Authorization header
         token = request.headers.get("authorization").replace("Bearer ", "")
-        if not JWTBearer().verify_jwt(jwtoken=token):
-            raise HTTPException(401)
+
+    if not token or not JWTBearer().verify_jwt(jwtoken=token):
+        # Raise an exception if no token is found or the token is invalid
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No or invalid authorization code.",
+        )
 
     event_source, id = sse_mgr.add_connection(request)
     new_connections.append(id)
