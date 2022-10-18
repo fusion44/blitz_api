@@ -65,7 +65,10 @@ async def redis_get(key: str) -> str:
             logging.warning(logstr)
         return ""
 
-    return v.decode("utf-8")
+    try:
+        return v.decode("utf-8")
+    except:
+        return v
 
 
 # TODO
