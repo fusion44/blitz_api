@@ -69,12 +69,7 @@ responses = {
     responses=responses,
 )
 async def addinvoice(
-    value_msat: int = Query(description="The amount of msat of the invoice", ge=0),
-    memo: str = Query("", description="The memo of the invoice"),
-    expiry: int = Query(3600, description="Expiry time in seconds"),
-    is_keysend: bool = Query(
-        False, description="LND only: Whether this invoice is a keysend invoice."
-    ),
+    value_msat: int, memo: str = "", expiry: int = 3600, is_keysend: bool = False
 ):
     try:
         return await add_invoice(memo, value_msat, expiry, is_keysend)

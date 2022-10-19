@@ -1,8 +1,7 @@
 from typing import Optional
 
-from decouple import config
-from fastapi import APIRouter, HTTPException, Request, Response, status
-from fastapi.params import Depends
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.params import Depends, Query
 
 from app.api.utils import SSE
 from app.auth.auth_bearer import JWTBearer

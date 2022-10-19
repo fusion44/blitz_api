@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from decouple import config as dconfig
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
 from fastapi_plugins import (
@@ -212,28 +212,12 @@ def _send_sse_event(id, event, data):
     return sse_mgr.send_to_single(id, build_sse_event(event, data))
 
 
-@app.get("/sse/subscribe", status_code=status.HTTP_200_OK)
+@app.get(
+    "/sse/subscribe",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(JWTBearer())],
+)
 async def stream(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        # No token in cookies found, try to get it from the Authorization header
-        token = request.headers.get("authorization")
-
-    if not token:
-        # Raise an exception as there is not token found
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No authorization code.",
-        )
-
-    token = token.replace("Bearer ", "")
-    if not JWTBearer().verify_jwt(jwtoken=token):
-        # token is invalid
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization code.",
-        )
-
     event_source, id = sse_mgr.add_connection(request)
     new_connections.append(id)
 

@@ -15,23 +15,23 @@ help:
 clean:
 	echo "Removing htmlcov folder and .coverage file"
 	rm -rf htmlcov .coverage
-	poetry run python -m pyclean .
+	python -m pyclean .
 
 install:
-	poetry run python -m pip install -r requirements.txt
+	python -m pip install -r requirements.txt
 
 install-dev:
-	poetry install && poetry run pre-commit install
+	poetry shell && poetry install && pre-commit install
 
 run:
-	poetry run python -m uvicorn app.main:app --reload
+	python -m uvicorn app.main:app --reload
 
 test:
-	poetry run python -m pytest
+	python -m pytest
 
 coverage:
-	poetry run python -m coverage run --source=. -m pytest
-	poetry run python -m coverage html
+	python -m coverage run --source=. -m pytest
+	python -m coverage html
 
 update-requirements-file:
 	poetry update && poetry export --output requirements.txt
@@ -40,7 +40,7 @@ sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
 
 pre-commit:
-	poetry run pre-commit run --all-files
+	pre-commit run --all-files
 
 generate-client-libs:
-	poetry run python gen_client_libs.py
+	python gen_client_libs.py
