@@ -58,10 +58,17 @@ async def redis_get(key: str) -> str:
     v = await redis_plugin.redis.get(key)
 
     if not v:
-        logging.warning(f"Key '{key}' not found in Redis DB.")
+        logstr = f"Key '{key}' not found in Redis DB."
+        if "tor_web_addr" in key:
+            logging.info(logstr)
+        else:
+            logging.warning(logstr)
         return ""
 
-    return v.decode("utf-8")
+    try:
+        return v.decode("utf-8")
+    except:
+        return v
 
 
 # TODO
@@ -176,12 +183,8 @@ def config_get_hex_str(value: str, name: str = "") -> str:
     if value is None or len(value) == 0:
         raise ValueError(f"{name} cannot be null or empty")
 
-    isPath = os.path.exists(value)
-    if isPath:
-        with open(value, "rb") as f:
-            m = f.read()
-            m = m.hex()
-            return m
+    if _is_hex(value):
+        return value
 
     return value
 
