@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.params import Depends, Query
 
 from app.api.utils import SSE
@@ -38,9 +38,11 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["System"])
     response_description="JWT token for the current session.",
     status_code=status.HTTP_200_OK,
 )
-async def login_path(i: LoginInput):
+async def login_path(i: LoginInput, response: Response):
     try:
-        return await login(i)
+        token = await login(i)
+        response.set_cookie("access_token", token)
+        return token
     except HTTPException as r:
         raise
     except NotImplementedError as r:
