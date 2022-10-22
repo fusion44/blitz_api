@@ -17,8 +17,7 @@ async def test_login(monkeypatch):
 
     res = await sys.login(i=LoginInput(password="12345678"))
     assert type(res) is dict
-    assert "access_token" in res
-    assert res["access_token"].startswith("ey") == True
+    assert res.startswith("ey") == True
 
     async def fake_match_pw_negative(_):
         return False

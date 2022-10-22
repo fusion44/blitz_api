@@ -17,11 +17,7 @@ def sign_jwt() -> Dict[str, str]:
         "expires": int(round(time.time() * 1000) + JWT_EXPIRY_TIME),
     }
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token_response(token)
-
-
-def token_response(token: str):
-    return {"access_token": token}
+    return token
 
 
 def decodeJWT(token: str) -> dict:
@@ -45,7 +41,7 @@ def handle_local_cookie():
 
     if enabled:
         f = open(full_cookie_file_path, "w")
-        f.write(sign_jwt()["access_token"])
+        f.write(sign_jwt())
         f.close()
 
 
