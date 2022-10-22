@@ -1,6 +1,7 @@
 import asyncio
 from typing import List
 
+from app.apps.service import get_app_status
 from app.bitcoind.service import get_btc_info
 from app.lightning.service import (
     get_fee_revenue,
@@ -33,7 +34,7 @@ async def get_full_client_warmup_data() -> List:
             get_ln_info_lite(),
             get_fee_revenue(),
             get_wallet_balance(),
-            # get_app_status(),
+            get_app_status(),
             get_hardware_info(),
         ]
     )
@@ -47,7 +48,7 @@ async def get_full_client_warmup_data_bitcoinonly() -> List:
         *[
             get_system_info(),
             get_btc_info(),
-            # get_app_status(),
+            get_app_status(),
             get_hardware_info(),
         ]
     )
