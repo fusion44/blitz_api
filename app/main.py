@@ -277,7 +277,8 @@ async def warmup_new_connections():
                         _send_sse_event(id, SSE.LN_INFO_LITE, res[3].dict()),
                         _send_sse_event(id, SSE.LN_FEE_REVENUE, res[4]),
                         _send_sse_event(id, SSE.WALLET_BALANCE, res[5].dict()),
-                        _send_sse_event(id, SSE.HARDWARE_INFO, res[6]),
+                        _send_sse_event(id, SSE.INSTALLED_APP_STATUS, res[6]),
+                        _send_sse_event(id, SSE.HARDWARE_INFO, res[7]),
                     ]
                 )
 
