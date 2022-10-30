@@ -8,6 +8,7 @@ from cashu.core.settings import DEBUG, MINT_URL, VERSION
 from fastapi import HTTPException
 
 import app.cashu.constants as c
+import app.cashu.exceptions as ce
 from app.cashu.models import (
     CashuInfo,
     CashuMint,
@@ -17,8 +18,6 @@ from app.cashu.models import (
     CashuWalletBalance,
     CashuWalletData,
 )
-import app.cashu.exceptions as ce
-
 from app.lightning.models import PaymentStatus
 from app.lightning.service import send_payment
 
