@@ -5,3 +5,4 @@ __pycache__
 htmlcov
 scripts/sync_to_blitz.personal.sh
 docker/.env
+cashu.db
