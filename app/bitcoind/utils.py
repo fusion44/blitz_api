@@ -1,3 +1,4 @@
+import itertools
 import json
 from types import coroutine
 
@@ -61,17 +62,22 @@ def bitcoin_rpc(method: str, params: list = []) -> requests.Response:
     return requests.post(bitcoin_config.rpc_url, auth=auth, headers=headers, data=data)
 
 
+# https://github.com/python/cpython/blob/3.10/Lib/asyncio/tasks.py#L31
+_generate_rpc_id = itertools.count(1).__next__
+
+
 async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
     auth = aiohttp.BasicAuth(bitcoin_config.username, bitcoin_config.pw)
-    headers = {"Content-type": "text/plain"}
+    headers = {"Content-type": "text/json"}
     data = (
         '{"jsonrpc": "2.0", "method": "'
         + method
-        + '", "id":"0", "params":'
+        + f'", "id":{_generate_rpc_id()}, "params":'
         + json.dumps(params)
         + "}"
     )
 
+    # TODO: Refactor this to use Exceptions
     async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
         async with session.post(bitcoin_config.rpc_url, data=data) as resp:
             if resp.status == status.HTTP_200_OK:
@@ -87,6 +93,20 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
                     "status": status.HTTP_403_FORBIDDEN,
                 }
             else:
+                e = await resp.json()
+                m = e["error"]["message"]
+                if e["error"]:
+                    if "No such mempool or blockchain transaction." in m:
+                        return {
+                            "error": "No such mempool or blockchain transaction.",
+                            "status": status.HTTP_404_NOT_FOUND,
+                        }
+                    if "parameter 1 must be of length 64" in m:
+                        return {
+                            "error": m,
+                            "status": status.HTTP_400_BAD_REQUEST,
+                        }
+
                 return {
                     "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
                     "status": resp.status,
