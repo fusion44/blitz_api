@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from pydantic.types import conint
 
 import app.lightning.docs as docs
+from app.lightning.utils import parse_cln_msat
 
 
 class LnInitState(str, Enum):
@@ -1605,6 +1606,24 @@ class OnChainTransaction(BaseModel):
             total_fees=t.total_fees,
             dest_addresses=addrs,
             label=t.label,
+        )
+
+    @classmethod
+    def from_cln_bkpr(cls, t):
+        amount = None
+        if t["tag"] == "deposit":
+            amount = parse_cln_msat(t["credit_msat"]) / 1000
+        elif t["tag"] == "withdrawal":
+            amount = -parse_cln_msat(t["debit_msat"]) / 1000
+
+        return cls(
+            tx_hash=t["outpoint"].split(":")[0],
+            amount=amount,
+            num_confirmations=0,  # block_height - t["blockheight"],
+            block_height=0,  # Block height must be set later in CLN ...
+            time_stamp=t["timestamp"],
+            total_fees=0,  # Fees are an extra event in CLN, must be set later
+            dest_addresses=[],
         )
 
 

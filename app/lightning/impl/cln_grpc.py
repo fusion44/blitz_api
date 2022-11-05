@@ -37,6 +37,7 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
+from app.lightning.utils import parse_cln_msat
 
 
 async def _make_local_call(cmd: str):
@@ -317,62 +318,77 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     async def list_on_chain_tx(self) -> List[OnChainTransaction]:
         logging.debug("CLN_GRPC: list_on_chain_tx() ")
+        info = await self.get_ln_info()  # for current block height
+        res = await _make_local_call("bkpr-listincome")
 
-        # Make a temporary copy of the file to avoid locking the db.
-        # CLN might want to write while we read.
-        info = await self.get_ln_info()
-
-        # FIXME(#87): Once Core Lightnings accountability plugin is available
-        src = "/home/bitcoin/.lightning/bitcoin/lightningd.sqlite3"
-        dest = "/tmp/lightningd.sqlite3"
-        shutil.copyfile(src, dest)
-
-        conn = sqlite3.connect(dest, uri=True)
-        cur = conn.execute("select * from outputs")
-        res = cur.fetchall()
-        conn.close()
-
-        txs = []
-        for o in res:
-            prev_out_tx = o[0].hex()
-            amount = o[2]
-            conf_block = o[9]
-            spent_block = o[10]
-            conf_time = (await self._get_block_time(conf_block))[0]
-            tx_hash = f"prev_out_tx {prev_out_tx}"
-
-            confs = info.block_height - conf_block
-            if confs < 0:
-                confs = 0
-                logging.error(
-                    f"Got negative confirmation count of for {tx_hash}\nCalc:{info.block_height} - {conf_block} = {confs}"
-                )
-
-            txs.append(
-                OnChainTransaction(
-                    tx_hash=tx_hash,
-                    amount=amount,
-                    num_confirmations=confs,
-                    block_height=conf_block,
-                    time_stamp=conf_time,
-                    total_fees=0,
-                )
+        if not res:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unknown CLN error while listing account income events",
             )
 
-            if spent_block is not None:
-                spent_time = (await self._get_block_time(spent_block))[0]
-                txs.append(
-                    OnChainTransaction(
-                        tx_hash=tx_hash,
-                        amount=-amount,
-                        num_confirmations=confs,
-                        block_height=spent_block,
-                        time_stamp=spent_time,
-                        total_fees=0,
-                    ),
-                )
+        if len(res) == 0:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No response from CLN while trying to list account income events",
+            )
 
-        return txs
+        decoded = res[0].decode()
+        js = json.loads(decoded)
+
+        txs = {}
+        num_events = len(js["income_events"])
+        for i in range(0, num_events):
+            e = js["income_events"][i]
+            if e["account"] != "wallet":
+                continue
+
+            if e["tag"] == "deposit" or e["tag"] == "withdrawal":
+                tx = OnChainTransaction.from_cln_bkpr(e)
+                txs[tx.tx_hash] = tx
+            elif e["tag"] == "onchain_fee":
+                if e["txid"] in txs:
+                    txs[e["txid"]].total_fees = parse_cln_msat(e["debit_msat"]) / 1000
+
+        # TODO: Improve this once CLN reports the block height in bkpr-listincome
+        # see https://github.com/ElementsProject/lightning/issues/5694
+        
+        # now get the block height for each tx ...
+        res = await _make_local_call("bkpr-listaccountevents")
+        if not res:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unknown CLN error while listing account events",
+            )
+
+        if len(res) == 0:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No response from CLN while trying to list account events",
+            )
+
+        decoded = res[0].decode()
+        js = json.loads(decoded)
+        num_events = len(js["events"])
+        for i in range(0, num_events):
+            e = js["events"][i]
+            if e["account"] != "wallet" or e["type"] != "chain":
+                continue
+
+            txid = ""
+            if e["tag"] == "deposit":
+                txid = e["outpoint"].split(":")[0]
+            elif e["tag"] == "withdrawal":
+                txid = e["txid"]
+
+            if len(txid) == 0:
+                continue
+
+            if txid in txs:
+                txs[txid].block_height = e["blockheight"]
+                txs[txid].num_confirmations = info.block_height - txs[txid].block_height
+
+        return [txs[k] for k in txs.keys()]
 
     async def list_payments(
         self,
