@@ -166,6 +166,12 @@ async def _initialize_lightning():
                 ln_status = StartupState.LOCKED
                 changed = True
             elif (
+                u.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+                and api_startup_status != LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+            ):
+                ln_status = LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+                changed = True
+            elif (
                 u.state == LnInitState.DONE
                 and api_startup_status.lightning != StartupState.DONE
             ):
