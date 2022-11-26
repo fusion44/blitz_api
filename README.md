@@ -193,11 +193,11 @@ http://127.0.0.1:8000/latest/docs
 ### Useful cURL commands to test the API
 
 ```sh
-curl -N http://127.0.0.1:8000/sse/subscribe
+curl -N -H "Authorization: Bearer JWT_TOKEN_HERE" http://127.0.0.1:8000/sse/subscribe
 ```
 
 ```sh
-curl -N http://127.0.0.1:8000/v1/bitcoin/getblockchaininfo
+curl -N -H "Authorization: Bearer JWT_TOKEN_HERE" http://127.0.0.1:8000/v1/bitcoin/getblockchaininfo
 ```
 
 ```sh
