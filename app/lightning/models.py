@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from pydantic.types import conint
 
 import app.lightning.docs as docs
@@ -1136,10 +1136,6 @@ class SendCoinsInput(BaseModel):
         ...,
         description="The base58 or bech32 encoded bitcoin address to send coins to on-chain",
     )
-    amount: conint(gt=0) = Query(
-        ...,
-        description="The number of bitcoin denominated in satoshis to send",
-    )
     target_conf: int = Query(
         None,
         description="The number of blocks that the transaction *should* confirm in, will be used for fee estimation",
@@ -1155,6 +1151,47 @@ class SendCoinsInput(BaseModel):
     label: str = Query(
         "", description="A label for the transaction. Ignored by CLN backend."
     )
+    send_all: bool = Query(
+        False,
+        description="Send all available on-chain funds from the wallet. Will be executed `amount` is **0**",
+    )
+    amount: conint(ge=0) = Query(
+        0,
+        description="The number of bitcoin denominated in satoshis to send. Must not be set when `send_all` is true.",
+    )
+
+    @validator("amount", pre=True, always=True)
+    def check_amount_or_send_all(cls, amount, values):
+        if amount == None:
+            amount = 0
+
+        send_all = values.get("send_all") if "send_all" in values else False
+
+        if amount < 0:
+            raise ValueError("Amount must not be negative")
+
+        if amount == 0 and not send_all:
+            # neither amount nor send_all is set
+            raise ValueError(
+                "Either amount or send_all must be set. Please review the documentation."
+            )
+
+        if amount > 0 and not send_all:
+            # amount is set and send_all is false
+            return amount
+
+        if amount > 0 and send_all:
+            # amount is set and send_all is true
+            raise ValueError(
+                "Amount and send_all must not be set at the same time. Please review the documentation."
+            )
+
+        if amount == 0 and send_all:
+            # amount is not set and send_all is true
+            return amount
+
+        # normally this should never be reached
+        raise ValueError(f"Unknown input.")
 
 
 class SendCoinsResponse(BaseModel):
@@ -1167,16 +1204,22 @@ class SendCoinsResponse(BaseModel):
         ...,
         description="The number of bitcoin denominated in satoshis which where sent",
     )
+    fees: conint(ge=0) = Query(
+        None,
+        description="The number of bitcoin denominated in satoshis which where paid as fees",
+    )
     label: str = Query(
         "", description="The label used for the transaction. Ignored by CLN backend."
     )
 
     @classmethod
     def from_lnd_grpc(cls, r, input: SendCoinsInput):
+        amount = input.amount if input.send_all == False else r.amount
         return cls(
-            txid=r.txid,
+            txid=r.tx_hash,
             address=input.address,
-            amount=input.amount,
+            amount=abs(amount),
+            fees=r.total_fees,
             label=input.label,
         )
 

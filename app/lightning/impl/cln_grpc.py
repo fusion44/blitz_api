@@ -16,6 +16,7 @@ import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
 from app.api.utils import config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
+from app.api.utils import SSE, broadcast_sse_msg
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
     Channel,
@@ -352,7 +353,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         # TODO: Improve this once CLN reports the block height in bkpr-listincome
         # see https://github.com/ElementsProject/lightning/issues/5694
-        
+
         # now get the block height for each tx ...
         res = await _make_local_call("bkpr-listaccountevents")
         if not res:
@@ -567,7 +568,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 utxos.append(lnp.Outpoint(txid=o.txid, outnum=o.output))
                 max_amt += o.amount_msat.msat
 
-            if max_amt <= input.amount:
+            if not input.send_all and max_amt <= input.amount:
                 raise HTTPException(
                     status.HTTP_412_PRECONDITION_FAILED,
                     detail=f"Could not afford {input.amount}sat. Not enough funds available",
@@ -576,14 +577,17 @@ class LnNodeCLNgRPC(LightningNodeBase):
             req = ln.WithdrawRequest(
                 destination=input.address,
                 satoshi=lnp.AmountOrAll(
-                    amount=lnp.Amount(msat=input.amount), all=False
+                    amount=lnp.Amount(msat=input.amount),
+                    all=input.send_all,
                 ),
                 minconf=input.min_confs,
                 feerate=fee_rate,
                 utxos=utxos,
             )
-            res = await self._cln_stub.Withdraw(req)
-            return SendCoinsResponse.from_cln_grpc(res, input)
+            response = await self._cln_stub.Withdraw(req)
+            r = SendCoinsResponse.from_cln_grpc(response, input)
+            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
+            return r
         except grpc.aio._call.AioRpcError as error:
             details = error.details()
             if details and details.find("Could not parse destination address") > -1:
