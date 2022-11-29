@@ -1,0 +1,21 @@
+# Builds a Docker image for use LNbits regtest scripts.
+# Currenly works only for the forked version:
+# fork: https://github.com/fusion44/legend-regtest-enviroment
+# original: https://github.com/lnbits/legend-regtest-enviroment
+
+FROM python:3.9
+
+WORKDIR /code
+
+COPY ./requirements.txt /code/requirements.txt
+
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+
+COPY ./app /code/app
+
+COPY ./docker/regtest/.env.cln1 /code/.env.cln1
+COPY ./docker/regtest/.env.lnd1 /code/.env.lnd1
+COPY ./docker/regtest/entrypoint.sh /code/entrypoint.sh
+
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]

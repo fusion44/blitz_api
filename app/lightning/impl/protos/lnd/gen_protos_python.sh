@@ -18,7 +18,7 @@ function generate() {
     DIRECTORY=$(dirname "${file}")
 
     echo "Generating protos from ${file}, into ${DIRECTORY}"
-  
+
     # Generate the protos.
     python -m grpc_tools.protoc --proto_path=googleapis:. --python_out=. --grpc_python_out=. "${file}"
   done
