@@ -1,8 +1,6 @@
 import asyncio
 import json
 import logging
-import shutil
-import sqlite3
 import time
 from typing import AsyncGenerator, List, Optional
 
@@ -14,9 +12,8 @@ from starlette import status
 import app.lightning.impl.protos.cln.node_pb2 as ln
 import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
-from app.api.utils import config_get_hex_str, next_push_id
+from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
-from app.api.utils import SSE, broadcast_sse_msg
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
     Channel,
@@ -445,7 +442,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         id = next_push_id()
         req = ln.InvoiceRequest(
-            msatoshi=msat,
+            amount_msat=msat,
             description=memo,
             label=id,
             expiry=expiry,
@@ -453,17 +450,26 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         try:
             res = await self._cln_stub.Invoice(req)
-        except Exception as e:
-            print(e)
+            return Invoice(
+                payment_request=res.bolt11,
+                memo=memo,
+                value_msat=value_msat,
+                expiry_date=res.expires_at,
+                add_index=id,
+                state=InvoiceState.OPEN,
+            )
+        except grpc.aio._call.AioRpcError as error:
+            details = error.details()
 
-        return Invoice(
-            payment_request=res.bolt11,
-            memo=memo,
-            value_msat=value_msat,
-            expiry_date=res.expires_at,
-            add_index=id,
-            state=InvoiceState.OPEN,
-        )
+            try:
+                self._handle_base_cln_error(error)
+            except HTTPException:
+                raise
+
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unknown CLN error while adding invoice: {details}",
+            )
 
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
         logging.debug(f"CLN_GRPC: decode_pay_request(pay_req={pay_req})")
@@ -626,7 +632,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         fee_limit = lnp.Amount(msat=fee_limit_msat)
         req = ln.PayRequest(
             bolt11=pay_req,
-            msatoshi=amt,
+            amount_msat=amt,
             maxfee=fee_limit,
             retry_for=timeout_seconds,
         )
@@ -644,13 +650,19 @@ class LnNodeCLNgRPC(LightningNodeBase):
                     detail=f"Ran out of routes to try after {attempts} attempts.",
                 )
 
-            if "msatoshi parameter required" in details:
+            if "Invalid bolt11: " in details:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="invalid bech32 string",
+                )
+
+            if "amount_msat parameter required" in details:
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
                     detail="amount must be specified when paying a zero amount invoice",
                 )
 
-            if "msatoshi parameter unnecessary" in details:
+            if "amount_msat parameter unnecessary" in details:
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
                     detail="amount must not be specified when paying a non-zero amount invoice",
@@ -664,8 +676,21 @@ class LnNodeCLNgRPC(LightningNodeBase):
         logging.debug(f"CLN_GRPC: get_ln_info()")
 
         req = ln.GetinfoRequest()
-        res = await self._cln_stub.Getinfo(req)
-        return LnInfo.from_cln_grpc(self.get_implementation_name(), res)
+        try:
+            res = await self._cln_stub.Getinfo(req)
+            return LnInfo.from_cln_grpc(self.get_implementation_name(), res)
+        except grpc.aio._call.AioRpcError as error:
+            details = error.details()
+
+            try:
+                self._handle_base_cln_error(error)
+            except HTTPException:
+                raise
+
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"CLN_GRPC: Unknown CLN error while getting lightning info: {details}",
+            )
 
     async def unlock_wallet(self, password: str) -> bool:
         logging.debug(f"CLN_GRPC: unlock_wallet(password=wedontlogpasswords)")
@@ -884,4 +909,15 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
+
+    def _handle_base_cln_error(self, error: grpc.aio._call.AioRpcError) -> None:
+        # This method handles all errors common to all CLN calls
+        details = error.details()
+
+        if details and details.find("Received RST_STREAM with error code 8") > -1:
+            logging.error(details)
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="CLN is responding with an error. Please check the logs.",
             )
