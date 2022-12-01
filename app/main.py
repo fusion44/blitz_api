@@ -45,7 +45,9 @@ from app.system.service import get_hardware_info, register_hardware_info_gathere
 
 logging.basicConfig(level=logging.WARNING)
 
-node_type = dconfig("ln_node")
+node_type = dconfig("ln_node").lower()
+if node_type == "":
+    node_type = "none"
 
 
 @registered_configuration
@@ -135,7 +137,7 @@ async def _initialize_bitcoin():
 
 
 async def _initialize_lightning():
-    if node_type == "none" or node_type == "":
+    if node_type == "none":
         api_startup_status.lightning = StartupState.DISABLED
         api_startup_status.lightning_msg = ""
         await _set_startup_status(lightning=StartupState.DISABLED)

@@ -26,7 +26,7 @@ from app.system.models import APIPlatform
 
 PLATFORM = config("platform", cast=str)
 
-ln_node = config("ln_node")
+ln_node = config("ln_node").lower()
 if ln_node == "lnd_grpc":
     from app.lightning.impl.lnd_grpc import LnNodeLNDgRPC as LnNode
 elif ln_node == "cln_grpc" and PLATFORM != APIPlatform.RASPIBLITZ:
@@ -38,9 +38,11 @@ elif ln_node == "cln_grpc" and PLATFORM == APIPlatform.RASPIBLITZ:
 elif ln_node == "none":
     logging.info(f"lightning was explicitly turned off")
 elif ln_node == "":
+    ln_node = "none"
     logging.info(f"lightning is not set yet")
 else:
-    logging.error(f"unknown lightning node: {ln_node}")
+    logging.error(f"config: unknown lightning node: {ln_node}")
+    raise RuntimeError(f"unknown lightning node type: {ln_node}")
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
 
@@ -56,7 +58,8 @@ FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float
 if FWD_GATHER_INTERVAL < 0.3:
     raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
 
-ln = LnNode()
+if ln_node != "none":
+    ln = LnNode()
 
 
 async def initialize_ln_repo() -> AsyncGenerator[InitLnRepoUpdate, None]:
@@ -190,7 +193,7 @@ async def register_lightning_listener():
 
     try:
 
-        if ln_node == "" or ln_node == "none":
+        if ln_node == "none":
             logging.info(
                 "SKIPPING register_lightning_listener -> no lightning configured"
             )
