@@ -9,8 +9,7 @@ from fastapi.openapi.utils import get_openapi
 # npm install @openapitools/openapi-generator-cli -g
 # sudo apt install default-jre
 
-# For now assume that the clients repository is a sibling to the current working directory.
-out_path = os.path.abspath(os.path.join("../", f"blitz_api_client_libraries"))
+out_path = os.path.abspath(os.path.join("../../", f"blitz_api_client_libraries"))
 
 mod = importlib.import_module(f"app.main")
 
@@ -24,7 +23,38 @@ if version:
             break
 
 
-def _generate(generator: str):
+def _dart_dio_post_action():
+    # dart-dio has to generate some code after the initial generation.
+    # flutter pub get && flutter pub run build_runner build --delete-conflicting-outputs
+    print("Post action for dart-dio")
+    p = os.path.abspath(os.path.join(out_path, f"clients/dart-dio"))
+
+    print("Running flutter pub get")
+    process = Popen(["flutter", "pub", "get"], stdout=PIPE, stderr=PIPE, cwd=p)
+    _, stderr = process.communicate()
+    if stderr:
+        print(stderr)
+
+    print("Generating code")
+    process = Popen(
+        [
+            "flutter",
+            "pub",
+            "run",
+            "build_runner",
+            "build",
+            "--delete-conflicting-outputs",
+        ],
+        stdout=PIPE,
+        stderr=PIPE,
+        cwd=p,
+    )
+    _, stderr = process.communicate()
+    if stderr:
+        print(stderr)
+
+
+def _generate(generator: str, langOptions: list = []):
     p = os.path.abspath(os.path.join(out_path, f"clients/{generator}"))
 
     print(f"Removing {p}")
@@ -46,6 +76,7 @@ def _generate(generator: str):
             generator,
             "-o",
             p,
+            *langOptions,
         ],
         stdout=PIPE,
         stderr=PIPE,
@@ -68,14 +99,21 @@ def main():
     with open(f"openapi.json", "w") as f:
         json.dump(specs, f, indent=2)
 
-    _generate("dart-dio")
-    _generate("dart")
+    dartOpts = [
+        "--additional-properties=pubName=blitz_api_client",
+        "--additional-properties=pubVersion=0.5.1",
+    ]
+
+    _generate("dart-dio", dartOpts)
+    _generate("dart", dartOpts)
     _generate("go")
     _generate("javascript")
     _generate("kotlin")
     _generate("python")
     _generate("typescript-axios")
     _generate("typescript-fetch")
+
+    _dart_dio_post_action()
 
 
 if __name__ == "__main__":

@@ -282,7 +282,7 @@
           "Bitcoin Core"
         ],
         "summary": "Get current fee estimation from Bitcoin Core",
-        "description": "Estimates the fee for the given parameters.\n    See documentation on [bitcoin.org](https://developer.bitcoin.org/reference/rpc/estimatesmartfee.html)\n    ",
+        "description": "Estimates the fee for the given parameters.\n    See documentation on [bitcoin.org](https://developer.bitcoin.org/reference/rpc/estimatesmartfee.html)",
         "operationId": "bitcoin_estimate_fee_bitcoin_estimate_fee_get",
         "parameters": [
           {
@@ -370,13 +370,71 @@
         ]
       }
     },
+    "/bitcoin/get-raw-transaction": {
+      "get": {
+        "tags": [
+          "Bitcoin Core"
+        ],
+        "summary": "Get information about a raw transaction",
+        "description": "See documentation on [bitcoincore.org](https://bitcoincore.org/en/doc/22.0.0/rpc/rawtransactions/getrawtransaction/)",
+        "operationId": "bitcoin_get_raw_transaction_bitcoin_get_raw_transaction_get",
+        "parameters": [
+          {
+            "description": "The transaction id",
+            "required": true,
+            "schema": {
+              "title": "Txid",
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string",
+              "description": "The transaction id"
+            },
+            "name": "txid",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A JSON String with relevant information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RawTransaction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid transaction id"
+          },
+          "404": {
+            "description": "No such mempool or blockchain transaction."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTBearer": []
+          }
+        ]
+      }
+    },
     "/bitcoin/block-sub": {
       "get": {
         "tags": [
           "Bitcoin Core"
         ],
         "summary": "Subscribe to incoming blocks.",
-        "description": "\nSimilar to Bitcoin Core getblock\n\nSSE endpoint to receive new block information as soon as it is appended to chain.\n\nIf verbosity is 0, returns a string that is serialized, hex-encoded data for block 'hash'.<br>\nIf verbosity is 1, returns an Object with information about block <hash>.<br>\nIf verbosity is 2, returns an Object with information about block <hash> and information about each transaction.<br>\n",
+        "description": "Similar to Bitcoin Core getblock\n\nSSE endpoint to receive new block information as soon as it is appended to chain.\n\nIf verbosity is 0, returns a string that is serialized, hex-encoded data for block 'hash'.<br>\nIf verbosity is 1, returns an Object with information about block <hash>.<br>\nIf verbosity is 2, returns an Object with information about block <hash> and information about each transaction.<br>",
         "operationId": "bitcoin_block_sub_bitcoin_block_sub_get",
         "parameters": [
           {
@@ -427,39 +485,48 @@
         "operationId": "lightning_add_invoice_lightning_add_invoice_post",
         "parameters": [
           {
+            "description": "The amount of msat of the invoice",
             "required": true,
             "schema": {
               "title": "Value Msat",
-              "type": "integer"
+              "minimum": 0.0,
+              "type": "integer",
+              "description": "The amount of msat of the invoice"
             },
             "name": "value_msat",
             "in": "query"
           },
           {
+            "description": "The memo of the invoice",
             "required": false,
             "schema": {
               "title": "Memo",
               "type": "string",
+              "description": "The memo of the invoice",
               "default": ""
             },
             "name": "memo",
             "in": "query"
           },
           {
+            "description": "Expiry time in seconds",
             "required": false,
             "schema": {
               "title": "Expiry",
               "type": "integer",
+              "description": "Expiry time in seconds",
               "default": 3600
             },
             "name": "expiry",
             "in": "query"
           },
           {
+            "description": "LND only: Whether this invoice is a keysend invoice.",
             "required": false,
             "schema": {
               "title": "Is Keysend",
               "type": "boolean",
+              "description": "LND only: Whether this invoice is a keysend invoice.",
               "default": false
             },
             "name": "is_keysend",
@@ -533,7 +600,7 @@
           "Lightning"
         ],
         "summary": "Returns the daily, weekly and monthly fee revenue earned.",
-        "description": "\nCurrently, year and total fees are always null. Backends don't return these values by default.\nImplementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64).\n    ",
+        "description": "Currently, year and total fees are always null. Backends don't return these values by default.\nImplementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64).",
         "operationId": "lightning_get_fee_revenue_lightning_get_fee_revenue_get",
         "responses": {
           "200": {
@@ -563,7 +630,7 @@
           "Lightning"
         ],
         "summary": "Lists all on-chain transactions, payments and invoices in the wallet",
-        "description": "Returns a list with all on-chain transaction, payments and invoices combined into one list.\n    The index of each tx is only valid for each identical set of parameters.\n    ",
+        "description": "Returns a list with all on-chain transaction, payments and invoices combined into one list.\n    The index of each tx is only valid for each identical set of parameters.",
         "operationId": "lightning_list_all_tx_lightning_list_all_tx_get",
         "parameters": [
           {
@@ -876,7 +943,7 @@
           "Lightning"
         ],
         "summary": "Generate a new on-chain address",
-        "description": "\nGenerate a wallet new address. Address-types has to be one of:\n* **p2wkh**:  Pay to witness key hash (bech32)\n* **np2wkh**: Pay to nested witness key hash\n    ",
+        "description": "Generate a wallet new address. Address-types has to be one of:\n* **p2wkh**:  Pay to witness key hash (bech32)\n* **np2wkh**: Pay to nested witness key hash",
         "operationId": "lightning_new_address_lightning_new_address_post",
         "requestBody": {
           "content": {
@@ -927,7 +994,7 @@
           "Lightning"
         ],
         "summary": "Attempt to send on-chain funds.",
-        "description": "\n__send-coins__ executes a request to send coins to a particular address.\n\n### LND:\nIf neither __target_conf__, or __sat_per_vbyte__ are set, then the internal wallet will consult its fee model to determine a fee for the default confirmation target.\n\n> \ud83d\udc49 See [https://api.lightning.community/?shell#sendcoins](https://api.lightning.community/?shell#sendcoins)\n\n### c-lightning:\n* Set __target_conf__ ==1: interpreted as urgent (aim for next block)\n* Set __target_conf__ >=2: interpreted as normal (next 4 blocks or so, **default**)\n* Set __target_cont__ >=10: interpreted as slow (next 100 blocks or so)\n* If __sat_per_vbyte__ is set then __target_conf__ is ignored and vbytes (sipabytes) will be used.\n\n> \ud83d\udc49 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)\n",
+        "description": "__send-coins__ executes a request to send coins to a particular address.\n\n### LND:\nIf neither __target_conf__, or __sat_per_vbyte__ are set, then the internal wallet will consult its fee model to determine a fee for the default confirmation target.\n\n> \ud83d\udc49 See [https://api.lightning.community/?shell#sendcoins](https://api.lightning.community/?shell#sendcoins)\n\n### c-lightning:\n* Set __target_conf__ ==1: interpreted as urgent (aim for next block)\n* Set __target_conf__ >=2: interpreted as normal (next 4 blocks or so, **default**)\n* Set __target_cont__ >=10: interpreted as slow (next 100 blocks or so)\n* If __sat_per_vbyte__ is set then __target_conf__ is ignored and vbytes (sipabytes) will be used.\n\n> \ud83d\udc49 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)\n\n### Sending all onchain funds\n> \u2139\ufe0f Keep the following points in mind when sending all onchain funds:\n\n* If __send_all__ is set to __true__, the __amount__ field must be set to __0__.\n* If the __amount__ field is greater than __0__, the __send_all__ field must be __false__.\n  * The API will return an error if neither or both conditions are met at the same time.\n* If __send_all__ is set to __true__ the amount of satoshis to send will be calculated by subtracting the fee from the wallet balance.\n* If the wallet balance is not sufficient to cover the fee, the call will fail.\n* The call will __not__ close any channels.\n* The implementation may keep a reserve of funds if there are still open channels.",
         "operationId": "lightning_send_coins_lightning_send_coins_post",
         "requestBody": {
           "content": {
@@ -980,7 +1047,7 @@
           "Lightning"
         ],
         "summary": "open a new lightning channel",
-        "description": "\n__open-channel__ attempts to open a channel with a peer.\n\n### LND:\n_target_conf_: The target number of blocks that the funding transaction should be confirmed by.\n\n### c-lightning:\n* Set _target_conf_ ==1: interpreted as urgent (aim for next block)\n* Set _target_conf_ >=2: interpreted as normal (next 4 blocks or so, **default**)\n* Set _target_cont_ >=10: interpreted as slow (next 100 blocks or so)\n\n> \ud83d\udc49 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)\n",
+        "description": "__open-channel__ attempts to open a channel with a peer.\n\n### LND:\n_target_conf_: The target number of blocks that the funding transaction should be confirmed by.\n\n### c-lightning:\n* Set _target_conf_ ==1: interpreted as urgent (aim for next block)\n* Set _target_conf_ >=2: interpreted as normal (next 4 blocks or so, **default**)\n* Set _target_cont_ >=10: interpreted as slow (next 100 blocks or so)\n\n> \ud83d\udc49 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)",
         "operationId": "lightning_open_channel_lightning_open_channel_post",
         "parameters": [
           {
@@ -1151,7 +1218,7 @@
           "Lightning"
         ],
         "summary": "Attempt to pay a payment request.",
-        "description": "\nThis endpoints attempts to pay a payment request.\n\nIntermediate status updates will be sent via the SSE channel. This endpoint returns the last success or error message from the node.\n",
+        "description": "This endpoints attempts to pay a payment request.\n\nIntermediate status updates will be sent via the SSE channel. This endpoint returns the last success or error message from the node.",
         "operationId": "lightning_send_payment_lightning_send_payment_post",
         "parameters": [
           {
@@ -1462,18 +1529,9 @@
         "tags": [
           "System"
         ],
-        "summary": "Endpoint to change your password a, b or c",
+        "summary": "Endpoint to change your password",
         "operationId": "system_change_password_system_change_password_post",
         "parameters": [
-          {
-            "required": true,
-            "schema": {
-              "title": "Type",
-              "type": "string"
-            },
-            "name": "type",
-            "in": "query"
-          },
           {
             "required": true,
             "schema": {
@@ -1490,6 +1548,17 @@
               "type": "string"
             },
             "name": "new_password",
+            "in": "query"
+          },
+          {
+            "description": " \u2139\ufe0f Used in **RaspiBlitz only**. Password A, B or C. Must be one of `[\"a\", \"b\", \"c\"]`",
+            "required": false,
+            "schema": {
+              "title": "Type",
+              "type": "string",
+              "description": " \u2139\ufe0f Used in **RaspiBlitz only**. Password A, B or C. Must be one of `[\"a\", \"b\", \"c\"]`"
+            },
+            "name": "type",
             "in": "query"
           }
         ],
@@ -1605,7 +1674,7 @@
           "System"
         ],
         "summary": "Get raw system logs as a text string.",
-        "description": "\nThis endpoint will gather latest system logs and return it in a\nraw string. This endpoint will **not** return immediately because\nit gathers all data on time of the request.\n",
+        "description": "This endpoint will gather latest system logs and return it in a\nraw string. This endpoint will **not** return immediately because\nit gathers all data on time of the request.",
         "operationId": "system_get_debug_logs_raw_system_get_debug_logs_raw_get",
         "responses": {
           "200": {
@@ -1635,7 +1704,7 @@
         "operationId": "system_hardware_info_sub_system_hardware_info_sub_get",
         "responses": {
           "200": {
-            "description": "Yields a JSON string with hardware information every 120.5 seconds:\n\n```JSON\n{\n  \"cpu_overall_percent\": 15.8,\n  \"cpu_per_cpu_percent\": [\n    11.8,\n    6.1,\n    12.5\n  ],\n  \"vram_total_bytes\": 25134919680,\n  \"vram_available_bytes\": 17240051712,\n  \"vram_used_bytes\": 6044856320,\n  \"vram_usage_percent\": 31.4,\n  \"swap_ram_total_bytes\": 2147479552,\n  \"swap_used_bytes\": 0,\n  \"swap_usage_bytes\": 0,\n  \"temperatures_celsius\": {\n    \"coretemp\": [\n      [\n        \"Core 1\",\n        51,\n        84,\n        100\n      ],\n      [\n        \"Core 2\",\n        53,\n        84,\n        100\n      ],\n      [\n        \"Core 3\",\n        50,\n        84,\n        100\n      ]\n    ]\n  },\n  \"boot_time_timestamp\": 1623486468,\n  \"disk_io_read_count\": 254574,\n  \"disk_io_write_count\": 133353,\n  \"disk_io_read_bytes\": 5306839040,\n  \"disk_io_write_bytes\": 5593076736,\n  \"disks\": [\n    {\n      \"device\": \"/dev/sda1\",\n      \"mountpoint\": \"/boot/efi\",\n      \"filesystem_type\": \"vfat\",\n      \"partition_total_bytes\": 535805952,\n      \"partition_used_bytes\": 8228864,\n      \"partition_free_bytes\": 527577088,\n      \"partition_percent\": 1.5\n    },\n    {\n      \"device\": \"/dev/sda2\",\n      \"mountpoint\": \"/\",\n      \"filesystem_type\": \"ext4\",\n      \"partition_total_bytes\": 250438021120,\n      \"partition_used_bytes\": 177157742592,\n      \"partition_free_bytes\": 60487389184,\n      \"partition_percent\": 74.5\n    }\n  ],\n  \"networks\": [\n    {\n      \"interface_name\": \"lo\",\n      \"address\": \"127.0.0.1\",\n      \"mac_address\": \"00:00:00:00:00:00\"\n    },\n    {\n      \"interface_name\": \"enp4s0\",\n      \"address\": \"192.168.1.23\",\n      \"mac_address\": \"35:a3:5c:6a:4a:f0\"\n    }\n  ],\n  \"networks_bytes_sent\": 137088249,\n  \"networks_bytes_received\": 1603400654\n}\n```\n",
+            "description": "Yields a JSON string with hardware information every 60.5 seconds:\n\n```JSON\n{\n  \"cpu_overall_percent\": 15.8,\n  \"cpu_per_cpu_percent\": [\n    11.8,\n    6.1,\n    12.5\n  ],\n  \"vram_total_bytes\": 25134919680,\n  \"vram_available_bytes\": 17240051712,\n  \"vram_used_bytes\": 6044856320,\n  \"vram_usage_percent\": 31.4,\n  \"swap_ram_total_bytes\": 2147479552,\n  \"swap_used_bytes\": 0,\n  \"swap_usage_bytes\": 0,\n  \"temperatures_celsius\": {\n    \"coretemp\": [\n      [\n        \"Core 1\",\n        51,\n        84,\n        100\n      ],\n      [\n        \"Core 2\",\n        53,\n        84,\n        100\n      ],\n      [\n        \"Core 3\",\n        50,\n        84,\n        100\n      ]\n    ]\n  },\n  \"boot_time_timestamp\": 1623486468,\n  \"disk_io_read_count\": 254574,\n  \"disk_io_write_count\": 133353,\n  \"disk_io_read_bytes\": 5306839040,\n  \"disk_io_write_bytes\": 5593076736,\n  \"disks\": [\n    {\n      \"device\": \"/dev/sda1\",\n      \"mountpoint\": \"/boot/efi\",\n      \"filesystem_type\": \"vfat\",\n      \"partition_total_bytes\": 535805952,\n      \"partition_used_bytes\": 8228864,\n      \"partition_free_bytes\": 527577088,\n      \"partition_percent\": 1.5\n    },\n    {\n      \"device\": \"/dev/sda2\",\n      \"mountpoint\": \"/\",\n      \"filesystem_type\": \"ext4\",\n      \"partition_total_bytes\": 250438021120,\n      \"partition_used_bytes\": 177157742592,\n      \"partition_free_bytes\": 60487389184,\n      \"partition_percent\": 74.5\n    }\n  ],\n  \"networks\": [\n    {\n      \"interface_name\": \"lo\",\n      \"address\": \"127.0.0.1\",\n      \"mac_address\": \"00:00:00:00:00:00\"\n    },\n    {\n      \"interface_name\": \"enp4s0\",\n      \"address\": \"192.168.1.23\",\n      \"mac_address\": \"35:a3:5c:6a:4a:f0\"\n    }\n  ],\n  \"networks_bytes_sent\": 137088249,\n  \"networks_bytes_received\": 1603400654\n}\n```\n",
             "content": {
               "application/json": {
                 "schema": {}
@@ -1656,7 +1725,7 @@
           "System"
         ],
         "summary": "Reboots the system",
-        "description": "Attempts to reboot the system.\n    Will send a `system_reboot_initiated` SSE message immediately to\n    all connected clients.\n    ",
+        "description": "Attempts to reboot the system.\n    Will send a `system_reboot_initiated` SSE message immediately to\n    all connected clients.",
         "operationId": "system_reboot_system_reboot_post",
         "responses": {
           "200": {
@@ -1681,7 +1750,7 @@
           "System"
         ],
         "summary": "Shuts the system down",
-        "description": "Attempts to shutdown the system.\n    Will send a `system_shutdown_initiated` SSE message immediately to all\n    connected clients.\n    ",
+        "description": "Attempts to shutdown the system.\n    Will send a `system_shutdown_initiated` SSE message immediately to all\n    connected clients.",
         "operationId": "system_shutdown_system_shutdown_post",
         "responses": {
           "200": {
@@ -1699,211 +1768,10 @@
           }
         ]
       }
-    },
-    "/setup/status": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Get Status",
-        "operationId": "get_status_setup_status_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/setup-start-info": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Setup Start Info",
-        "operationId": "setup_start_info_setup_setup_start_info_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/setup-start-done": {
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Setup Start Done",
-        "operationId": "setup_start_done_setup_setup_start_done_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartDoneData"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/setup-final-info": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Setup Final Info",
-        "operationId": "setup_final_info_setup_setup_final_info_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWTBearer": []
-          }
-        ]
-      }
-    },
-    "/setup/setup-final-done": {
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Setup Final Done",
-        "operationId": "setup_final_done_setup_setup_final_done_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWTBearer": []
-          }
-        ]
-      }
-    },
-    "/setup/shutdown": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Get Shutdown",
-        "operationId": "get_shutdown_setup_shutdown_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/setup-sync-info": {
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Setup Sync Info",
-        "operationId": "setup_sync_info_setup_setup_sync_info_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWTBearer": []
-          }
-        ]
-      }
     }
   },
   "components": {
     "schemas": {
-      "AMP": {
-        "title": "AMP",
-        "required": [
-          "root_share",
-          "set_id",
-          "child_index",
-          "hash",
-          "preimage"
-        ],
-        "type": "object",
-        "properties": {
-          "root_share": {
-            "title": "Root Share",
-            "type": "string"
-          },
-          "set_id": {
-            "title": "Set Id",
-            "type": "string"
-          },
-          "child_index": {
-            "title": "Child Index",
-            "type": "integer"
-          },
-          "hash": {
-            "title": "Hash",
-            "type": "string"
-          },
-          "preimage": {
-            "title": "Preimage",
-            "type": "string"
-          }
-        }
-      },
       "AMPRecord": {
         "title": "AMPRecord",
         "required": [
@@ -1936,6 +1804,39 @@
         ],
         "type": "string",
         "description": "An enumeration."
+      },
+      "Amp": {
+        "title": "Amp",
+        "required": [
+          "root_share",
+          "set_id",
+          "child_index",
+          "hash",
+          "preimage"
+        ],
+        "type": "object",
+        "properties": {
+          "root_share": {
+            "title": "Root Share",
+            "type": "string"
+          },
+          "set_id": {
+            "title": "Set Id",
+            "type": "string"
+          },
+          "child_index": {
+            "title": "Child Index",
+            "type": "integer"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "preimage": {
+            "title": "Preimage",
+            "type": "string"
+          }
+        }
       },
       "Bip9Data": {
         "title": "Bip9Data",
@@ -3070,7 +2971,7 @@
             "title": "Amp",
             "allOf": [
               {
-                "$ref": "#/components/schemas/AMP"
+                "$ref": "#/components/schemas/Amp"
               }
             ],
             "description": "Details relevant to AMP HTLCs, only populated if this is an AMP HTLC."
@@ -3734,6 +3635,97 @@
           }
         }
       },
+      "RawTransaction": {
+        "title": "RawTransaction",
+        "required": [
+          "txid",
+          "hash",
+          "size",
+          "vsize",
+          "weight",
+          "version",
+          "locktime",
+          "vin",
+          "vout",
+          "blockhash",
+          "confirmations",
+          "blocktime"
+        ],
+        "type": "object",
+        "properties": {
+          "in_active_chain": {
+            "title": "In Active Chain",
+            "type": "boolean",
+            "description": "Whether specified block is in the active chain or not (only present with explicit \"blockhash\" argument)"
+          },
+          "txid": {
+            "title": "Txid",
+            "type": "string",
+            "description": "The transaction id (same as provided)"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string",
+            "description": "The transaction hash (differs from txid for witness transactions)"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer",
+            "description": "The serialized transaction size"
+          },
+          "vsize": {
+            "title": "Vsize",
+            "type": "integer",
+            "description": "The virtual transaction size (differs from size for witness transactions)"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "integer",
+            "description": "The transaction's weight (between vsize*4 - 3 and vsize*4)"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer",
+            "description": "The version"
+          },
+          "locktime": {
+            "title": "Locktime",
+            "type": "integer",
+            "description": "The lock time"
+          },
+          "vin": {
+            "title": "Vin",
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "The transaction's inputs"
+          },
+          "vout": {
+            "title": "Vout",
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "The transaction's outputs"
+          },
+          "blockhash": {
+            "title": "Blockhash",
+            "type": "string",
+            "description": "The block hash"
+          },
+          "confirmations": {
+            "title": "Confirmations",
+            "type": "integer",
+            "description": "The number of confirmations"
+          },
+          "blocktime": {
+            "title": "Blocktime",
+            "type": "integer",
+            "description": "The block time in seconds since epoch (Jan 1 1970 GMT)"
+          }
+        }
+      },
       "Route": {
         "title": "Route",
         "required": [
@@ -3807,8 +3799,7 @@
       "SendCoinsInput": {
         "title": "SendCoinsInput",
         "required": [
-          "address",
-          "amount"
+          "address"
         ],
         "type": "object",
         "properties": {
@@ -3816,12 +3807,6 @@
             "title": "Address",
             "type": "string",
             "description": "The base58 or bech32 encoded bitcoin address to send coins to on-chain"
-          },
-          "amount": {
-            "title": "Amount",
-            "exclusiveMinimum": 0.0,
-            "type": "integer",
-            "description": "The number of bitcoin denominated in satoshis to send"
           },
           "target_conf": {
             "title": "Target Conf",
@@ -3844,6 +3829,19 @@
             "type": "string",
             "description": "A label for the transaction. Ignored by CLN backend.",
             "default": ""
+          },
+          "send_all": {
+            "title": "Send All",
+            "type": "boolean",
+            "description": "Send all available on-chain funds from the wallet. Will be executed `amount` is **0**",
+            "default": false
+          },
+          "amount": {
+            "title": "Amount",
+            "minimum": 0.0,
+            "type": "integer",
+            "description": "The number of bitcoin denominated in satoshis to send. Must not be set when `send_all` is true.",
+            "default": 0
           }
         }
       },
@@ -3871,6 +3869,12 @@
             "exclusiveMinimum": 0.0,
             "type": "integer",
             "description": "The number of bitcoin denominated in satoshis which where sent"
+          },
+          "fees": {
+            "title": "Fees",
+            "minimum": 0.0,
+            "type": "integer",
+            "description": "The number of bitcoin denominated in satoshis which where paid as fees"
           },
           "label": {
             "title": "Label",
@@ -3917,47 +3921,6 @@
             "title": "Height",
             "type": "integer",
             "description": "Height of the first block which the rules are or will be enforced (only for `buried` type, or `bip9` type with `active` status)"
-          }
-        }
-      },
-      "StartDoneData": {
-        "title": "StartDoneData",
-        "type": "object",
-        "properties": {
-          "hostname": {
-            "title": "Hostname",
-            "type": "string",
-            "default": ""
-          },
-          "forceFreshSetup": {
-            "title": "Forcefreshsetup",
-            "type": "boolean",
-            "default": false
-          },
-          "keepBlockchain": {
-            "title": "Keepblockchain",
-            "type": "boolean",
-            "default": true
-          },
-          "lightning": {
-            "title": "Lightning",
-            "type": "string",
-            "default": ""
-          },
-          "passwordA": {
-            "title": "Passworda",
-            "type": "string",
-            "default": ""
-          },
-          "passwordB": {
-            "title": "Passwordb",
-            "type": "string",
-            "default": ""
-          },
-          "passwordC": {
-            "title": "Passwordc",
-            "type": "string",
-            "default": ""
           }
         }
       },
