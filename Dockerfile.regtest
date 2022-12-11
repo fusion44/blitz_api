@@ -14,7 +14,10 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY ./app /code/app
 
 COPY ./docker/regtest/.env.cln1 /code/.env.cln1
+COPY ./docker/regtest/.env.cln1 /code/.env.cln2
 COPY ./docker/regtest/.env.lnd1 /code/.env.lnd1
+COPY ./docker/regtest/.env.lnd1 /code/.env.lnd2
+COPY ./docker/regtest/.env.lnd1 /code/.env.lnd3
 COPY ./docker/regtest/entrypoint.sh /code/entrypoint.sh
 
 
