@@ -225,7 +225,7 @@ class FeaturesEntry(BaseModel):
         )
 
 
-class AMP(BaseModel):
+class Amp(BaseModel):
     # An n-of-n secret share of the root seed from
     # which child payment hashes and preimages are derived.
     root_share: str
@@ -246,7 +246,7 @@ class AMP(BaseModel):
     preimage: str
 
     @classmethod
-    def from_lnd_grpc(cls, a) -> "AMP":
+    def from_lnd_grpc(cls, a) -> "Amp":
         return cls(
             root_share=a.root_share.hex(),
             set_id=a.set_id.hex(),
@@ -303,7 +303,7 @@ class InvoiceHTLC(BaseModel):
         ..., description="The total amount of the mpp payment in msat."
     )
 
-    amp: AMP = Query(
+    amp: Amp = Query(
         None,
         description="Details relevant to AMP HTLCs, only populated if this is an AMP HTLC.",
     )
@@ -327,7 +327,7 @@ class InvoiceHTLC(BaseModel):
             state=InvoiceHTLCState.from_lnd_grpc(h.state),
             custom_records=_crecords(h.custom_records),
             mpp_total_amt_msat=h.mpp_total_amt_msat,
-            amp=AMP.from_lnd_grpc(h.amp),
+            amp=Amp.from_lnd_grpc(h.amp),
         )
 
 
