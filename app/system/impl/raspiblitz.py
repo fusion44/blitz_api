@@ -63,6 +63,7 @@ class RaspiBlitzSystem(SystemBase):
             color=data_color,
             platform=APIPlatform.RASPIBLITZ,
             platform_version=await redis_get("raspiBlitzVersion"),
+            code_version=await redis_get("codeVersion"),
             api_version=API_VERSION,
             tor_web_ui=tor,
             tor_api=f"{tor}/api",

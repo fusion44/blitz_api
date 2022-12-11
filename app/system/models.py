@@ -46,6 +46,10 @@ class SystemInfo(BaseModel):
         "",
         description="The version of this platform",
     )
+    code_version = Query(
+        "",
+        description="[RaspiBlitz only] The code version.",
+    )
     api_version: str = Query(
         ..., description="Version of the API software on this system."
     )
