@@ -106,7 +106,7 @@ pre-commit install
 or
 
 ```sh
-make install_dev
+make install-dev
 ```
 
 If python dependencies have been changed it's necessary to freeze all requirements to requirements.txt:
