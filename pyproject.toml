@@ -26,6 +26,7 @@ grpcio-tools = "1.50.0"
 googleapis-common-protos = "1.57.0"
 protobuf = "^4.21.9"
 deepdiff = "5.8.1"
+loguru = "^0.6.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "22.10.0"
