@@ -21,6 +21,7 @@ available_app_ids = {
     "lnbits",
     "mempool",
     "thunderhub",
+    "joinmarket-webui",
 }
 
 
