@@ -35,6 +35,8 @@ GET_DEBUG_LOG_SCRIPT = os.path.join(
     SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh"
 )
 
+os.environ["TERM"] = "xterm"
+
 
 class RaspiBlitzSystem(SystemBase):
     def __init__(self) -> None:
