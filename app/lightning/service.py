@@ -1,10 +1,10 @@
 import asyncio
-import logging
 from typing import AsyncGenerator, List, Optional
 
 from decouple import config
 from fastapi import status
 from fastapi.exceptions import HTTPException
+from loguru import logger
 
 from app.api.utils import SSE, broadcast_sse_msg, redis_get
 from app.lightning.models import (
@@ -36,12 +36,12 @@ elif ln_node == "cln_grpc" and PLATFORM == APIPlatform.RASPIBLITZ:
         LnNodeCLNgRPCBlitz as LnNode,
     )
 elif ln_node == "none":
-    logging.info(f"lightning was explicitly turned off")
+    logger.info(f"lightning was explicitly turned off")
 elif ln_node == "":
     ln_node = "none"
-    logging.info(f"lightning is not set yet")
+    logger.info(f"lightning is not set yet")
 else:
-    logging.error(f"config: unknown lightning node: {ln_node}")
+    logger.error(f"config: unknown lightning node: {ln_node}")
     raise RuntimeError(f"unknown lightning node type: {ln_node}")
 
 GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
@@ -194,7 +194,7 @@ async def register_lightning_listener():
     try:
 
         if ln_node == "none":
-            logging.info(
+            logger.info(
                 "SKIPPING register_lightning_listener -> no lightning configured"
             )
             return

@@ -764,9 +764,7 @@ This will show more debug information.
                     error.details() != None
                     and error.details().find("already connected to peer") > -1
                 ):
-                    print("ALREADY CONNECTED TO PEER")
-                    print(str(pubkey))
-
+                    logging.debug(f"already connected to peer {pubkey}")
                 else:
                     raise error
 

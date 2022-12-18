@@ -1821,11 +1821,6 @@ class GenericTx(BaseModel):
 
         s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
 
-        print(tx["hash"])
-
-        for ins in tx["inputs"]:
-            print(f"i:  {ins['index']}")
-
         amount = 0
         for out in tx["outputs"]:
             amount += out["msat"].millisatoshis

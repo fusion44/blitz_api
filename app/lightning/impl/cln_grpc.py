@@ -1,12 +1,13 @@
 import asyncio
 import json
-import logging
+import sys
 import time
 from typing import AsyncGenerator, List, Optional
 
 import grpc
 from decouple import config
 from fastapi.exceptions import HTTPException
+from loguru import logger
 from starlette import status
 
 import app.lightning.impl.protos.cln.node_pb2 as ln
@@ -54,7 +55,7 @@ async def _make_local_call(cmd: str):
     if stderr != None and stderr != b"":
         err = stderr.decode()
         if "lightning-cli: Connecting to 'lightning-rpc': Permission denied" in err:
-            logging.critical(
+            logger.critical(
                 "CLN_GRPC: Unable to connect to lightning-cli: Permission denied. Is the lightning-rpc socket readable for the API user?"
             )
 
@@ -64,7 +65,7 @@ async def _make_local_call(cmd: str):
             )
 
         if "lightning-cli: Moving into" in err and "No such file or directory" in err:
-            logging.critical(
+            logger.critical(
                 "CLN_GRPC: Unable to connect to lightning-cli: No such file or directory. Is the lightning-rpc socket available to the API user?"
             )
 
@@ -73,7 +74,7 @@ async def _make_local_call(cmd: str):
                 detail="CLN_GRPC: Unable to connect to lightning-cli: API Can't access lightning-cli.",
             )
 
-        logging.critical(f"CLN_GRPC: Unable to connect to lightning-cli: {err}")
+        logger.critical(f"CLN_GRPC: Unable to connect to lightning-cli: {err}")
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -95,23 +96,28 @@ class LnNodeCLNgRPC(LightningNodeBase):
         return "CLN_GRPC"
 
     async def initialize(self) -> AsyncGenerator[InitLnRepoUpdate, None]:
-        logging.debug("CLN_GRPC: Unable to connect to CLN daemon, waiting...")
+        logger.info("CLN_GRPC: Establishing a connection to the CLN daemon ...")
         if self._initialized:
-            logging.warning(
+            logger.warning(
                 "CLN_GRPC: Connection already initialized. This function must not be called twice."
             )
             yield InitLnRepoUpdate(state=LnInitState.DONE)
 
-        cln_grpc_cert = bytes.fromhex(
-            config_get_hex_str(config("cln_grpc_cert"), name="cln_grpc_cert")
-        )
-        cln_grpc_key = bytes.fromhex(
-            config_get_hex_str(config("cln_grpc_key"), name="cln_grpc_key")
-        )
-        cln_grpc_ca = bytes.fromhex(
-            config_get_hex_str(config("cln_grpc_ca"), name="cln_grpc_ca")
-        )
-        cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
+        try:
+            cln_grpc_key = bytes.fromhex(
+                config_get_hex_str(config("cln_grpc_key"), name="cln_grpc_key")
+            )
+            cln_grpc_cert = bytes.fromhex(
+                config_get_hex_str(config("cln_grpc_cert"), name="cln_grpc_cert")
+            )
+            cln_grpc_ca = bytes.fromhex(
+                config_get_hex_str(config("cln_grpc_ca"), name="cln_grpc_ca")
+            )
+            cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
+        except ValueError as e:
+            logger.critical(f"CLN_GRPC: Unable to decode cln_grpc_cert: {e.args}.")
+            sys.exit(0)
+
         self.creds = grpc.ssl_channel_credentials(
             root_certificates=cln_grpc_ca,
             private_key=cln_grpc_key,
@@ -121,6 +127,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         opts = (("grpc.ssl_target_name_override", "cln"),)
 
         while not self._initialized:
+            logger.warning("CLN_GRPC: iterating ...")
             try:
                 if self._channel is None:
                     self._channel = grpc.aio.secure_channel(
@@ -133,7 +140,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 yield InitLnRepoUpdate(state=LnInitState.DONE)
             except grpc.aio._call.AioRpcError as error:
                 details = error.details()
-                logging.debug(f"CLN_GRPC: Waiting for CLN daemon... Details {details}")
+                logger.debug(f"CLN_GRPC: Waiting for CLN daemon... Details {details}")
 
                 if "failed to connect to all addresses" in details:
                     yield InitLnRepoUpdate(
@@ -144,15 +151,17 @@ class LnNodeCLNgRPC(LightningNodeBase):
                     await self._channel.close()
                     self._channel = self.cln_stub = None
                 else:
-                    logging.error(f"CLN_GRPC: Unknown error: {details}")
+                    logger.error(f"CLN_GRPC: Unknown error: {details}")
                     raise
 
                 await asyncio.sleep(2)
+            except Exception as e:
+                logger.error(f"CLN_GRPC: Unknown error: {e}")
 
-        logging.info("CLN_GRPC: Initialization complete.")
+        logger.info("CLN_GRPC: Initialization complete.")
 
     async def get_wallet_balance(self) -> WalletBalance:
-        logging.debug("CLN_GRPC: get_wallet_balance() ")
+        logger.debug("CLN_GRPC: get_wallet_balance() ")
 
         req = ln.ListfundsRequest()
         res = await self._cln_stub.ListFunds(req)
@@ -194,7 +203,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         )
 
     async def _get_block_time(self, block_height: int) -> tuple:
-        logging.debug(f"CLN_GRPC: _get_block_time(block_height={block_height}) ")
+        logger.debug(f"CLN_GRPC: _get_block_time(block_height={block_height}) ")
 
         if block_height is None or block_height < 0:
             raise ValueError("block_height cannot be None or negative")
@@ -214,7 +223,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
     async def list_all_tx(
         self, successful_only: bool, index_offset: int, max_tx: int, reversed: bool
     ) -> List[GenericTx]:
-        logging.debug(
+        logger.debug(
             f"CLN_GRPC: list_all_tx(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
         )
 
@@ -293,7 +302,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         num_max_invoices: int,
         reversed: bool,
     ) -> List[Invoice]:
-        logging.debug("CLN_GRPC: list_invoices() ")
+        logger.debug("CLN_GRPC: list_invoices() ")
 
         req = ln.ListinvoicesRequest()
         res = await self._cln_stub.ListInvoices(req)
@@ -315,7 +324,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         return tx[index_offset : index_offset + num_max_invoices]
 
     async def list_on_chain_tx(self) -> List[OnChainTransaction]:
-        logging.debug("CLN_GRPC: list_on_chain_tx() ")
+        logger.debug("CLN_GRPC: list_on_chain_tx() ")
         info = await self.get_ln_info()  # for current block height
         res = await _make_local_call("bkpr-listincome")
 
@@ -395,7 +404,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         max_payments: int,
         reversed: bool,
     ):
-        logging.debug(
+        logger.debug(
             f"CLN_GRPC: list_payments(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
         )
 
@@ -427,7 +436,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         expiry: int = 3600,
         is_keysend: bool = False,
     ) -> Invoice:
-        logging.debug(
+        logger.debug(
             f"CLN_GRPC: add_invoice(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
         )
 
@@ -472,7 +481,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
 
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
-        logging.debug(f"CLN_GRPC: decode_pay_request(pay_req={pay_req})")
+        logger.debug(f"CLN_GRPC: decode_pay_request(pay_req={pay_req})")
 
         res = await _make_local_call(f"decodepay bolt11={pay_req}")
 
@@ -498,7 +507,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         return PaymentRequest.from_cln_json(json.loads(decoded))
 
     async def get_fee_revenue(self) -> FeeRevenue:
-        logging.debug(f"CLN_GRPC: get_fee_revenue()")
+        logger.debug(f"CLN_GRPC: get_fee_revenue()")
 
         # status 1 == "settled"
         req = ln.ListforwardsRequest(status=1)
@@ -536,7 +545,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         return FeeRevenue(day=day, week=week, month=month, year=year, total=total)
 
     async def new_address(self, input: NewAddressInput) -> str:
-        logging.debug(f"CLN_GRPC: new_address(input={input})")
+        logger.debug(f"CLN_GRPC: new_address(input={input})")
 
         if input.type == OnchainAddressType.P2WKH:
             req = ln.NewaddrRequest(addresstype=2)
@@ -548,7 +557,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         return res.p2sh_segwit
 
     async def send_coins(self, input: SendCoinsInput) -> SendCoinsResponse:
-        logging.debug(f"CLN_GRPC: send_coins(input={input})")
+        logger.debug(f"CLN_GRPC: send_coins(input={input})")
 
         fee_rate: lnp.Feerate = None
         if input.sat_per_vbyte != None and input.sat_per_vbyte > 0:
@@ -624,7 +633,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         fee_limit_msat: int,
         amount_msat: Optional[int] = None,
     ) -> Payment:
-        logging.debug(
+        logger.debug(
             f"CLN_GRPC: send_payment(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
         )
 
@@ -673,7 +682,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         return Payment.from_cln_grpc(res)
 
     async def get_ln_info(self) -> LnInfo:
-        logging.debug(f"CLN_GRPC: get_ln_info()")
+        logger.debug(f"CLN_GRPC: get_ln_info()")
 
         req = ln.GetinfoRequest()
         try:
@@ -693,14 +702,14 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
 
     async def unlock_wallet(self, password: str) -> bool:
-        logging.debug(f"CLN_GRPC: unlock_wallet(password=wedontlogpasswords)")
+        logger.debug(f"CLN_GRPC: unlock_wallet(password=wedontlogpasswords)")
 
         # Core Lightning doesn't lock wallets,
         # so we don't need to do anything here
         return True
 
     async def listen_invoices(self) -> AsyncGenerator[Invoice, None]:
-        logging.debug(f"CLN_GRPC: listen_invoices()")
+        logger.debug(f"CLN_GRPC: listen_invoices()")
 
         lastpay_index = 0
         invoices = await self.list_invoices(
@@ -722,7 +731,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             yield i
 
     async def listen_forward_events(self) -> ForwardSuccessEvent:
-        logging.debug(f"CLN_GRPC: listen_forward_events()")
+        logger.debug(f"CLN_GRPC: listen_forward_events()")
 
         # CLN has no subscription to forwarded events.
         # We must poll instead.
@@ -746,7 +755,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             await asyncio.sleep(interval - 0.1)
 
     async def connect_peer(self, node_URI: str) -> bool:
-        logging.debug(f"CLN_GRPC: connect_peer(node_URI={node_URI})")
+        logger.debug(f"CLN_GRPC: connect_peer(node_URI={node_URI})")
 
         try:
             id = node_URI.split("@")[0]
@@ -765,7 +774,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
                         detail="Connection establishment: Connection refused.",
                     )
             if stderr:
-                logging.error(f"CLN_GRPC: {stderr.decode()}")
+                logger.error(f"CLN_GRPC: {stderr.decode()}")
 
             return False
 
@@ -775,7 +784,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
 
     async def peer_resolve_alias(self, node_pub: str) -> str:
-        logging.debug(f"CLN_GRPC: peer_resolve_alias(node_pub={node_pub})")
+        logger.debug(f"CLN_GRPC: peer_resolve_alias(node_pub={node_pub})")
 
         try:
             request = ln.ListnodesRequest(id=node_pub)
@@ -794,7 +803,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
     async def channel_open(
         self, local_funding_amount: int, node_URI: str, target_confs: int
     ) -> str:
-        logging.debug(
+        logger.debug(
             f"CLN_GRPC: channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
         )
 
@@ -845,7 +854,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
                     status.HTTP_500_INTERNAL_SERVER_ERROR, detail=j["message"]
                 )
             if stderr:
-                logging.error(f"CLN_GRPC: {stderr.decode()}")
+                logger.error(f"CLN_GRPC: {stderr.decode()}")
 
             return False
         except grpc.aio._call.AioRpcError as error:
@@ -854,7 +863,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
 
     async def channel_list(self) -> List[Channel]:
-        logging.debug(f"CLN_GRPC: channel_list()")
+        logger.debug(f"CLN_GRPC: channel_list()")
 
         try:
             res = await self._cln_stub.ListFunds(ln.ListfundsRequest())
@@ -872,7 +881,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
 
     async def channel_close(self, channel_id: int, force_close: bool) -> str:
-        logging.debug(
+        logger.debug(
             f"CLN_GRPC: channel_close(channel_id={channel_id}, force_close={force_close})"
         )
 
@@ -916,7 +925,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         details = error.details()
 
         if details and details.find("Received RST_STREAM with error code 8") > -1:
-            logging.error(details)
+            logger.error(details)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="CLN is responding with an error. Please check the logs.",
