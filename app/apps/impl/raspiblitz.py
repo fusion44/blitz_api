@@ -66,6 +66,10 @@ class RaspiBlitzApps(AppsBase):
             if "error" in data.keys():
                 error = data["error"]
 
+            version = ""
+            if "version" in data.keys():
+                version = data["version"]
+
             if data["installed"] == "1":
                 # get basic data
                 status = "online"
@@ -92,6 +96,7 @@ class RaspiBlitzApps(AppsBase):
                     }
                 return {
                     "id": app_id,
+                    "version": version,
                     "installed": installed,
                     "status": status,
                     "address": address,
@@ -105,6 +110,7 @@ class RaspiBlitzApps(AppsBase):
             else:
                 return {
                     "id": app_id,
+                    "version": version,
                     "installed": False,
                     "status": "offline",
                     "error": error,
