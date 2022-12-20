@@ -1331,12 +1331,16 @@ class LnInfo(BaseModel):
             _features.append(FeaturesEntry.from_lnd_grpc(f, i.features[f]))
 
         _uris = [u for u in i.uris]
+        uri=""
+        if len(_uris) > 0:
+            uri = _uris[0]
 
         return LnInfo(
             implementation=implementation,
             version=i.version,
             commit_hash=i.commit_hash,
             identity_pubkey=i.identity_pubkey,
+            identity_uri=uri,
             alias=i.alias,
             color=i.color,
             num_pending_channels=i.num_pending_channels,
@@ -1392,15 +1396,22 @@ class LnInfo(BaseModel):
         # for k in i["our_features"].keys():
         #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
 
+        pubkey=i.id.hex()
+        uri=""
         _uris = []
+        for b in i.address:
+            _uris.append(f"{pubkey}@{b.address}:{b.port}")
         for b in i.binding:
-            _uris.append(f"{b.address}:{b.port}")
+            _uris.append(f"{pubkey}@{b.address}:{b.port}")
+        if len(_uris) > 0:
+            uri = _uris[0]
 
         return LnInfo(
             implementation=implementation,
             version=i.version,
             commit_hash=i.version.split("-")[-1],
-            identity_pubkey=i.id.hex(),
+            identity_pubkey=pubkey,
+            identity_uri=uri,
             alias=i.alias,
             color=i.color.hex(),
             num_pending_channels=i.num_pending_channels,
@@ -1421,6 +1432,9 @@ class LightningInfoLite(BaseModel):
     version: str = Query(..., description="Version of the implementation")
     identity_pubkey: str = Query(
         ..., description="The identity pubkey of the current node"
+    )
+    identity_uri: str = Query(
+        ..., description="The complete URI of the current node"
     )
     num_pending_channels: int = Query(..., description="Number of pending channels")
     num_active_channels: int = Query(..., description="Number of active channels")
@@ -1443,6 +1457,7 @@ class LightningInfoLite(BaseModel):
             implementation=info.implementation,
             version=info.version,
             identity_pubkey=info.identity_pubkey,
+            identity_uri=info.identity_uri,
             num_pending_channels=info.num_pending_channels,
             num_active_channels=info.num_active_channels,
             num_inactive_channels=info.num_inactive_channels,

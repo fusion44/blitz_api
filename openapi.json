@@ -3005,6 +3005,7 @@
           "implementation",
           "version",
           "identity_pubkey",
+          "identity_uri",
           "num_pending_channels",
           "num_active_channels",
           "num_inactive_channels",
@@ -3027,6 +3028,11 @@
             "title": "Identity Pubkey",
             "type": "string",
             "description": "The identity pubkey of the current node"
+          },
+          "identity_uri": {
+            "title": "Noude URI",
+            "type": "string",
+            "description": "The complete URI of the current node"
           },
           "num_pending_channels": {
             "title": "Num Pending Channels",
