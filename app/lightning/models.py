@@ -1331,7 +1331,7 @@ class LnInfo(BaseModel):
             _features.append(FeaturesEntry.from_lnd_grpc(f, i.features[f]))
 
         _uris = [u for u in i.uris]
-        uri=""
+        uri = ""
         if len(_uris) > 0:
             uri = _uris[0]
 
@@ -1396,8 +1396,8 @@ class LnInfo(BaseModel):
         # for k in i["our_features"].keys():
         #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
 
-        pubkey=i.id.hex()
-        uri=""
+        pubkey = i.id.hex()
+        uri = ""
         _uris = []
         for b in i.address:
             _uris.append(f"{pubkey}@{b.address}:{b.port}")
@@ -1433,9 +1433,7 @@ class LightningInfoLite(BaseModel):
     identity_pubkey: str = Query(
         ..., description="The identity pubkey of the current node"
     )
-    identity_uri: str = Query(
-        ..., description="The complete URI of the current node"
-    )
+    identity_uri: str = Query(..., description="The complete URI of the current node")
     num_pending_channels: int = Query(..., description="Number of pending channels")
     num_active_channels: int = Query(..., description="Number of active channels")
     num_inactive_channels: int = Query(..., description="Number of inactive channels")
