@@ -390,7 +390,6 @@ class RouteHint(BaseModel):
 
 
 class Channel(BaseModel):
-
     channel_id: Optional[str]
     active: Optional[bool]
 

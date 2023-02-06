@@ -208,7 +208,6 @@ class EventSourceResponse(Response):
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         async with anyio.create_task_group() as task_group:
-
             # https://trio.readthedocs.io/en/latest/reference-core.html#custom-supervisors
             async def wrap(func: Callable[[], Coroutine[None, None, None]]) -> None:
                 await func()

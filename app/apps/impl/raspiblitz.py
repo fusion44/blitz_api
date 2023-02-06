@@ -32,7 +32,6 @@ node_type = config("ln_node")
 
 class RaspiBlitzApps(AppsBase):
     async def get_app_status_single(self, app_id):
-
         if app_id not in available_app_ids:
             return {
                 "id": f"{app_id}",
@@ -126,7 +125,6 @@ class RaspiBlitzApps(AppsBase):
     async def get_app_status(self):
         appStatusList: List = []
         for appID in available_app_ids:
-
             # skip app based on node running
             if node_type == "" or node_type == "none":
                 if appID == "rtl":
@@ -200,7 +198,6 @@ class RaspiBlitzApps(AppsBase):
         return jsonable_encoder({"id": app_id})
 
     async def run_bonus_script(self, app_id: str, params: str):
-
         # to satisfy CodeQL: test again against predefined array and don't use 'user value'
         tested_app_id = ""
         for id in available_app_ids:
@@ -275,7 +272,6 @@ class RaspiBlitzApps(AppsBase):
                 )
             # nothing above consider success
             else:
-
                 # check if script was effective
                 updatedAppData = await self.get_app_status_single(app_id)
 

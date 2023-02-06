@@ -1660,7 +1660,6 @@ _sym_db.RegisterMessage(StopResponse)
 
 _NODE = DESCRIPTOR.services_by_name["Node"]
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _GETINFOREQUEST._serialized_start = 37
     _GETINFOREQUEST._serialized_end = 53
