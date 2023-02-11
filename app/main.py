@@ -282,10 +282,8 @@ async def warmup_new_connections():
     is_ready = api_startup_status.is_fully_initialized()
 
     if is_ready:
-
         # when lightning is active
         if node_type != "" and node_type != "none":
-
             res = await get_full_client_warmup_data()
             for id in new_connections:
                 await asyncio.gather(
@@ -303,7 +301,6 @@ async def warmup_new_connections():
 
         # when its bitcoin only
         else:
-
             res = await get_full_client_warmup_data_bitcoinonly()
             for id in new_connections:
                 await asyncio.gather(

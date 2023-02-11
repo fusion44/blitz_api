@@ -15,6 +15,7 @@ router = APIRouter(prefix="/setup", tags=["RaspiBlitz Setup"])
 setupFilePath = "/var/cache/raspiblitz/temp/raspiblitz.setup"
 configFilePath = "/mnt/hdd/raspiblitz.conf"
 
+
 # can always be called without credentials to check if
 # the system needs or is in setup (setupPhase!="done")
 # for example in the beginning setupPhase can be (see controlSetupDialog.sh)
@@ -56,7 +57,6 @@ async def get_status():
 
 @router.get("/setup-start-info")
 async def setup_start_info():
-
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
@@ -99,7 +99,6 @@ class StartDoneData(BaseModel):
 # With all this info the WebUi can run its own runs its dialogs and in the end makes a call to
 @router.post("/setup-start-done")
 async def setup_start_done(data: StartDoneData):
-
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
@@ -260,7 +259,6 @@ async def setup_final_info():
 # When WebUI displayed seed words & user confirmed write the calls:
 @router.post("/setup-final-done", dependencies=[Depends(JWTBearer())])
 async def setup_final_done():
-
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
@@ -274,7 +272,6 @@ async def setup_final_done():
 
 @router.get("/shutdown")
 async def get_shutdown():
-
     # only allow unauthorized shutdowns during setup
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
@@ -293,7 +290,6 @@ async def get_shutdown():
 # When WebUI displayed seed words & user confirmed write the calls:
 @router.post("/setup-sync-info", dependencies=[Depends(JWTBearer())])
 async def setup_sync_info():
-
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     if setupPhase != "done":

@@ -139,7 +139,6 @@ async def send_payment(
 async def channel_open(
     local_funding_amount: int, node_URI: str, target_confs: int
 ) -> str:
-
     if local_funding_amount < 1:
         raise ValueError("funding amount needs to be positive")
 
@@ -192,7 +191,6 @@ async def register_lightning_listener():
     """
 
     try:
-
         if ln_node == "none":
             logger.info(
                 "SKIPPING register_lightning_listener -> no lightning configured"
