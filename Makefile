@@ -10,6 +10,7 @@ help:
 	@echo "To generate the requirements.txt file for pip type 'make requirements'"
 	@echo "To sync current changes to a blitz for testing, type 'make sync-to-blitz'.\n   ℹ️  Adjust connection values in scripts/push_to_blitz.sh"
 	@echo "To generate the client libraries type 'make generate-client-libs'"
+	@echo "To build the Docker regtest image type 'make docker-regtest-image'.\n   ℹ️  The image will be available to docker as 'blitz_api'"
 	@echo "------------------------------------"
 
 clean:
@@ -44,3 +45,6 @@ pre-commit:
 
 generate-client-libs:
 	poetry run python gen_client_libs.py
+
+docker-regtest-image:
+	docker build -f Dockerfile.regtest -t blitz_api .

@@ -106,7 +106,7 @@ pre-commit install
 or
 
 ```sh
-make install_dev
+make install-dev
 ```
 
 If python dependencies have been changed it's necessary to freeze all requirements to requirements.txt:
@@ -126,7 +126,7 @@ localIP="192.168.178.61"
 sshPort="22"
 passwordA=""
 
-Then you can run always `make sync_to_blitz` to copy your latest code over to your RaspiBlitz. The script automatically restarts the backend API with the new code on your RaspiBlitz and shows you the logs.
+Then you can run always `make sync-to-blitz` to copy your latest code over to your RaspiBlitz. The script automatically restarts the backend API with the new code on your RaspiBlitz and shows you the logs.
 
 To test the backend API then call the SwaggerUI: `http://[LOCALIP]/api/v1/docs` - to call protected endpoints run the `/system/login` endpoint first with HTTP POST body:
 ```
@@ -193,11 +193,11 @@ http://127.0.0.1:8000/latest/docs
 ### Useful cURL commands to test the API
 
 ```sh
-curl -N http://127.0.0.1:8000/sse/subscribe
+curl -N -H "Authorization: Bearer JWT_TOKEN_HERE" http://127.0.0.1:8000/sse/subscribe
 ```
 
 ```sh
-curl -N http://127.0.0.1:8000/v1/bitcoin/getblockchaininfo
+curl -N -H "Authorization: Bearer JWT_TOKEN_HERE" http://127.0.0.1:8000/v1/bitcoin/getblockchaininfo
 ```
 
 ```sh

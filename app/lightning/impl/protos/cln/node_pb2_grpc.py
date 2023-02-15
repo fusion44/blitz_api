@@ -209,6 +209,11 @@ class NodeStub(object):
             request_serializer=node__pb2.FeeratesRequest.SerializeToString,
             response_deserializer=node__pb2.FeeratesResponse.FromString,
         )
+        self.FundChannel = channel.unary_unary(
+            "/cln.Node/FundChannel",
+            request_serializer=node__pb2.FundchannelRequest.SerializeToString,
+            response_deserializer=node__pb2.FundchannelResponse.FromString,
+        )
         self.GetRoute = channel.unary_unary(
             "/cln.Node/GetRoute",
             request_serializer=node__pb2.GetrouteRequest.SerializeToString,
@@ -233,6 +238,11 @@ class NodeStub(object):
             "/cln.Node/SignMessage",
             request_serializer=node__pb2.SignmessageRequest.SerializeToString,
             response_deserializer=node__pb2.SignmessageResponse.FromString,
+        )
+        self.Stop = channel.unary_unary(
+            "/cln.Node/Stop",
+            request_serializer=node__pb2.StopRequest.SerializeToString,
+            response_deserializer=node__pb2.StopResponse.FromString,
         )
 
 
@@ -473,6 +483,12 @@ class NodeServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def FundChannel(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def GetRoute(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -498,6 +514,12 @@ class NodeServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def SignMessage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def Stop(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -701,6 +723,11 @@ def add_NodeServicer_to_server(servicer, server):
             request_deserializer=node__pb2.FeeratesRequest.FromString,
             response_serializer=node__pb2.FeeratesResponse.SerializeToString,
         ),
+        "FundChannel": grpc.unary_unary_rpc_method_handler(
+            servicer.FundChannel,
+            request_deserializer=node__pb2.FundchannelRequest.FromString,
+            response_serializer=node__pb2.FundchannelResponse.SerializeToString,
+        ),
         "GetRoute": grpc.unary_unary_rpc_method_handler(
             servicer.GetRoute,
             request_deserializer=node__pb2.GetrouteRequest.FromString,
@@ -725,6 +752,11 @@ def add_NodeServicer_to_server(servicer, server):
             servicer.SignMessage,
             request_deserializer=node__pb2.SignmessageRequest.FromString,
             response_serializer=node__pb2.SignmessageResponse.SerializeToString,
+        ),
+        "Stop": grpc.unary_unary_rpc_method_handler(
+            servicer.Stop,
+            request_deserializer=node__pb2.StopRequest.FromString,
+            response_serializer=node__pb2.StopResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1869,6 +1901,35 @@ class Node(object):
         )
 
     @staticmethod
+    def FundChannel(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/cln.Node/FundChannel",
+            node__pb2.FundchannelRequest.SerializeToString,
+            node__pb2.FundchannelResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def GetRoute(
         request,
         target,
@@ -2003,6 +2064,35 @@ class Node(object):
             "/cln.Node/SignMessage",
             node__pb2.SignmessageRequest.SerializeToString,
             node__pb2.SignmessageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def Stop(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/cln.Node/Stop",
+            node__pb2.StopRequest.SerializeToString,
+            node__pb2.StopResponse.FromString,
             options,
             channel_credentials,
             insecure,

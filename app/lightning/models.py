@@ -4,10 +4,11 @@ from typing import List, Optional, Union
 
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from pydantic.types import conint
 
 import app.lightning.docs as docs
+from app.lightning.utils import parse_cln_msat
 
 
 class LnInitState(str, Enum):
@@ -224,7 +225,7 @@ class FeaturesEntry(BaseModel):
         )
 
 
-class AMP(BaseModel):
+class Amp(BaseModel):
     # An n-of-n secret share of the root seed from
     # which child payment hashes and preimages are derived.
     root_share: str
@@ -245,7 +246,7 @@ class AMP(BaseModel):
     preimage: str
 
     @classmethod
-    def from_lnd_grpc(cls, a) -> "AMP":
+    def from_lnd_grpc(cls, a) -> "Amp":
         return cls(
             root_share=a.root_share.hex(),
             set_id=a.set_id.hex(),
@@ -302,7 +303,7 @@ class InvoiceHTLC(BaseModel):
         ..., description="The total amount of the mpp payment in msat."
     )
 
-    amp: AMP = Query(
+    amp: Amp = Query(
         None,
         description="Details relevant to AMP HTLCs, only populated if this is an AMP HTLC.",
     )
@@ -326,7 +327,7 @@ class InvoiceHTLC(BaseModel):
             state=InvoiceHTLCState.from_lnd_grpc(h.state),
             custom_records=_crecords(h.custom_records),
             mpp_total_amt_msat=h.mpp_total_amt_msat,
-            amp=AMP.from_lnd_grpc(h.amp),
+            amp=Amp.from_lnd_grpc(h.amp),
         )
 
 
@@ -1135,10 +1136,6 @@ class SendCoinsInput(BaseModel):
         ...,
         description="The base58 or bech32 encoded bitcoin address to send coins to on-chain",
     )
-    amount: conint(gt=0) = Query(
-        ...,
-        description="The number of bitcoin denominated in satoshis to send",
-    )
     target_conf: int = Query(
         None,
         description="The number of blocks that the transaction *should* confirm in, will be used for fee estimation",
@@ -1154,6 +1151,47 @@ class SendCoinsInput(BaseModel):
     label: str = Query(
         "", description="A label for the transaction. Ignored by CLN backend."
     )
+    send_all: bool = Query(
+        False,
+        description="Send all available on-chain funds from the wallet. Will be executed `amount` is **0**",
+    )
+    amount: conint(ge=0) = Query(
+        0,
+        description="The number of bitcoin denominated in satoshis to send. Must not be set when `send_all` is true.",
+    )
+
+    @validator("amount", pre=True, always=True)
+    def check_amount_or_send_all(cls, amount, values):
+        if amount == None:
+            amount = 0
+
+        send_all = values.get("send_all") if "send_all" in values else False
+
+        if amount < 0:
+            raise ValueError("Amount must not be negative")
+
+        if amount == 0 and not send_all:
+            # neither amount nor send_all is set
+            raise ValueError(
+                "Either amount or send_all must be set. Please review the documentation."
+            )
+
+        if amount > 0 and not send_all:
+            # amount is set and send_all is false
+            return amount
+
+        if amount > 0 and send_all:
+            # amount is set and send_all is true
+            raise ValueError(
+                "Amount and send_all must not be set at the same time. Please review the documentation."
+            )
+
+        if amount == 0 and send_all:
+            # amount is not set and send_all is true
+            return amount
+
+        # normally this should never be reached
+        raise ValueError(f"Unknown input.")
 
 
 class SendCoinsResponse(BaseModel):
@@ -1166,16 +1204,22 @@ class SendCoinsResponse(BaseModel):
         ...,
         description="The number of bitcoin denominated in satoshis which where sent",
     )
+    fees: conint(ge=0) = Query(
+        None,
+        description="The number of bitcoin denominated in satoshis which where paid as fees",
+    )
     label: str = Query(
         "", description="The label used for the transaction. Ignored by CLN backend."
     )
 
     @classmethod
     def from_lnd_grpc(cls, r, input: SendCoinsInput):
+        amount = input.amount if input.send_all == False else r.amount
         return cls(
-            txid=r.txid,
+            txid=r.tx_hash,
             address=input.address,
-            amount=input.amount,
+            amount=abs(amount),
+            fees=r.total_fees,
             label=input.label,
         )
 
@@ -1287,12 +1331,16 @@ class LnInfo(BaseModel):
             _features.append(FeaturesEntry.from_lnd_grpc(f, i.features[f]))
 
         _uris = [u for u in i.uris]
+        uri = ""
+        if len(_uris) > 0:
+            uri = _uris[0]
 
         return LnInfo(
             implementation=implementation,
             version=i.version,
             commit_hash=i.commit_hash,
             identity_pubkey=i.identity_pubkey,
+            identity_uri=uri,
             alias=i.alias,
             color=i.color,
             num_pending_channels=i.num_pending_channels,
@@ -1348,15 +1396,22 @@ class LnInfo(BaseModel):
         # for k in i["our_features"].keys():
         #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
 
+        pubkey = i.id.hex()
+        uri = ""
         _uris = []
+        for b in i.address:
+            _uris.append(f"{pubkey}@{b.address}:{b.port}")
         for b in i.binding:
-            _uris.append(f"{b.address}:{b.port}")
+            _uris.append(f"{pubkey}@{b.address}:{b.port}")
+        if len(_uris) > 0:
+            uri = _uris[0]
 
         return LnInfo(
             implementation=implementation,
             version=i.version,
             commit_hash=i.version.split("-")[-1],
-            identity_pubkey=i.id.hex(),
+            identity_pubkey=pubkey,
+            identity_uri=uri,
             alias=i.alias,
             color=i.color.hex(),
             num_pending_channels=i.num_pending_channels,
@@ -1378,6 +1433,7 @@ class LightningInfoLite(BaseModel):
     identity_pubkey: str = Query(
         ..., description="The identity pubkey of the current node"
     )
+    identity_uri: str = Query(..., description="The complete URI of the current node")
     num_pending_channels: int = Query(..., description="Number of pending channels")
     num_active_channels: int = Query(..., description="Number of active channels")
     num_inactive_channels: int = Query(..., description="Number of inactive channels")
@@ -1399,6 +1455,7 @@ class LightningInfoLite(BaseModel):
             implementation=info.implementation,
             version=info.version,
             identity_pubkey=info.identity_pubkey,
+            identity_uri=info.identity_uri,
             num_pending_channels=info.num_pending_channels,
             num_active_channels=info.num_active_channels,
             num_inactive_channels=info.num_inactive_channels,
@@ -1607,6 +1664,24 @@ class OnChainTransaction(BaseModel):
             label=t.label,
         )
 
+    @classmethod
+    def from_cln_bkpr(cls, t):
+        amount = None
+        if t["tag"] == "deposit":
+            amount = parse_cln_msat(t["credit_msat"]) / 1000
+        elif t["tag"] == "withdrawal":
+            amount = -parse_cln_msat(t["debit_msat"]) / 1000
+
+        return cls(
+            tx_hash=t["outpoint"].split(":")[0],
+            amount=amount,
+            num_confirmations=0,  # block_height - t["blockheight"],
+            block_height=0,  # Block height must be set later in CLN ...
+            time_stamp=t["timestamp"],
+            total_fees=0,  # Fees are an extra event in CLN, must be set later
+            dest_addresses=[],
+        )
+
 
 class TxCategory(str, Enum):
     ONCHAIN = "onchain"
@@ -1758,11 +1833,6 @@ class GenericTx(BaseModel):
             )
 
         s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT
-
-        print(tx["hash"])
-
-        for ins in tx["inputs"]:
-            print(f"i:  {ins['index']}")
 
         amount = 0
         for out in tx["outputs"]:

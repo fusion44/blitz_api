@@ -57,12 +57,15 @@ rm -r ./app/routers/__pycache__ 2>/dev/null
 rm -r ./app/auth/__pycache__ 2>/dev/null
 
 # make sure remote repo files can be overwritten bei user admin
+echo "# sshpass Test"
 sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP "sudo chown -R admin:admin ${remoteRepoPath}"
 result=$?
 echo "result(${result})"
 if [ "$result" != "0" ]; then
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "FAIL: was not able to ssh in: ssh -p ${sshPort} admin@$localIP"
+    echo "Is password correct? --> ${passwordA}"
+    echo "Too often wrong password? Wait a bit."
     echo "SSH in once manually. Then try again."
     exit 1
 fi

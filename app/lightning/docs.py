@@ -99,6 +99,17 @@ If neither __target_conf__, or __sat_per_vbyte__ are set, then the internal wall
 * If __sat_per_vbyte__ is set then __target_conf__ is ignored and vbytes (sipabytes) will be used.
 
 > 👉 See [https://lightning.readthedocs.io/lightning-txprepare.7.html](https://lightning.readthedocs.io/lightning-txprepare.7.html)
+
+### Sending all onchain funds
+> ℹ️ Keep the following points in mind when sending all onchain funds:
+
+* If __send_all__ is set to __true__, the __amount__ field must be set to __0__.
+* If the __amount__ field is greater than __0__, the __send_all__ field must be __false__.
+  * The API will return an error if neither or both conditions are met at the same time.
+* If __send_all__ is set to __true__ the amount of satoshis to send will be calculated by subtracting the fee from the wallet balance.
+* If the wallet balance is not sufficient to cover the fee, the call will fail.
+* The call will __not__ close any channels.
+* The implementation may keep a reserve of funds if there are still open channels.
 """
 
 send_payment_desc = """

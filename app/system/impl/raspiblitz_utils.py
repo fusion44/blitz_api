@@ -6,7 +6,7 @@ def password_valid(password: str):
         return False
     if password.find(" ") >= 0:
         return False
-    return re.match("^[a-zA-Z0-9]*$", password)
+    return re.match("^[\.a-zA-Z0-9-_]*$", password)
 
 
 def name_valid(password: str):

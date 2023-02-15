@@ -1,6 +1,6 @@
 from argparse import ArgumentError
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import Query
 from pydantic.main import BaseModel
@@ -61,6 +61,55 @@ class BtcLocalAddress(BaseModel):
             address=local_address["address"],
             port=local_address["port"],
             score=local_address["score"],
+        )
+
+
+class RawTransaction(BaseModel):
+    in_active_chain: Union[None, bool] = Query(
+        None,
+        description='Whether specified block is in the active chain or not (only present with explicit "blockhash" argument)',
+    )
+    txid: str = Query(..., description="The transaction id (same as provided)")
+    hash: str = Query(
+        ...,
+        description="The transaction hash (differs from txid for witness transactions)",
+    )
+    size: int = Query(..., description="The serialized transaction size")
+    vsize: int = Query(
+        ...,
+        description="The virtual transaction size (differs from size for witness transactions)",
+    )
+    weight: int = Query(
+        ..., description="The transaction's weight (between vsize*4 - 3 and vsize*4)"
+    )
+    version: int = Query(..., description="The version")
+    locktime: int = Query(..., description="The lock time")
+    vin: List[dict] = Query(..., description="The transaction's inputs")
+    vout: List[dict] = Query(..., description="The transaction's outputs")
+    blockhash: str = Query(..., description="The block hash")
+    confirmations: int = Query(..., description="The number of confirmations")
+    blocktime: int = Query(
+        ..., description="The block time in seconds since epoch (Jan 1 1970 GMT)"
+    )
+
+    @classmethod
+    def from_rpc(cls, tx):
+        return cls(
+            in_active_chain=tx["in_active_chain"]
+            if "in_active_chain" in tx.keys()
+            else None,
+            txid=tx["txid"] if "txid" in tx.keys() else "",
+            hash=tx["hash"] if "hash" in tx.keys() else "",
+            size=tx["size"] if "size" in tx.keys() else 0,
+            vsize=tx["vsize"] if "vsize" in tx.keys() else 0,
+            weight=tx["weight"] if "weight" in tx.keys() else 0,
+            version=tx["version"] if "version" in tx.keys() else 0,
+            locktime=tx["locktime"] if "locktime" in tx.keys() else 0,
+            vin=tx["vin"] if "vin" in tx.keys() else [],
+            vout=tx["vout"] if "vout" in tx.keys() else [],
+            blockhash=tx["blockhash"] if "blockhash" in tx.keys() else "",
+            confirmations=tx["confirmations"] if "confirmations" in tx.keys() else 0,
+            blocktime=tx["blocktime"] if "blocktime" in tx.keys() else 0,
         )
 
 

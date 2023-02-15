@@ -17,6 +17,7 @@ from app.bitcoind.models import (
     BtcInfo,
     FeeEstimationMode,
     NetworkInfo,
+    RawTransaction,
 )
 from app.bitcoind.utils import bitcoin_config, bitcoin_rpc_async
 
@@ -89,6 +90,21 @@ async def get_network_info() -> NetworkInfo:
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"]
         )
     return NetworkInfo.from_rpc(result["result"])
+
+
+async def get_raw_transaction(txid: str) -> RawTransaction:
+    result = await bitcoin_rpc_async("getrawtransaction", [txid, 1])
+
+    if result["error"] == None:
+        return RawTransaction.from_rpc(result["result"])
+
+    if "No such mempool or blockchain transaction." in result["error"]:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=result["error"])
+
+    if "must be of length 64" in result["error"]:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=result["error"])
+
+    raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result["error"])
 
 
 async def get_btc_info() -> BtcInfo:

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import os
 import random
 from typing import List
@@ -8,6 +7,7 @@ from typing import List
 from decouple import config
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from loguru import logger as logging
 
 from app.api.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
 from app.apps.impl.apps_base import AppsBase
@@ -21,6 +21,7 @@ available_app_ids = {
     "lnbits",
     "mempool",
     "thunderhub",
+    "jam",
 }
 
 
@@ -66,6 +67,10 @@ class RaspiBlitzApps(AppsBase):
             if "error" in data.keys():
                 error = data["error"]
 
+            version = ""
+            if "version" in data.keys():
+                version = data["version"]
+
             if data["installed"] == "1":
                 # get basic data
                 status = "online"
@@ -92,6 +97,7 @@ class RaspiBlitzApps(AppsBase):
                     }
                 return {
                     "id": app_id,
+                    "version": version,
                     "installed": installed,
                     "status": status,
                     "address": address,
@@ -105,6 +111,7 @@ class RaspiBlitzApps(AppsBase):
             else:
                 return {
                     "id": app_id,
+                    "version": version,
                     "installed": False,
                     "status": "offline",
                     "error": error,
@@ -215,17 +222,17 @@ class RaspiBlitzApps(AppsBase):
 
         # logging to console
         if stdout:
-            logging.info(f"[stdout]\n{stdout.decode()}")
+            logging.debug(f"[stdout]\n{stdout.decode()}")
         else:
-            logging.error(f"NO [stdout]")
+            logging.debug(f"NO [stdout]")
         if stderr:
-            logging.error(f"[stderr]\n{stderr.decode()}")
+            logging.debug(f"[stderr]\n{stderr.decode()}")
         else:
-            logging.error(f"NO [stderr]")
+            logging.debug(f"NO [stderr]")
 
         # create log file
         logFileName = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
-        logging.info(f"WRITING LONG FILE: {logFileName}")
+        logging.info(f"WRITING LOG FILE: {logFileName}")
         with open(logFileName, "w", encoding="utf-8") as f:
             f.write(f"API triggered script: {cmd}\n")
             f.write(f"###### STDOUT #######\n")
@@ -236,10 +243,10 @@ class RaspiBlitzApps(AppsBase):
                 f.write(stderr.decode())
 
         # sending final feedback event
-        logging.info(f"SENDING RESULT EVENT ...")
+        logging.debug(f"SENDING RESULT EVENT ...")
         if stdout:
             stdoutData = parse_key_value_text(stdout.decode())
-            logging.info(f"PARSED STDOUT DATA: {stdoutData}")
+            logging.debug(f"PARSED STDOUT DATA: {stdoutData}")
             # when there is a defined error message (if multiple it wil lbe the last one)
             if "error" in stdoutData:
                 logging.error(
@@ -289,7 +296,7 @@ class RaspiBlitzApps(AppsBase):
                 # if install was running
                 elif mode == "on":
                     if updatedAppData["installed"]:
-                        logging.info(f"WIN - install was effective")
+                        logging.info(f"WIN - install of {app_id} was effective")
                         await broadcast_sse_msg(
                             SSE.INSTALL_APP,
                             {
@@ -302,9 +309,9 @@ class RaspiBlitzApps(AppsBase):
                             },
                         )
                     else:
-                        logging.error(f"FAIL - was not installed")
-                        logging.warning(f"DEBUG - updatedAppData: {updatedAppData}")
-                        logging.warning(f"DEBUG - params: {params}")
+                        logging.error(f"FAIL - {app_id} was not installed")
+                        logging.debug(f"updatedAppData: {updatedAppData}")
+                        logging.debug(f"params: {params}")
                         await broadcast_sse_msg(
                             SSE.INSTALL_APP,
                             {
@@ -314,3 +321,15 @@ class RaspiBlitzApps(AppsBase):
                                 "details": "install was not effective",
                             },
                         )
+
+                elif mode == "off":
+                    await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
+
+                    if not updatedAppData["installed"]:
+                        logging.info(f"WIN - uninstall of {app_id} was effective")
+                        return
+
+                    logging.error(f"FAIL - {app_id} was not uninstalled")
+                    logging.debug(f"updatedAppData: {updatedAppData}")
+                    logging.debug(f"params: {params}")
+                    return

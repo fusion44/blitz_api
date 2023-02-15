@@ -8,6 +8,7 @@ from decouple import config as dconfig
 from fastapi.exceptions import HTTPException
 from starlette import status
 
+import app.bitcoind.service as btc
 import app.lightning.impl.protos.lnd.lightning_pb2 as ln
 import app.lightning.impl.protos.lnd.lightning_pb2_grpc as lnrpc
 import app.lightning.impl.protos.lnd.router_pb2 as router
@@ -503,14 +504,26 @@ This will show more debug information.
                 sat_per_vbyte=input.sat_per_vbyte,
                 min_confs=input.min_confs,
                 label=input.label,
+                send_all=input.send_all,
             )
 
-            response = await self._lnd_stub.SendCoins(r)
-            r = SendCoinsResponse.from_lnd_grpc(response, input)
+            bi = await btc.get_blockchain_info()
+            sendResponse = await self._lnd_stub.SendCoins(r)
+            txResponse = await self._lnd_stub.GetTransactions(
+                ln.GetTransactionsRequest(start_height=-1, end_height=bi.blocks)
+            )
+
+            tx = None
+            for t in txResponse.transactions:
+                if t.tx_hash == sendResponse.txid:
+                    tx = t
+                    break
+
+            r = SendCoinsResponse.from_lnd_grpc(tx, input)
             await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
             return r
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked()
+            _check_if_locked(error)
             details = error.details()
             if details and details.find("invalid bech32 string") > -1:
                 raise HTTPException(
@@ -751,9 +764,7 @@ This will show more debug information.
                     error.details() != None
                     and error.details().find("already connected to peer") > -1
                 ):
-                    print("ALREADY CONNECTED TO PEER")
-                    print(str(pubkey))
-
+                    logging.debug(f"already connected to peer {pubkey}")
                 else:
                     raise error
 

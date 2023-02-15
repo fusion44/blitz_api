@@ -35,6 +35,8 @@ GET_DEBUG_LOG_SCRIPT = os.path.join(
     SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh"
 )
 
+os.environ["TERM"] = "xterm"
+
 
 class RaspiBlitzSystem(SystemBase):
     def __init__(self) -> None:
@@ -63,6 +65,7 @@ class RaspiBlitzSystem(SystemBase):
             color=data_color,
             platform=APIPlatform.RASPIBLITZ,
             platform_version=await redis_get("raspiBlitzVersion"),
+            code_version=await redis_get("codeVersion"),
             api_version=API_VERSION,
             tor_web_ui=tor,
             tor_api=f"{tor}/api",

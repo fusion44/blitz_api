@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from decouple import config as dconfig
 from fastapi import FastAPI, Request
@@ -11,6 +10,7 @@ from fastapi_plugins import (
     redis_plugin,
     registered_configuration,
 )
+from loguru import logger
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
@@ -40,13 +40,17 @@ from app.external.fastapi_versioning import VersionedFastAPI
 from app.lightning.models import LnInitState
 from app.lightning.router import router as ln_router
 from app.lightning.service import initialize_ln_repo, register_lightning_listener
+from app.logging import configure_logger
 from app.setup.router import router as setup_router
 from app.system.router import router as system_router
 from app.system.service import get_hardware_info, register_hardware_info_gatherer
 
-logging.basicConfig(level=logging.WARNING)
+configure_logger()
 
-node_type = dconfig("ln_node")
+
+node_type = dconfig("ln_node").lower()
+if node_type == "":
+    node_type = "none"
 
 
 @registered_configuration
@@ -128,6 +132,7 @@ async def _set_startup_status(
     await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
 
 
+@logger.catch
 async def _initialize_bitcoin():
     await _set_startup_status(bitcoin=StartupState.OFFLINE)
     await initialize_bitcoin_repo()
@@ -136,12 +141,13 @@ async def _initialize_bitcoin():
     await _set_startup_status(bitcoin=StartupState.DONE)
 
 
+@logger.catch
 async def _initialize_lightning():
-    if node_type == "none" or node_type == "":
+    if node_type == "none":
         api_startup_status.lightning = StartupState.DISABLED
         api_startup_status.lightning_msg = ""
         await _set_startup_status(lightning=StartupState.DISABLED)
-        logging.info("Lightning node is disabled, skipping initialization")
+        logger.info("Lightning node is disabled, skipping initialization")
         return
 
     try:
@@ -168,6 +174,12 @@ async def _initialize_lightning():
                 ln_status = StartupState.LOCKED
                 changed = True
             elif (
+                u.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+                and api_startup_status != LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+            ):
+                ln_status = LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
+                changed = True
+            elif (
                 u.state == LnInitState.DONE
                 and api_startup_status.lightning != StartupState.DONE
             ):
@@ -186,8 +198,7 @@ async def _initialize_lightning():
                 await _set_startup_status(lightning=ln_status, lightning_msg=ln_msg)
 
     except HTTPException as r:
-        logging.error(f"Exception {r.detail}.")
-        raise
+        logger.error(r.detail)
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -266,7 +277,7 @@ async def warmup_new_connections():
 
     global warmup_running
     if warmup_running:
-        logging.debug("Warmup already running, skipping")
+        logger.debug("Warmup already running, skipping")
         return
 
     warmup_running = True

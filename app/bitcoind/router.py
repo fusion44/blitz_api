@@ -3,12 +3,19 @@ from fastapi.params import Depends, Query
 
 from app.auth.auth_bearer import JWTBearer
 from app.bitcoind.docs import blocks_sub_doc, estimate_fee_mode_desc
-from app.bitcoind.models import BlockchainInfo, BtcInfo, FeeEstimationMode, NetworkInfo
+from app.bitcoind.models import (
+    BlockchainInfo,
+    BtcInfo,
+    FeeEstimationMode,
+    NetworkInfo,
+    RawTransaction,
+)
 from app.bitcoind.service import (
     estimate_fee,
     get_blockchain_info,
     get_btc_info,
     get_network_info,
+    get_raw_transaction,
     handle_block_sub,
 )
 from app.bitcoind.utils import bitcoin_rpc
@@ -104,6 +111,27 @@ async def _estimate_fee(
 async def getnetworkinfo():
     info = await get_network_info()
     return info
+
+
+@router.get(
+    "/get-raw-transaction",
+    name=f"{_PREFIX}.get-raw-transaction",
+    summary="Get information about a raw transaction",
+    description="See documentation on [bitcoincore.org](https://bitcoincore.org/en/doc/22.0.0/rpc/rawtransactions/getrawtransaction/)",
+    response_description="A JSON String with relevant information.",
+    dependencies=[Depends(JWTBearer())],
+    response_model=RawTransaction,
+    responses={
+        400: {"description": "Invalid transaction id"},
+        404: {"description": "No such mempool or blockchain transaction."},
+    },
+)
+async def get_raw_transaction_path(
+    txid: str = Query(
+        ..., min_length=64, max_length=64, description="The transaction id"
+    )
+):
+    return await get_raw_transaction(txid)
 
 
 @router.get(
