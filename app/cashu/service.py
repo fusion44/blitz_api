@@ -158,7 +158,6 @@ class CashuService:
             raise
 
     def balance(self) -> CashuWalletBalance:
-
         b = CashuWalletBalance()
 
         for w in self._wallets:
