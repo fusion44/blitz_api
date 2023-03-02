@@ -138,7 +138,6 @@ async def store_p2sh(db: Database, p2sh: P2SHScript):
 
 
 async def get_unused_locks(db: Database, address: str = None):
-
     clause: List[str] = []
     values: dict[str, Any] = {}
 
