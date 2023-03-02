@@ -4,20 +4,24 @@ from os import listdir
 from os.path import isdir, join
 from typing import Union
 
-from cashu.core.settings import DEBUG, MINT_URL, VERSION
 from fastapi import HTTPException
+from loguru import logger
 
 import app.cashu.constants as c
 import app.cashu.exceptions as ce
+from app.cashu.errors import CashuException
 from app.cashu.models import (
     CashuInfo,
     CashuMint,
     CashuMintInput,
+    CashuMintKeyInput,
     CashuPayEstimation,
+    CashuReceiveResult,
     CashuWallet,
     CashuWalletBalance,
     CashuWalletData,
 )
+from app.external.cashu.core.settings import DEBUG, MINT_URL, VERSION
 from app.lightning.models import PaymentStatus
 from app.lightning.service import send_payment
 
@@ -94,6 +98,16 @@ class CashuService:
 
         return m
 
+    async def update_mint_key(self, i: CashuMintKeyInput) -> bool:
+        w = self._resolve_wallet(i.wallet_name)
+        try:
+            # loading the mint with the updated key
+            # will also save it to the DB
+            await w.load_mint(i.key)
+            return True
+        except:
+            raise
+
     async def list_mints(self) -> list[CashuMint]:
         # pretend doing a DB operation
         await asyncio.sleep(0.01)
@@ -164,11 +178,19 @@ class CashuService:
             self.add_mint(mint_in=CashuMintInput(url=mint_name))
             wallet.url = mint_name
 
-        await wallet.load_mint()
+        try:
+            await wallet.load_mint()
+        except Exception as e:
+            logger.error(f"Error while loading mint {e.with_traceback(None)}")
+            raise HTTPException(status_code=500, detail=f"Error while loading mint {e}")
 
         wallet.status()  # TODO: remove me, debug only
 
-        invoice = await wallet.request_mint(amount)
+        try:
+            invoice = await wallet.request_mint(amount)
+        except Exception as e:
+            logger.error(f"Error while requesting mint {e}")
+            raise HTTPException(status_code=500, detail=f"Error while loading mint {e}")
 
         res = await send_payment(
             pay_req=invoice.pr, timeout_seconds=5, fee_limit_msat=8000
@@ -187,24 +209,24 @@ class CashuService:
             except Exception as e:
                 # TODO: cashu wallet lib throws an Exception here =>
                 #       submit PR with a more specific exception
-                raise HTTPException(status_code=500, detail="Error while minting {e}")
+                raise HTTPException(status_code=500, detail=f"Error while minting {e}")
 
     async def receive(
         self,
-        coin: str,
+        token: str,
         lock: str,
-        mint_name: Union[None, str],
         wallet_name: Union[None, str],
-    ) -> CashuWalletBalance:
-        wallet = self._resolve_wallet(wallet_name)
+        trust_mint: bool = False,
+    ) -> CashuReceiveResult:
+        wallet: CashuWallet = self._resolve_wallet(wallet_name)
 
         wallet.status()  # TODO: remove me, debug only
 
-        await wallet.receive(coin, lock)
+        res = await wallet.receive(token, lock, trust_mint)
 
         wallet.status()  # TODO: remove me, debug only
 
-        return wallet.balance_overview
+        return res
 
     async def pay(
         self,
@@ -219,7 +241,9 @@ class CashuService:
 
         res = await self.estimate_pay(invoice, mint_name, wallet_name)
 
-        _, send_proofs = await wallet.split_to_send(wallet.proofs, res.amount)
+        _, send_proofs = await wallet.split_to_send(
+            wallet.proofs, res.amount
+        )  # type:ignore
         await wallet.pay_lightning(send_proofs, invoice)
         wallet.status()
 

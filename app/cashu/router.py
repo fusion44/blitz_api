@@ -1,15 +1,18 @@
 import asyncio
 from typing import Union
 
-from fastapi import APIRouter, Body, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, Response, status
 
 import app.cashu.constants as c
 import app.cashu.docs as docs
+from app.cashu.errors import CashuException, UntrustedMintException
 from app.cashu.models import (
     CashuInfo,
     CashuMint,
     CashuMintInput,
+    CashuMintKeyInput,
     CashuPayEstimation,
+    CashuReceiveResult,
     CashuWalletBalance,
     CashuWalletData,
 )
@@ -222,23 +225,39 @@ async def cashu_mint_path(
     "/receive-tokens",
     name=f"{_PREFIX}.receive-tokens",
     summary="Receive Cashu tokens",
-    response_model=CashuWalletBalance,
+    response_model=CashuReceiveResult,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "An error happened while receiving the tokens. See the error message for details.",
+            "model": CashuReceiveResult,
+        },
+        status.HTTP_406_NOT_ACCEPTABLE: {
+            "description": "The mint is not trusted. Use the /update-mint-key endpoint to trust the mint with the given key.",
+            "model": CashuReceiveResult,
+        },
+    },
     # dependencies=[Depends(JWTBearer())],
 )
 async def cashu_receive_path(
+    response: Response,
     coin: str = Body(..., description="The coins to receive."),
     lock: str = Body(None, description="Unlock coins."),
-    mint_name: Union[None, str] = Body(
-        None,
-        description=f"Name of the mint. Will use the pinned mint if empty.",
-    ),
     wallet_name: Union[None, str] = Body(
         None,
         description=f"Name of the wallet. Will use the pinned wallet if empty.",
     ),
-) -> CashuWalletBalance:
+    trust_mint: bool = Body(
+        False, description="Automatically trust the mint if it is not trusted yet."
+    ),
+) -> CashuReceiveResult:
     try:
-        return await service.receive(coin, lock, wallet_name, mint_name)
+        return await service.receive(coin, lock, wallet_name, trust_mint)
+    except UntrustedMintException as e:
+        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+        return CashuReceiveResult.from_exception(e)
+    except CashuException as e:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashuReceiveResult.from_exception(e)
     except HTTPException:
         raise
     except NotImplementedError:

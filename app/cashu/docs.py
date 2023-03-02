@@ -19,3 +19,12 @@ If it fails it will try to pay the invoice using a lightning payment.
 
 > 👉 This is different from the /lightning/pay-invoice endpoint which will only try to pay the invoice using a lightning payment.
 """
+
+receive_error_description = """Reason why the token could not be received.
+
+Possible values:
+`none`: No error
+`mint_offline`: Mint is not reachable
+`mint_error`: Mint returned an error
+`mint_untrusted`: Mint is unknown, must be added as trusted mint first
+"""
