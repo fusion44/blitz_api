@@ -44,7 +44,6 @@ class RaspiBlitzSystem(SystemBase):
         super().__init__()
 
     async def get_system_info(self) -> SystemInfo:
-
         lightning = await redis_get("lightning")
         if lightning == "" or lightning == "none":
             data_chain = await redis_get("chain")
@@ -111,7 +110,6 @@ class RaspiBlitzSystem(SystemBase):
         return True
 
     async def get_connection_info(self) -> ConnectionInfo:
-
         lightning = await redis_get("lightning")
 
         # Bitcoin RPC
@@ -208,7 +206,6 @@ class RaspiBlitzSystem(SystemBase):
         )
 
     async def change_password(self, type: str, old_password: str, new_password: str):
-
         # check just allowed type values
         type = type.lower()
         if not type in ["a", "b", "c"]:

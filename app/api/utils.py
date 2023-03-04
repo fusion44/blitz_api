@@ -114,7 +114,6 @@ class _PushID(object):
     )
 
     def __init__(self):
-
         # Timestamp of last push, used to prevent local collisions if you
         # push twice in one ms.
         self.last_push_time = 0

@@ -327,7 +327,6 @@ class BlockchainInfo(BaseModel):
 
     @classmethod
     def from_rpc(cls, r):
-
         # get softfork information if available
         softforks = []
         if "softforks" in r:

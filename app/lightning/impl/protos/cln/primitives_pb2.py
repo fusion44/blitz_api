@@ -158,7 +158,6 @@ RoutehintList = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(RoutehintList)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _CHANNELSIDE._serialized_start = 632
     _CHANNELSIDE._serialized_end = 662

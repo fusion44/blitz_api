@@ -81,7 +81,6 @@ class RawDebugLogData(BaseModel):
 
 
 class ConnectionInfo(BaseModel):
-
     lnd_admin_macaroon: str = Query(
         "", description="lnd macaroon with admin rights in hexstring format"
     )
