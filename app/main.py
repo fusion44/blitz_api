@@ -35,6 +35,7 @@ from app.bitcoind.service import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
+from app.cashu.router import router as cashu_router
 from app.external.fastapi_versioning import VersionedFastAPI
 from app.lightning.models import LnInitState
 from app.lightning.router import router as ln_router
@@ -67,6 +68,7 @@ if node_type != "none":
 unversioned_app.include_router(system_router)
 if setup_router is not None:
     unversioned_app.include_router(setup_router)
+unversioned_app.include_router(cashu_router)
 
 
 app = VersionedFastAPI(

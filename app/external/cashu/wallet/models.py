@@ -1,0 +1,6 @@
+proofs_table_name = "proofs"
+proofs_used_table_name = "proofs_used"
+p2sh_table_name = "p2sh"
+keysets_table_name = "keysets"
+invoices_table_name = "invoices"
+nostr_table_name = "nostr"
