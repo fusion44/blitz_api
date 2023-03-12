@@ -81,7 +81,9 @@ the schema"""
 new_address_desc = """
 Generate a wallet new address. Address-types has to be one of:
 * **p2wkh**:  Pay to witness key hash (bech32)
-* **np2wkh**: Pay to nested witness key hash
+* **np2wkh**: Pay to nested witness key hash (LND only)
+
+> ℹ️ _CLN only supports and returns p2wkh (bech32) addresses_
     """
 
 send_coins_desc = """

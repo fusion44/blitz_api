@@ -788,7 +788,6 @@ This will show more debug information.
 
         # get fresh list of peers and their aliases
         try:
-
             request = ln.NodeInfoRequest(pub_key=node_pub, include_channels=False)
             response = await self._lnd_stub.GetNodeInfo(request)
             return str(response.node.alias)
@@ -802,7 +801,6 @@ This will show more debug information.
         logging.debug(f"LND_GRPC: channel_list()")
 
         try:
-
             request = ln.ListChannelsRequest()
             response = await self._lnd_stub.ListChannels(request)
 
@@ -839,7 +837,6 @@ This will show more debug information.
             raise ValueError("channel_id must contain : for lnd")
 
         try:
-
             funding_txid = channel_id.split(":")[0]
             output_index = channel_id.split(":")[1]
 

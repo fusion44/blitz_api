@@ -547,14 +547,9 @@ class LnNodeCLNgRPC(LightningNodeBase):
     async def new_address(self, input: NewAddressInput) -> str:
         logger.debug(f"CLN_GRPC: new_address(input={input})")
 
-        if input.type == OnchainAddressType.P2WKH:
-            req = ln.NewaddrRequest(addresstype=2)
-            res = await self._cln_stub.NewAddr(req)
-            return res.bech32
-
-        req = ln.NewaddrRequest(addresstype=1)
+        req = ln.NewaddrRequest()
         res = await self._cln_stub.NewAddr(req)
-        return res.p2sh_segwit
+        return res.bech32
 
     async def send_coins(self, input: SendCoinsInput) -> SendCoinsResponse:
         logger.debug(f"CLN_GRPC: send_coins(input={input})")

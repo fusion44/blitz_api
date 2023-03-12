@@ -7,6 +7,8 @@ from loguru import logger
 # Sourced from LNbits project:
 # https://github.com/lnbits/lnbits/blob/841e8e7bbd61fb942a776d82ca0b6d03668eb524/lnbits/app.py#L285
 
+# More info: https://loguru.readthedocs.io/en/stable/api/logger.html
+
 
 def configure_logger() -> None:
     level = dconfig("log_level", default="INFO", cast=str)
@@ -14,7 +16,7 @@ def configure_logger() -> None:
 
     logger.remove()
     formatter = Formatter(level)
-    logger.add(sys.stderr, level=level, format=formatter.format)
+    logger.add(sys.stdout, level=level, format=formatter.format, colorize=True)
 
     if log_file is not None and log_file != "":
         logger.add(
@@ -33,17 +35,24 @@ def configure_logger() -> None:
 class Formatter:
     def __init__(self, level: str):
         self.padding = 0
-        self.minimal_fmt: str = "<green>{time:YYYY-MM-DD HH:mm:ss.SS}</green> | <level>{level}</level> | <level>{message}</level>\n"
-        if level == "DEBUG":
-            self.fmt: str = "<green>{time:YYYY-MM-DD HH:mm:ss.SS}</green> | <level>{level: <4}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>\n"
-        else:
-            self.fmt: str = self.minimal_fmt
+        self.fmt_default: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level.icon}</level> | <level>{message}</level>\n"
+        self.fmt_default_exception: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level.icon}</level> | <level>{message}</level>\n{exception}\n"
+        self.fmt_warning: str = "<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow> | <level>{level.icon}</level> | <level>{message}</level>\n"
+        self.fmt_warning_exception: str = "<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow> | <level>{level.icon}</level> | <level>{message}</level>\n{exception} |\n"
+        self.fmt_error: str = "<red>{time:YYYY-MM-DD HH:mm:ss}</red> | <level>{level.icon}</level> | <level>{message}</level>\n"
+        self.fmt_error_exception: str = "<red>{time:YYYY-MM-DD HH:mm:ss}</red> | <level>{level.icon}</level> | <level>{message}</level>\n{exception}\n"
 
     def format(self, record):
-        function = "{function}".format(**record)
-        if function == "emit":  # uvicorn logs
-            return self.minimal_fmt
-        return self.fmt
+        level = record["level"]
+        e = record["exception"] is not None
+
+        if level.no < 30:
+            return self.fmt_default_exception if e else self.fmt_default
+
+        if level.no == 30:
+            return self.fmt_warning_exception if e else self.fmt_warning
+
+        return self.fmt_error_exception if e else self.fmt_error
 
 
 class InterceptHandler(logging.Handler):
