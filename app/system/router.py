@@ -106,7 +106,7 @@ async def get_system_info_path():
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
 )
-async def hw_info() -> map:
+async def hw_info():
     return await get_hardware_info()
 
 
@@ -119,7 +119,7 @@ async def hw_info() -> map:
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
 )
-async def connection_info() -> map:
+async def connection_info():
     return await get_connection_info()
 
 
