@@ -1,15 +1,15 @@
 #!/bin/sh
 
 
-if [ "$LN_BACKEND" = "cln-1" ]; then
+if [ "$LN_BACKEND" = "cln1" ]; then
   cp /code/.env.cln1 /code/.env
-elif [ "$LN_BACKEND" = "cln-2" ]; then
+elif [ "$LN_BACKEND" = "cln2" ]; then
   cp /code/.env.cln2 /code/.env
-elif [ "$LN_BACKEND" = "lnd-1" ]; then
+elif [ "$LN_BACKEND" = "lnd1" ]; then
   cp /code/.env.lnd1 /code/.env
-elif [ "$LN_BACKEND" = "lnd-2" ]; then
+elif [ "$LN_BACKEND" = "lnd2" ]; then
   cp /code/.env.lnd2 /code/.env
-elif [ "$LN_BACKEND" = "lnd-3" ]; then
+elif [ "$LN_BACKEND" = "lnd3" ]; then
   cp /code/.env.lnd3 /code/.env
 else
   echo "Unknown LN_BACKEND: $LN_BACKEND"
