@@ -44,15 +44,19 @@ from app.lightning.models import (
 )
 from app.lightning.utils import generic_grpc_error_handler
 
+_WAIT_ANY_INVOICE_ID = 0
+
 
 class LnNodeCLNjRPC(LightningNodeBase):
-    _current_id: int = 0
+    lastpay_index = 0
+    _current_id: int = _WAIT_ANY_INVOICE_ID + 1
     _futures: dict[int, asyncio.Future] = {}
     _socket_path: str = None
     _reader: asyncio.StreamReader = None
     _writer: asyncio.StreamWriter = None
     _loop: asyncio.AbstractEventLoop = None
     _initialized: bool = False
+    _invoice_queue = asyncio.Queue()
 
     # Decoding the payment request take a long time,
     # hence we build a simple cache here.
@@ -92,6 +96,11 @@ class LnNodeCLNjRPC(LightningNodeBase):
         )
 
         asyncio.create_task(self._read_loop())
+
+        logger.info("Setting up invoice waitanyinvoice subscription.")
+        await self._refresh_invoice_sub(True)
+
+        yield InitLnRepoUpdate(state=LnInitState.DONE)
 
     @logger.catch(exclude=(HTTPException,))
     async def get_wallet_balance(self) -> WalletBalance:
@@ -568,7 +577,21 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_invoices(self) -> AsyncGenerator[Invoice, None]:
-        raise NotImplementedError()
+        logger.trace("listen_invoices()")
+
+        while True:
+            try:
+                data = await self._invoice_queue.get()
+                data = json.loads(data)["result"]
+                i = Invoice.from_cln_json(data)
+                self.lastpay_index = i.settle_index
+                await self._refresh_invoice_sub()
+                yield i
+            except Exception as e:
+                logger.error(f"Got an invoice but could not parse the data: {e}")
+                # if we have an error we are in an unknown state
+                # so we fetch the latest invoice index and start from there
+                await self._refresh_invoice_sub(True)
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_forward_events(self) -> ForwardSuccessEvent:
@@ -721,8 +744,14 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 self._handle_response(data)
 
     def _handle_response(self, data):
+        logger.trace(f"_handle_response(data={data})")
+
         response = json.loads(data)
         id = response["id"]
+
+        if id == _WAIT_ANY_INVOICE_ID:
+            return self._invoice_queue.put_nowait(data)
+
         logger.trace(f"Got response: {response} for id {self._current_id}")
         future = self._futures[id]
         future.set_result(response)
@@ -757,3 +786,32 @@ class LnNodeCLNjRPC(LightningNodeBase):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error while {action}: {err}",
         )
+
+    async def _refresh_invoice_sub(self, refresh_pay_index=False):
+        if refresh_pay_index:
+            logger.info("Refreshing pay_index")
+
+            invoices = await self.list_invoices(
+                pending_only=False,
+                index_offset=0,
+                num_max_invoices=9999999999999,
+                reversed=True,
+            )
+
+            for i in invoices:  # type Invoice
+                if i.state is not InvoiceState.SETTLED:
+                    continue
+
+                if i.settle_index != None and i.settle_index < self.lastpay_index:
+                    break
+
+                self.lastpay_index = i.settle_index
+
+        data = self._build_request_data(
+            "waitanyinvoice",
+            _WAIT_ANY_INVOICE_ID,
+            {"lastpay_index": self.lastpay_index},
+        )
+
+        logger.trace(f"Sending waitanyinvoice request: {data}")
+        self._writer.write(data.encode("utf-8"))
