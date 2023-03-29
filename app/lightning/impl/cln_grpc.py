@@ -83,10 +83,6 @@ async def _make_local_call(cmd: str):
     return stdout, stderr
 
 
-def _extract_message(details):
-    return details.split('message: "')[1].replace('" }', ".")
-
-
 class LnNodeCLNgRPC(LightningNodeBase):
     _initialized = False
     _channel = None
@@ -753,46 +749,31 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 num_fwd_last_poll = len(res.forwards)
             await asyncio.sleep(interval - 0.1)
 
-    async def connect_peer(self, uri: str) -> bool:
-        logger.debug(f"CLN_GRPC: connect_peer(node_URI={uri})")
+    async def connect_peer(self, node_URI: str) -> bool:
+        logger.debug(f"CLN_GRPC: connect_peer(node_URI={node_URI})")
 
         try:
-            req = ln.ConnectRequest(id=uri)
-            res = await self._cln_stub.ConnectPeer(req)
+            id = node_URI.split("@")[0]
+            stdout, stderr = await _make_local_call(f"connect id={node_URI}")
+            if stdout:
+                if id in stdout.decode():
+                    return True
+                if "Connection timed out" in stdout.decode():
+                    raise HTTPException(
+                        status.HTTP_504_GATEWAY_TIMEOUT,
+                        detail="Connection establishment: Connection timed out.",
+                    )
+                if "Connection refused" in stdout.decode():
+                    raise HTTPException(
+                        status.HTTP_504_GATEWAY_TIMEOUT,
+                        detail="Connection establishment: Connection refused.",
+                    )
+            if stderr:
+                logger.error(f"CLN_GRPC: {stderr.decode()}")
 
-            return True
+            return False
+
         except grpc.aio._call.AioRpcError as error:
-            details = error.details()
-            logger.warning(details)
-
-            if "All addresses failed" in details:
-                m = details.split('message: "')[1]
-
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail=m,
-                )
-
-            if "no address known for peer" in details:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="Connection establishment: No address known for peer",
-                )
-
-            if "Connection timed out" in details:
-                raise HTTPException(
-                    status.HTTP_504_GATEWAY_TIMEOUT,
-                    detail="Connection establishment: Connection timed out.",
-                )
-
-            if "Connection refused" in details:
-                raise HTTPException(
-                    status.HTTP_504_GATEWAY_TIMEOUT,
-                    detail="Connection establishment: Connection refused.",
-                )
-
-            logger.exception(details)
-
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -814,7 +795,6 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
-    # @logger.catch(reraise=True, exclude=HTTPException)
     async def channel_open(
         self, local_funding_amount: int, node_URI: str, target_confs: int
     ) -> str:
@@ -822,73 +802,60 @@ class LnNodeCLNgRPC(LightningNodeBase):
             f"CLN_GRPC: channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
         )
 
-        await self.connect_peer(node_URI)
-
-        fee_rate: lnp.Feerate = None
+        fee_rate = None
         if target_confs == 1:
-            fee_rate = lnp.Feerate(urgent=True)
+            fee_rate = "urgent"
         elif target_confs >= 2 and target_confs <= 9:
-            fee_rate = lnp.Feerate(normal=True)
+            fee_rate = "normal"
         elif target_confs >= 10:
-            fee_rate = lnp.Feerate(slow=True)
+            fee_rate = "slow"
 
         try:
-            h = bytes.fromhex(node_URI.split("@")[0])
-            req = ln.FundchannelRequest(
-                id=h,
-                amount=lnp.AmountOrAll(
-                    amount=lnp.Amount(msat=local_funding_amount),
-                    all=False,
-                ),
-                feerate=fee_rate,
-            )
-        except TypeError as e:
-            logger.error(
-                f"CLN_GRPC: channel_open() failed at ln.FundchannelRequest(): {e}"
-            )
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+            res = await self.connect_peer(node_URI)
+            if not res:
+                raise HTTPException(
+                    status.HTTP_408_REQUEST_TIMEOUT,
+                    detail="Unknown error while trying to connect to peer",
+                )
 
-        try:
-            res = await self._cln_stub.FundChannel(req)
-            res = res.decode("utf-8")
+            cmd = f"fundchannel id={node_URI} amount={local_funding_amount} feerate={fee_rate}"
+            stdout, stderr = await _make_local_call(cmd)
+            if stdout:
+                o = stdout.decode()
+                j = json.loads(o)
+                if "txid" in o and "channel_id" in o:
+                    return j["txid"]
+                if "Unknown peer" in o:
+                    raise HTTPException(
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="We where able to connect to the peer but CLN can't find it when opening a channel.",
+                    )
+                if "Owning subdaemon openingd died" in o:
+                    # https://github.com/ElementsProject/lightning/issues/2798#issuecomment-511205719
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail="Likely the peer didn't like our channel opening proposal and disconnected from us.",
+                    )
+                if "Could not afford " in o:
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST, detail=j["message"]
+                    )
+                if "Number of pending channels exceed maximum" in o:
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST, detail=j["message"]
+                    )
 
-            if "txid" in res and "channel_id" in res:
-                return res["txid"]
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=j["message"]
+                )
+            if stderr:
+                logger.error(f"CLN_GRPC: {stderr.decode()}")
 
+            return False
         except grpc.aio._call.AioRpcError as error:
-            details = error.details()
-            logger.debug(details)
-
-            if "amount: should be a satoshi amount" in details:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="The amount is not a valid satoshi amount.",
-                )
-
-            if "Unknown peer" in details:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="We where able to connect to the peer but CLN can't find it when opening a channel.",
-                )
-
-            if "Owning subdaemon openingd died" in details:
-                # https://github.com/ElementsProject/lightning/issues/2798#issuecomment-511205719
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="Likely the peer didn't like our channel opening proposal and disconnected from us.",
-                )
-
-            if (
-                "Number of pending channels exceed maximum" in details
-                or "exceeds maximum chan size of 10 BTC" in details
-                or "Could not afford all using all " in details
-            ):
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST, detail=_extract_message(details)
-                )
-
-            logger.warning(f"UNHANDLED ERROR: {details}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
 
     async def channel_list(self) -> List[Channel]:
         logger.debug(f"CLN_GRPC: channel_list()")
