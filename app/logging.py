@@ -35,35 +35,12 @@ def configure_logger() -> None:
 class Formatter:
     def __init__(self, level: str):
         self.padding = 0
-        self.fmt_default: str = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            + "<level>{level.icon}</level> | "
-            + "<level>{file}:{line}</level> | "
-            + "<level>{message}</level>\n"
-        )
-
-        self.fmt_default_exception: str = (
-            self.fmt_default + "<level>{exception}</level>\n"
-        )
-
-        self.fmt_warning: str = (
-            "<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow> | "
-            + "<level>{level.icon}</level> | "
-            + "<level>{file}:{line}</level> | "
-            + "<level>{message}</level>\n"
-        )
-        self.fmt_warning_exception: str = (
-            self.fmt_warning + "<level>{exception}</level>\n"
-        )
-
-        self.fmt_error: str = (
-            "<red>{time:YYYY-MM-DD HH:mm:ss}</red> | "
-            + "<level>{level.icon}</level> | "
-            + "<level>{file}:{line}</level> | "
-            + "<level>{message}</level>\n"
-        )
-
-        self.fmt_error_exception: str = self.fmt_error + "<level>{exception}</level>\n"
+        self.fmt_default: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level.icon}</level> | <level>{message}</level>\n"
+        self.fmt_default_exception: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level.icon}</level> | <level>{message}</level>\n{exception}\n"
+        self.fmt_warning: str = "<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow> | <level>{level.icon}</level> | <level>{message}</level>\n"
+        self.fmt_warning_exception: str = "<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow> | <level>{level.icon}</level> | <level>{message}</level>\n{exception} |\n"
+        self.fmt_error: str = "<red>{time:YYYY-MM-DD HH:mm:ss}</red> | <level>{level.icon}</level> | <level>{message}</level>\n"
+        self.fmt_error_exception: str = "<red>{time:YYYY-MM-DD HH:mm:ss}</red> | <level>{level.icon}</level> | <level>{message}</level>\n{exception}\n"
 
     def format(self, record):
         level = record["level"]

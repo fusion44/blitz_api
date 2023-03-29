@@ -127,7 +127,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         opts = (("grpc.ssl_target_name_override", "cln"),)
 
         while not self._initialized:
-            logger.debug("CLN_GRPC: iterating ...")
+            logger.warning("CLN_GRPC: iterating ...")
             try:
                 if self._channel is None:
                     self._channel = grpc.aio.secure_channel(
@@ -158,7 +158,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             except Exception as e:
                 logger.error(f"CLN_GRPC: Unknown error: {e}")
 
-        logger.success("CLN_GRPC: Initialization complete.")
+        logger.info("CLN_GRPC: Initialization complete.")
 
     async def get_wallet_balance(self) -> WalletBalance:
         logger.debug("CLN_GRPC: get_wallet_balance() ")
