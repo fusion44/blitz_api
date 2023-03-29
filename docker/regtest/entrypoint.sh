@@ -1,7 +1,5 @@
 #!/bin/sh
 
-echo "LN_BACKEND: $LN_BACKEND"
-
 
 if [ "$LN_BACKEND" = "cln1" ]; then
   cp /code/.env.cln1 /code/.env
@@ -18,7 +16,6 @@ else
 fi
 
 # wait until the nodes are ready
-echo "Waiting for node $LN_BACKEND to finish bootstrapping..."
-sleep 120
+sleep 60
 
 python3 -m uvicorn app.main:app --host 0.0.0.0 --port 80
