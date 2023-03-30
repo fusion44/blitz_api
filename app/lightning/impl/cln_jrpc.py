@@ -45,6 +45,7 @@ from app.lightning.models import (
 from app.lightning.utils import generic_grpc_error_handler
 
 _WAIT_ANY_INVOICE_ID = 0
+_SOCKET_BUFFER_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
 
 
 class LnNodeCLNjRPC(LightningNodeBase):
@@ -92,7 +93,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         self._loop = asyncio.get_running_loop()
         self._reader, self._writer = await asyncio.open_unix_connection(
-            path=self._socket_path
+            path=self._socket_path,
+            limit=_SOCKET_BUFFER_SIZE_LIMIT,
         )
 
         asyncio.create_task(self._read_loop())
