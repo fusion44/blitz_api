@@ -61,7 +61,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     # Decoding the payment request take a long time,
     # hence we build a simple cache here.
-    _memo_cache = {}
+    _bolt11_cache: dict[str, PaymentRequest] = {}
     _block_cache = {}
 
     def get_implementation_name(self) -> str:
@@ -216,13 +216,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
             comment = ""
 
             if pay.payment_request is not None and len(pay.payment_request) > 0:
-                b11 = pay.payment_request
-                if b11 in self._memo_cache:
-                    comment = self._memo_cache[b11]
-                else:
-                    pr = await self.decode_pay_request(b11)
-                    comment = pr.description
-                    self._memo_cache[b11] = pr.description
+                b11 = await self._decode_bolt11_cached(pay.payment_request)
+                comment = b11.description
 
             p = GenericTx.from_payment(pay, comment)
 
@@ -377,6 +372,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 continue
 
             if include_incomplete:
+                b11_decoded = await self._decode_bolt11_cached(p["bolt11"])
+                p["amount_msat"] = b11_decoded.num_msat
                 pays.append(Payment.from_cln_jrpc(p))
 
         if reversed:
@@ -428,12 +425,17 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
+        if pay_req in self._bolt11_cache:
+            return self._bolt11_cache[pay_req]
+
         params = [pay_req]
         res = await self._send_request("decodepay", params)
 
         if not "error" in res:
             res = res["result"]
-            return PaymentRequest.from_cln_json(res)
+            req = PaymentRequest.from_cln_json(res)
+            self._bolt11_cache[pay_req] = req
+            return req
 
         m = res["error"]["message"]
         logger.error(m)
@@ -911,3 +913,11 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         logger.trace(f"Sending waitanyinvoice request: {data}")
         self._writer.write(data.encode("utf-8"))
+
+    async def _decode_bolt11_cached(self, bolt11: str) -> PaymentRequest:
+        if bolt11 in self._bolt11_cache:
+            return self._bolt11_cache[bolt11]
+
+        pr = await self.decode_pay_request(bolt11)
+        self._bolt11_cache[bolt11] = pr
+        return pr
