@@ -721,10 +721,44 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_close(self, channel_id: int, force_close: bool) -> str:
+        # https://lightning.readthedocs.io/lightning-close.7.html
         logger.trace(
             f"channel_close(channel_id={channel_id}, force_close={force_close})"
         )
-        raise NotImplementedError()
+
+        # on CLN we wait for 2 minutes to negotiate a channel close
+        # if peer doesn't respond we force close
+        params = {
+            "id": channel_id,
+            "unilateraltimeout": 120 if force_close else 0,
+        }
+        res = await self._send_request("close", params)
+        if "error" in res:
+            message = res["error"]["message"]
+            if (
+                "Short channel ID not active:" in message
+                or "Short channel ID not found" in message
+            ):
+                logger.warning(f"Error while closing channel {channel_id}: {message}")
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=message)
+
+            self._raise_internal_server_error("closing channel", res)
+
+        res = res["result"]
+
+        # “mutual”, “unilateral”, “unopened”
+        t = res["type"]
+        if t == "mutual" or t == "unilateral":
+            return res["txid"]
+        elif t == "unopened":
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Channel is not open yet."
+            )
+
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=f"CLN returned unknown close type: {t}",
+        )
 
     async def connect_peer(self, uri: str) -> bool:
         logger.trace(f"connect_peer(node_URI={uri})")
