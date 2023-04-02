@@ -45,6 +45,7 @@ from app.lightning.models import (
 from app.lightning.utils import generic_grpc_error_handler
 
 _WAIT_ANY_INVOICE_ID = 0
+_SOCKET_BUFFER_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
 
 
 class LnNodeCLNjRPC(LightningNodeBase):
@@ -60,7 +61,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     # Decoding the payment request take a long time,
     # hence we build a simple cache here.
-    _memo_cache = {}
+    _bolt11_cache: dict[str, PaymentRequest] = {}
     _block_cache = {}
 
     def get_implementation_name(self) -> str:
@@ -92,7 +93,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         self._loop = asyncio.get_running_loop()
         self._reader, self._writer = await asyncio.open_unix_connection(
-            path=self._socket_path
+            path=self._socket_path,
+            limit=_SOCKET_BUFFER_SIZE_LIMIT,
         )
 
         asyncio.create_task(self._read_loop())
@@ -214,13 +216,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
             comment = ""
 
             if pay.payment_request is not None and len(pay.payment_request) > 0:
-                b11 = pay.payment_request
-                if b11 in self._memo_cache:
-                    comment = self._memo_cache[b11]
-                else:
-                    pr = await self.decode_pay_request(b11)
-                    comment = pr.description
-                    self._memo_cache[b11] = pr.description
+                b11 = await self._decode_bolt11_cached(pay.payment_request)
+                comment = b11.description
 
             p = GenericTx.from_payment(pay, comment)
 
@@ -375,6 +372,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 continue
 
             if include_incomplete:
+                b11_decoded = await self._decode_bolt11_cached(p["bolt11"])
+                p["amount_msat"] = b11_decoded.num_msat
                 pays.append(Payment.from_cln_jrpc(p))
 
         if reversed:
@@ -426,12 +425,17 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
+        if pay_req in self._bolt11_cache:
+            return self._bolt11_cache[pay_req]
+
         params = [pay_req]
         res = await self._send_request("decodepay", params)
 
         if not "error" in res:
             res = res["result"]
-            return PaymentRequest.from_cln_json(res)
+            req = PaymentRequest.from_cln_json(res)
+            self._bolt11_cache[pay_req] = req
+            return req
 
         m = res["error"]["message"]
         logger.error(m)
@@ -514,6 +518,23 @@ class LnNodeCLNjRPC(LightningNodeBase):
         # [retry_for] [maxdelay] [exemptfee] [localinvreqid] [exclude]
         # [maxfee] [description]
 
+        res = await self._send_request("listpays", {"bolt11": pay_req})
+        if "error" in res:
+            e = res["error"]["message"]
+            if "Invalid invstring: unexpected prefix" in e:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="invalid bech32 string",
+                )
+
+            self._raise_internal_server_error("checking if invoice was paid", res)
+
+        pays = res["result"]["pays"]
+        if len(pays) > 0 and pays[0]["status"] == "complete":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="invoice is already paid"
+            )
+
         params = {
             "bolt11": pay_req,
             "maxfee": fee_limit_msat,
@@ -547,7 +568,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 detail="amount must be specified when paying a zero amount invoice",
             )
 
-        if "amount_msat parameter unnecessary" in message:
+        if (
+            "amount_msat parameter unnecessary" in message
+            or "msatoshi parameter unnecessary" in message
+        ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="amount must not be specified when paying a non-zero amount invoice",
@@ -595,7 +619,33 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_forward_events(self) -> ForwardSuccessEvent:
-        raise NotImplementedError()
+        logger.trace("listen_forward_events()")
+
+        # CLN has no subscription to forwarded events.
+        # We must poll instead.
+
+        interval = config("gather_ln_info_interval", default=2, cast=float)
+
+        # make sure we know how many forwards we have
+        # we need to calculate the difference between each iteration
+        res = await self._send_request("listforwards", {"status": "settled"})
+
+        if "error" in res:
+            self._raise_internal_server_error("getting forwards", res)
+
+        res = res["result"]
+        num_fwd_last_poll = len(res["forwards"])
+        while True:
+            res = await self._send_request("listforwards", {"status": "settled"})
+            res = res["result"]
+            if len(res["forwards"]) > num_fwd_last_poll:
+                fwds = res["forwards"][num_fwd_last_poll:]
+
+                for fwd in fwds:
+                    yield ForwardSuccessEvent.from_cln_json(fwd)
+
+                num_fwd_last_poll = len(res["forwards"])
+            await asyncio.sleep(interval - 0.1)
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_open(
@@ -614,11 +664,13 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         if "error" in res:
             self._handle_open_channel_error(res["error"])
+        res = res["result"]
 
         if "txid" in res and "channel_id" in res:
             return res["txid"]
 
     def _handle_open_channel_error(self, error):
+        logger.trace(f"_handle_open_channel_error({error})")
         message = error["message"]
 
         if "amount: should be a satoshi amount" in message:
@@ -676,6 +728,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_list(self) -> List[Channel]:
+        logger.trace("channel_list()")
+
         res = await self._send_request("listfunds")
         if "error" in res:
             self._raise_internal_server_error("listing channels", res)
@@ -690,7 +744,44 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_close(self, channel_id: int, force_close: bool) -> str:
-        raise NotImplementedError()
+        # https://lightning.readthedocs.io/lightning-close.7.html
+        logger.trace(
+            f"channel_close(channel_id={channel_id}, force_close={force_close})"
+        )
+
+        # on CLN we wait for 2 minutes to negotiate a channel close
+        # if peer doesn't respond we force close
+        params = {
+            "id": channel_id,
+            "unilateraltimeout": 120 if force_close else 0,
+        }
+        res = await self._send_request("close", params)
+        if "error" in res:
+            message = res["error"]["message"]
+            if (
+                "Short channel ID not active:" in message
+                or "Short channel ID not found" in message
+            ):
+                logger.warning(f"Error while closing channel {channel_id}: {message}")
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=message)
+
+            self._raise_internal_server_error("closing channel", res)
+
+        res = res["result"]
+
+        # “mutual”, “unilateral”, “unopened”
+        t = res["type"]
+        if t == "mutual" or t == "unilateral":
+            return res["txid"]
+        elif t == "unopened":
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="Channel is not open yet."
+            )
+
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=f"CLN returned unknown close type: {t}",
+        )
 
     async def connect_peer(self, uri: str) -> bool:
         logger.trace(f"connect_peer(node_URI={uri})")
@@ -733,15 +824,21 @@ class LnNodeCLNjRPC(LightningNodeBase):
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
 
     async def _read_loop(self):
-        while True:
-            data = await self._reader.readline()
-            data = data.decode("utf-8")
+        logger.trace("_read_loop()")
 
-            if data == "\n":
+        while not self._writer.is_closing():
+            try:
+                data = await self._reader.readline()
+                data = data.decode("utf-8")
+
+                if data == "\n":
+                    continue
+
+                if data:
+                    self._handle_response(data)
+            except (ValueError, asyncio.exceptions.LimitOverrunError) as e:
+                logger.exception(e)
                 continue
-
-            if data:
-                self._handle_response(data)
 
     def _handle_response(self, data):
         logger.trace(f"_handle_response(data={data})")
@@ -798,14 +895,15 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 reversed=True,
             )
 
-            for i in invoices:  # type Invoice
-                if i.state is not InvoiceState.SETTLED:
-                    continue
+            if invoices is not None:
+                for i in invoices:  # type Invoice
+                    if i.state is not InvoiceState.SETTLED:
+                        continue
 
-                if i.settle_index != None and i.settle_index < self.lastpay_index:
-                    break
+                    if i.settle_index != None and i.settle_index < self.lastpay_index:
+                        break
 
-                self.lastpay_index = i.settle_index
+                    self.lastpay_index = i.settle_index
 
         data = self._build_request_data(
             "waitanyinvoice",
@@ -815,3 +913,11 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         logger.trace(f"Sending waitanyinvoice request: {data}")
         self._writer.write(data.encode("utf-8"))
+
+    async def _decode_bolt11_cached(self, bolt11: str) -> PaymentRequest:
+        if bolt11 in self._bolt11_cache:
+            return self._bolt11_cache[bolt11]
+
+        pr = await self.decode_pay_request(bolt11)
+        self._bolt11_cache[bolt11] = pr
+        return pr

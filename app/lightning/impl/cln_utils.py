@@ -23,8 +23,11 @@ def calc_fee_rate_str(sat_per_vbyte, target_conf) -> str:
     return fee_rate
 
 
-def parse_cln_msat(msat: str) -> int:
-    return int(msat.replace("msat", ""))
+def parse_cln_msat(msat) -> int:
+    if isinstance(msat, str):
+        return int(msat.replace("msat", ""))
+
+    return msat
 
 
 def cln_classify_fee_revenue(forwards: list):
@@ -39,8 +42,14 @@ def cln_classify_fee_revenue(forwards: list):
 
     # TODO: performance: cache this in redis
     for f in forwards:
-        received_time = f.received_time
-        fee = f.fee_msat.msat
+        received_time = fee = 0
+        if isinstance(f, dict):
+            received_time = f["received_time"]
+            fee = parse_cln_msat(f["fee_msat"])
+        else:
+            received_time = f.received_time
+            fee = f.fee_msat.msat
+
         total += fee
 
         if received_time > t_day:
