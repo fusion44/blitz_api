@@ -516,6 +516,23 @@ class LnNodeCLNjRPC(LightningNodeBase):
         # [retry_for] [maxdelay] [exemptfee] [localinvreqid] [exclude]
         # [maxfee] [description]
 
+        res = await self._send_request("listpays", {"bolt11": pay_req})
+        if "error" in res:
+            e = res["error"]["message"]
+            if "Invalid invstring: unexpected prefix" in e:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="invalid bech32 string",
+                )
+
+            self._raise_internal_server_error("checking if invoice was paid", res)
+
+        pays = res["result"]["pays"]
+        if len(pays) > 0 and pays[0]["status"] == "complete":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="invoice is already paid"
+            )
+
         params = {
             "bolt11": pay_req,
             "maxfee": fee_limit_msat,
@@ -549,7 +566,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 detail="amount must be specified when paying a zero amount invoice",
             )
 
-        if "amount_msat parameter unnecessary" in message:
+        if (
+            "amount_msat parameter unnecessary" in message
+            or "msatoshi parameter unnecessary" in message
+        ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="amount must not be specified when paying a non-zero amount invoice",
