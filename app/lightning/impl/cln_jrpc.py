@@ -767,15 +767,21 @@ class LnNodeCLNjRPC(LightningNodeBase):
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
 
     async def _read_loop(self):
-        while True:
-            data = await self._reader.readline()
-            data = data.decode("utf-8")
+        logger.trace("_read_loop()")
 
-            if data == "\n":
+        while not self._writer.is_closing():
+            try:
+                data = await self._reader.readline()
+                data = data.decode("utf-8")
+
+                if data == "\n":
+                    continue
+
+                if data:
+                    self._handle_response(data)
+            except (ValueError, asyncio.exceptions.LimitOverrunError) as e:
+                logger.exception(e)
                 continue
-
-            if data:
-                self._handle_response(data)
 
     def _handle_response(self, data):
         logger.trace(f"_handle_response(data={data})")
@@ -832,14 +838,15 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 reversed=True,
             )
 
-            for i in invoices:  # type Invoice
-                if i.state is not InvoiceState.SETTLED:
-                    continue
+            if invoices is not None:
+                for i in invoices:  # type Invoice
+                    if i.state is not InvoiceState.SETTLED:
+                        continue
 
-                if i.settle_index != None and i.settle_index < self.lastpay_index:
-                    break
+                    if i.settle_index != None and i.settle_index < self.lastpay_index:
+                        break
 
-                self.lastpay_index = i.settle_index
+                    self.lastpay_index = i.settle_index
 
         data = self._build_request_data(
             "waitanyinvoice",
