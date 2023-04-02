@@ -1153,13 +1153,13 @@ class Payment(BaseModel):
 
         return cls(
             payment_hash=p["payment_hash"],
-            payment_preimage=p["preimage"],
+            payment_preimage=p["payment_preimage"] if "payment_preimage" in p else "",
             value_msat=value,
-            payment_request="" if not "bolt11" in p else p["bolt11"],
+            payment_request=p["bolt11"] if "bolt11" in p else "",
             status=PaymentStatus.from_cln_jrpc(p["status"]),
             fee_msat=total_sent - value,
             creation_time_ns=p["created_at"],
-            label="" if not "label" in p else p["label"],
+            label=p["label"] if "label" in p else "",
             failure_reason=PaymentFailureReason.from_cln_jrpc(p),
         )
 
@@ -1787,19 +1787,23 @@ class GenericTx(BaseModel):
     def from_invoice(cls, i: Invoice) -> "GenericTx":
         status = TxStatus.UNKNOWN
         time_stamp = i.expiry_date
+        amount = None
         if i.state == InvoiceState.SETTLED:
             status = TxStatus.SUCCEEDED
             time_stamp = i.settle_date
+            amount = i.amt_paid_msat
         elif i.state == InvoiceState.OPEN:
             status = TxStatus.IN_FLIGHT
+            amount = i.value_msat
         elif i.state == InvoiceState.CANCELED:
             status = TxStatus.FAILED
+            amount = i.value_msat
 
         return cls(
             id=i.payment_request,
             category=TxCategory.LIGHTNING,
             type=TxType.RECEIVE,
-            amount=i.amt_paid_msat,
+            amount=amount,
             time_stamp=time_stamp,
             comment=i.memo,
             status=status,
@@ -1945,22 +1949,29 @@ class GenericTx(BaseModel):
         )
 
     @classmethod
-    def from_cln_grpc_payment(cls, payment, comment: str = "") -> "GenericTx":
+    def from_cln_grpc_payment(
+        cls, payment, comment: str = "", amount: Union[None, int] = None
+    ) -> "GenericTx":
         status = TxStatus.UNKNOWN
+        fees = 0
+
         if payment.status == 0:  # pending
             status = TxStatus.IN_FLIGHT
         elif payment.status == 1:  # failed
             status = TxStatus.FAILED
         elif payment.status == 2:  # complete
             status = TxStatus.SUCCEEDED
+            fees = payment.amount_sent_msat.msat - payment.amount_msat.msat
 
         return cls(
             id=payment.bolt11,
             category=TxCategory.LIGHTNING,
             type=TxType.SEND,
             time_stamp=payment.created_at,
-            amount=-payment.amount_msat.msat,
+            amount=-payment.amount_msat.msat if amount is None else -amount,
             status=status,
-            total_fees=payment.amount_sent_msat.msat - payment.amount_msat.msat,
+            total_fees=payment.amount_sent_msat.msat - payment.amount_msat.msat
+            if fees is None
+            else fees,
             comment=comment,
         )
