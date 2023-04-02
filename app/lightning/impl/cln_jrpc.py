@@ -621,6 +621,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
             return res["txid"]
 
     def _handle_open_channel_error(self, error):
+        logger.trace(f"_handle_open_channel_error({error})")
         message = error["message"]
 
         if "amount: should be a satoshi amount" in message:
@@ -678,6 +679,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_list(self) -> List[Channel]:
+        logger.trace("channel_list()")
+
         res = await self._send_request("listfunds")
         if "error" in res:
             self._raise_internal_server_error("listing channels", res)
@@ -692,6 +695,9 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_close(self, channel_id: int, force_close: bool) -> str:
+        logger.trace(
+            f"channel_close(channel_id={channel_id}, force_close={force_close})"
+        )
         raise NotImplementedError()
 
     async def connect_peer(self, uri: str) -> bool:

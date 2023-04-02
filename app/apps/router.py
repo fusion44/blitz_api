@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
+from loguru import logger
 from pydantic import BaseModel
 
 import app.apps.docs as docs
@@ -19,13 +20,9 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
     response_description=docs.get_app_status_response_docs,
     dependencies=[Depends(JWTBearer())],
 )
+@logger.catch(exclude=(HTTPException,))
 async def get_status():
-    try:
-        return await repo.get_app_status()
-    except:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
-        )
+    return await repo.get_app_status()
 
 
 @router.get(
@@ -34,13 +31,9 @@ async def get_status():
     summary="Get the status of a single app by id.",
     dependencies=[Depends(JWTBearer())],
 )
+@logger.catch(exclude=(HTTPException,))
 async def get_single_status(id):
-    try:
-        return await repo.get_app_status_single(id)
-    except:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
-        )
+    return await repo.get_app_status_single(id)
 
 
 @router.get(
@@ -50,13 +43,9 @@ async def get_single_status(id):
     response_description=docs.get_app_status_sub_response_docs,
     dependencies=[Depends(JWTBearer())],
 )
+@logger.catch(exclude=(HTTPException,))
 async def get_status():
-    try:
-        return EventSourceResponse(repo.get_app_status_sub())
-    except:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unknown error"
-        )
+    return EventSourceResponse(repo.get_app_status_sub())
 
 
 @router.post(
@@ -65,6 +54,7 @@ async def get_status():
     summary="Install app",
     dependencies=[Depends(JWTBearer())],
 )
+@logger.catch(exclude=(HTTPException,))
 async def install_app(name: str):
     return await repo.install_app_sub(name)
 
@@ -79,5 +69,6 @@ class UninstallData(BaseModel):
     summary="Uninstall app",
     dependencies=[Depends(JWTBearer())],
 )
+@logger.catch(exclude=(HTTPException,))
 async def uninstall_app(name: str, data: UninstallData):
     return await repo.uninstall_app_sub(name, data.keepData)
