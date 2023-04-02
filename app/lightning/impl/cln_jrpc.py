@@ -662,6 +662,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         if "error" in res:
             self._handle_open_channel_error(res["error"])
+        res = res["result"]
 
         if "txid" in res and "channel_id" in res:
             return res["txid"]
