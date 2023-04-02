@@ -597,7 +597,33 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_forward_events(self) -> ForwardSuccessEvent:
-        raise NotImplementedError()
+        logger.trace("listen_forward_events()")
+
+        # CLN has no subscription to forwarded events.
+        # We must poll instead.
+
+        interval = config("gather_ln_info_interval", default=2, cast=float)
+
+        # make sure we know how many forwards we have
+        # we need to calculate the difference between each iteration
+        res = await self._send_request("listforwards", {"status": "settled"})
+
+        if "error" in res:
+            self._raise_internal_server_error("getting forwards", res)
+
+        res = res["result"]
+        num_fwd_last_poll = len(res["forwards"])
+        while True:
+            res = await self._send_request("listforwards", {"status": "settled"})
+            res = res["result"]
+            if len(res["forwards"]) > num_fwd_last_poll:
+                fwds = res["forwards"][num_fwd_last_poll:]
+
+                for fwd in fwds:
+                    yield ForwardSuccessEvent.from_cln_json(fwd)
+
+                num_fwd_last_poll = len(res["forwards"])
+            await asyncio.sleep(interval - 0.1)
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_open(
