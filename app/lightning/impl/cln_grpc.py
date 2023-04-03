@@ -128,7 +128,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
             certificate_chain=cln_grpc_cert,
         )
 
-        opts = (("grpc.ssl_target_name_override", "cln"),)
+        opts = (
+            ("grpc.ssl_target_name_override", "cln"),
+            ("grpc.max_receive_message_length", 1024 * 1024 * 10),
+        )
 
         while not self._initialized:
             logger.debug("CLN_GRPC: iterating ...")

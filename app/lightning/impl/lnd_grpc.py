@@ -83,8 +83,12 @@ This will show more debug information.
             logging.warning("LND_GRPC: gRPC channel already created.")
             return
 
+        opts = [("grpc.max_receive_message_length", 1024 * 1024 * 10)]
+
         self._channel = grpc.aio.secure_channel(
-            self._lnd_grpc_url, self._combined_creds
+            self._lnd_grpc_url,
+            self._combined_creds,
+            options=opts,
         )
         self._lnd_stub = lnrpc.LightningStub(self._channel)
         self._router_stub = routerrpc.RouterStub(self._channel)
