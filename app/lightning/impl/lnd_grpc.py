@@ -1,11 +1,11 @@
 import asyncio
-import logging
 import os
 from typing import AsyncGenerator, List, Optional
 
 import grpc
 from decouple import config as dconfig
 from fastapi.exceptions import HTTPException
+from loguru import logger
 from starlette import status
 
 import app.bitcoind.service as btc
@@ -38,8 +38,9 @@ from app.lightning.models import (
 )
 
 
+@logger.catch(exclude=(HTTPException,))
 def _check_if_locked(error):
-    logging.debug(f"LND_GRPC: _check_if_locked()")
+    logger.debug(f"logger._check_if_locked()")
 
     if error.details() != None and error.details().find("wallet locked") > -1:
         raise HTTPException(
@@ -60,7 +61,7 @@ os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
 
 class LnNodeLNDgRPC(LightningNodeBase):
     _lnd_connect_error_debug_msg = """
-LND_GRPC: Unable to connect to LND. Possible reasons:
+Unable to connect to LND. Possible reasons:
 * Node is not reachable (ports, network down, ...)
 * Macaroon is not correct
 * IP is not included in LND tls certificate
@@ -80,26 +81,31 @@ This will show more debug information.
 
     def _create_stubs(self) -> None:
         if self._channel is not None:
-            logging.warning("LND_GRPC: gRPC channel already created.")
+            logger.warning("gRPC channel already created.")
             return
 
+        opts = [("grpc.max_receive_message_length", 1024 * 1024 * 10)]
+
         self._channel = grpc.aio.secure_channel(
-            self._lnd_grpc_url, self._combined_creds
+            self._lnd_grpc_url,
+            self._combined_creds,
+            options=opts,
         )
         self._lnd_stub = lnrpc.LightningStub(self._channel)
         self._router_stub = routerrpc.RouterStub(self._channel)
         self._wallet_unlocker = unlockerrpc.WalletUnlockerStub(self._channel)
 
-        logging.debug("LND_GRPC: Created LND gRPC stubs")
+        logger.debug("logger.Created LND gRPC stubs")
 
     def get_implementation_name(self) -> str:
         return "LND_GRPC"
 
+    @logger.catch(exclude=(HTTPException,))
     async def _check_lnd_status(
         self,
         sleep_time: float = 2,
     ) -> AsyncGenerator[InitLnRepoUpdate, None]:
-        logging.debug("LND_GRPC: _check_lnd_status() start")
+        logger.debug("_check_lnd_status() start")
 
         self._lnd_connect_error_debug_msg_sent = False
 
@@ -130,7 +136,7 @@ This will show more debug information.
                 break
             except grpc.aio._call.AioRpcError as error:
                 details = error.details()
-                logging.debug(f"LND_GRPC: Waiting for LND daemon... Details {details}")
+                logger.debug(f"Waiting for LND daemon... Details {details}")
 
                 if "failed to connect to all addresses" in details:
                     await self._init_queue.put(
@@ -141,7 +147,7 @@ This will show more debug information.
                     )
 
                     if not self._lnd_connect_error_debug_msg_sent:
-                        logging.debug(self._lnd_connect_error_debug_msg)
+                        logger.debug(self._lnd_connect_error_debug_msg)
                         self._lnd_connect_error_debug_msg_sent = True
 
                     await temp_channel.close()
@@ -177,22 +183,21 @@ This will show more debug information.
                         )
                     )
                 else:
-                    logging.error(f"LND_GRPC: Unknown error: {details}")
+                    logger.error(f"Unknown error: {details}")
                     raise
 
-                logging.debug(
-                    f"LND_GRPC: _check_lnd_status() sleeping {sleep_time} seconds..."
-                )
+                logger.debug(f"_check_lnd_status() sleeping {sleep_time} seconds...")
                 await asyncio.sleep(sleep_time)
 
-        logging.debug("LND_GRPC: _check_lnd_status() done")
+        logger.debug("_check_lnd_status() done")
 
+    @logger.catch(exclude=(HTTPException,))
     async def initialize(self) -> AsyncGenerator[InitLnRepoUpdate, None]:
-        logging.debug("LND_GRPC: Unable to connect to LND daemon, waiting...")
+        logger.trace("Unable to connect to LND daemon, waiting...")
 
         if self._initialized:
-            logging.warning(
-                "LND_GRPC: Connection already initialized. This function must not be called twice."
+            logger.warning(
+                "Connection already initialized. This function must not be called twice."
             )
             yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -219,7 +224,7 @@ This will show more debug information.
 
         self._init_queue = asyncio.Queue()
 
-        logging.info("LND_GRPC: Unable to connect to LND daemon, waiting...")
+        logger.info("Trying to connect to LND daemon ...")
 
         loop = asyncio.get_event_loop()
         task = loop.create_task(self._check_lnd_status(sleep_time=2))
@@ -250,16 +255,15 @@ This will show more debug information.
             ):
                 pass  # do nothing here
             else:
-                logging.warning(
-                    f"LND_GRPC: Unhandled initialization event: {res.dict()}"
-                )
+                logger.warning(f"Unhandled initialization event: {res.dict()}")
 
             yield res
 
-        logging.info("LND_GRPC: Initialization complete.")
+        logger.info("Initialization complete.")
 
+    @logger.catch(exclude=(HTTPException,))
     async def get_wallet_balance(self) -> WalletBalance:
-        logging.debug("LND_GRPC: get_wallet_balance() ")
+        logger.trace("get_wallet_balance() ")
 
         try:
             w_req = ln.WalletBalanceRequest()
@@ -275,11 +279,12 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def list_all_tx(
         self, successful_only: bool, index_offset: int, max_tx: int, reversed: bool
     ) -> List[GenericTx]:
-        logging.debug(
-            f"LND_GRPC: list_all_tx(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+        logger.trace(
+            f"logger.list_all_tx(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
         )
 
         # TODO: find a better caching strategy
@@ -346,6 +351,7 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def list_invoices(
         self,
         pending_only: bool,
@@ -353,7 +359,7 @@ This will show more debug information.
         num_max_invoices: int,
         reversed: bool,
     ):
-        logging.debug("LND_GRPC: list_invoices() ")
+        logger.trace("logger.list_invoices() ")
 
         try:
             req = ln.ListInvoiceRequest(
@@ -370,8 +376,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def list_on_chain_tx(self) -> List[OnChainTransaction]:
-        logging.debug("LND_GRPC: list_on_chain_tx() ")
+        logger.trace("logger.list_on_chain_tx() ")
 
         try:
             req = ln.GetTransactionsRequest()
@@ -383,6 +390,7 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def list_payments(
         self,
         include_incomplete: bool,
@@ -390,8 +398,8 @@ This will show more debug information.
         max_payments: int,
         reversed: bool,
     ):
-        logging.debug(
-            f"LND_GRPC: list_payments(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
+        logger.trace(
+            f"logger.list_payments(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
         )
 
         try:
@@ -409,6 +417,7 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def add_invoice(
         self,
         value_msat: int,
@@ -416,8 +425,8 @@ This will show more debug information.
         expiry: int = 3600,
         is_keysend: bool = False,
     ) -> Invoice:
-        logging.debug(
-            f"LND_GRPC: add_invoice(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
+        logger.trace(
+            f"logger.add_invoice(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
         )
 
         try:
@@ -451,8 +460,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
-        logging.debug(f"LND_GRPC: decode_pay_request(pay_req={pay_req})")
+        logger.trace(f"logger.decode_pay_request(pay_req={pay_req})")
 
         try:
             req = ln.PayReqString(pay_req=pay_req)
@@ -472,15 +482,17 @@ This will show more debug information.
                     status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
                 )
 
+    @logger.catch(exclude=(HTTPException,))
     async def get_fee_revenue(self) -> FeeRevenue:
-        logging.debug(f"LND_GRPC: get_fee_revenue()")
+        logger.trace(f"logger.get_fee_revenue()")
 
         req = ln.FeeReportRequest()
         res = await self._lnd_stub.FeeReport(req)
         return FeeRevenue.from_lnd_grpc(res)
 
+    @logger.catch(exclude=(HTTPException,))
     async def new_address(self, input: NewAddressInput) -> str:
-        logging.debug(f"LND_GRPC: new_address(input={input})")
+        logger.trace(f"logger.new_address(input={input})")
 
         t = 1 if input.type == OnchainAddressType.NP2WKH else 2
         try:
@@ -493,8 +505,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def send_coins(self, input: SendCoinsInput) -> SendCoinsResponse:
-        logging.debug(f"LND_GRPC: send_coins(input={input})")
+        logger.trace(f"logger.send_coins(input={input})")
 
         try:
             r = ln.SendCoinsRequest(
@@ -537,6 +550,7 @@ This will show more debug information.
                     status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details
                 )
 
+    @logger.catch(exclude=(HTTPException,))
     async def send_payment(
         self,
         pay_req: str,
@@ -544,8 +558,8 @@ This will show more debug information.
         fee_limit_msat: int,
         amount_msat: Optional[int] = None,
     ) -> Payment:
-        logging.debug(
-            f"LND_GRPC: send_payment(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
+        logger.trace(
+            f"logger.send_payment(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
         )
 
         try:
@@ -613,8 +627,9 @@ This will show more debug information.
                     status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
                 )
 
+    @logger.catch(exclude=(HTTPException,))
     async def get_ln_info(self) -> LnInfo:
-        logging.debug(f"LND_GRPC: get_ln_info()")
+        logger.trace(f"logger.get_ln_info()")
 
         if not self._initialized:
             raise HTTPException(
@@ -631,8 +646,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def _wait_wallet_fully_ready(self):
-        logging.debug(f"LND_GRPC: _wait_wallet_fully_ready()")
+        logger.trace(f"logger._wait_wallet_fully_ready()")
 
         # This must only be called after unlocking the wallet.
 
@@ -641,8 +657,8 @@ This will show more debug information.
                 info = await self._lnd_stub.GetInfo(ln.GetInfoRequest())
 
                 if info != None:
-                    logging.debug(
-                        f"LND_GRPC: _wait_wallet_fully_ready() breaking out of loop"
+                    logger.debug(
+                        f"logger._wait_wallet_fully_ready() breaking out of wait ready loop"
                     )
                     break
             except grpc.aio._call.AioRpcError as error:
@@ -660,11 +676,12 @@ This will show more debug information.
                     )
                     await asyncio.sleep(0.1)
                 else:
-                    logging.error(f"LND_GRPC: Unknown error: {details}")
+                    logger.error(f"logger.Unknown error: {details}")
                     raise
 
+    @logger.catch(exclude=(HTTPException,))
     async def unlock_wallet(self, password: str) -> bool:
-        logging.debug(f"LND_GRPC: unlock_wallet(password=wedontlogpasswords)")
+        logger.trace(f"logger.unlock_wallet(password=wedontlogpasswords)")
 
         try:
             if self._channel is None:
@@ -688,8 +705,9 @@ This will show more debug information.
                     status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
                 )
 
+    @logger.catch(exclude=(HTTPException,))
     async def listen_invoices(self) -> AsyncGenerator[Invoice, None]:
-        logging.debug(f"LND_GRPC: listen_invoices()")
+        logger.trace(f"logger.listen_invoices()")
 
         request = ln.InvoiceSubscription()
         try:
@@ -701,8 +719,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def listen_forward_events(self) -> ForwardSuccessEvent:
-        logging.debug(f"LND_GRPC: listen_forward_events()")
+        logger.trace(f"logger.listen_forward_events()")
 
         request = router.SubscribeHtlcEventsRequest()
         try:
@@ -740,11 +759,12 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def channel_open(
         self, local_funding_amount: int, node_URI: str, target_confs: int
     ) -> str:
-        logging.debug(
-            f"LND_GRPC: channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
+        logger.trace(
+            f"logger.channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
         )
 
         try:
@@ -764,7 +784,7 @@ This will show more debug information.
                     error.details() != None
                     and error.details().find("already connected to peer") > -1
                 ):
-                    logging.debug(f"already connected to peer {pubkey}")
+                    logger.debug(f"already connected to peer {pubkey}")
                 else:
                     raise error
 
@@ -783,8 +803,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def peer_resolve_alias(self, node_pub: str) -> str:
-        logging.debug(f"LND_GRPC: peer_resolve_alias(node_pub={node_pub})")
+        logger.trace(f"logger.peer_resolve_alias(node_pub={node_pub})")
 
         # get fresh list of peers and their aliases
         try:
@@ -797,8 +818,9 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def channel_list(self) -> List[Channel]:
-        logging.debug(f"LND_GRPC: channel_list()")
+        logger.trace(f"logger.channel_list()")
 
         try:
             request = ln.ListChannelsRequest()
@@ -828,9 +850,10 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
+    @logger.catch(exclude=(HTTPException,))
     async def channel_close(self, channel_id: int, force_close: bool) -> str:
-        logging.debug(
-            f"LND_GRPC: channel_close(channel_id={channel_id}, force_close={force_close})"
+        logger.trace(
+            f"logger.channel_close(channel_id={channel_id}, force_close={force_close})"
         )
 
         if not ":" in channel_id:
