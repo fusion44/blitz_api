@@ -15,6 +15,7 @@ import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
+from app.lightning.impl.cln_utils import cln_classify_fee_revenue, parse_cln_msat
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
     Channel,
@@ -255,7 +256,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 tx.append(i)
 
             for transaction in res[1]:
-                t = GenericTx.from_cln_grpc_onchain_tx(transaction, res[3].block_height)
+                t = GenericTx.from_onchain_tx(transaction, res[3].block_height)
                 if successful_only and t.status == TxStatus.SUCCEEDED:
                     tx.append(t)
                     continue
@@ -263,17 +264,18 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 tx.append(t)
 
             for pay in res[2].pays:
-                comment = ""
+                decoded_bolt11: PaymentRequest = None
 
                 if pay.bolt11 is not None and len(pay.bolt11) > 0:
                     if pay.bolt11 in self._memo_cache:
-                        comment = self._memo_cache[pay.bolt11]
+                        decoded_bolt11 = self._memo_cache[pay.bolt11]
                     else:
-                        pr = await self.decode_pay_request(pay.bolt11)
-                        comment = pr.description
-                        self._memo_cache[pay.bolt11] = pr.description
+                        decoded_bolt11 = await self.decode_pay_request(pay.bolt11)
+                        self._memo_cache[pay.bolt11] = decoded_bolt11
 
-                p = GenericTx.from_cln_grpc_payment(pay, comment)
+                p = GenericTx.from_cln_grpc_payment(
+                    pay, decoded_bolt11.description, decoded_bolt11.num_msat
+                )
 
                 if successful_only and p.status == TxStatus.SUCCEEDED:
                     tx.append(p)
@@ -311,24 +313,30 @@ class LnNodeCLNgRPC(LightningNodeBase):
     ) -> List[Invoice]:
         logger.debug("CLN_GRPC: list_invoices() ")
 
-        req = ln.ListinvoicesRequest()
-        res = await self._cln_stub.ListInvoices(req)
+        try:
+            req = ln.ListinvoicesRequest()
+            res = await self._cln_stub.ListInvoices(req)
 
-        tx = []
-        for i in res.invoices:
-            if pending_only:
-                if i.status == 0:
+            tx = []
+            for i in res.invoices:
+                if pending_only:
+                    if i.status == 0:
+                        tx.append(Invoice.from_cln_grpc(i))
+                else:
                     tx.append(Invoice.from_cln_grpc(i))
-            else:
-                tx.append(Invoice.from_cln_grpc(i))
 
-        if reversed:
-            tx.reverse()
+            if reversed:
+                tx.reverse()
 
-        if num_max_invoices == 0 or num_max_invoices is None:
-            return tx
+            if num_max_invoices == 0 or num_max_invoices is None:
+                return tx
 
-        return tx[index_offset : index_offset + num_max_invoices]
+            return tx[index_offset : index_offset + num_max_invoices]
+
+        except grpc.aio._call.AioRpcError as error:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
 
     async def list_on_chain_tx(self) -> List[OnChainTransaction]:
         logger.debug("CLN_GRPC: list_on_chain_tx() ")
@@ -414,27 +422,31 @@ class LnNodeCLNgRPC(LightningNodeBase):
         logger.debug(
             f"CLN_GRPC: list_payments(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
         )
+        try:
+            req = ln.ListpaysRequest()
+            res = await self._cln_stub.ListPays(req)
 
-        req = ln.ListpaysRequest()
-        res = await self._cln_stub.ListPays(req)
+            pays = []
+            for p in res.pays:
+                if p.status == 2:
+                    # always include completed payments
+                    pays.append(Payment.from_cln_grpc(p))
+                    continue
 
-        pays = []
-        for p in res.pays:
-            if p.status == 2:
-                # always include completed payments
-                pays.append(Payment.from_cln_grpc(p))
-                continue
+                if include_incomplete:
+                    pays.append(Payment.from_cln_grpc(p))
 
-            if include_incomplete:
-                pays.append(Payment.from_cln_grpc(p))
+            if reversed:
+                pays.reverse()
 
-        if reversed:
-            pays.reverse()
+            if max_payments == 0 or max_payments is None:
+                return pays
 
-        if max_payments == 0 or max_payments is None:
-            return pays
-
-        return pays[index_offset : index_offset + max_payments]
+            return pays[index_offset : index_offset + max_payments]
+        except grpc.aio._call.AioRpcError as error:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
 
     async def add_invoice(
         self,
@@ -489,74 +501,60 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
         logger.debug(f"CLN_GRPC: decode_pay_request(pay_req={pay_req})")
+        try:
+            res = await _make_local_call(f"decodepay bolt11={pay_req}")
 
-        res = await _make_local_call(f"decodepay bolt11={pay_req}")
+            if not res:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Unknown CLN error decoding pay request",
+                )
 
-        if not res:
+            if len(res) == 0:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="No response from CLN decoding pay request",
+                )
+
+            decoded = res[0].decode()
+
+            if "Invalid bolt11: Bad bech32 string" in decoded:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid bolt11: Bad bech32 string",
+                )
+
+            return PaymentRequest.from_cln_json(json.loads(decoded))
+        except e:
             raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unknown CLN error decoding pay request",
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
-
-        if len(res) == 0:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No response from CLN decoding pay request",
-            )
-
-        decoded = res[0].decode()
-
-        if "Invalid bolt11: Bad bech32 string" in decoded:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, detail="Invalid bolt11: Bad bech32 string"
-            )
-
-        return PaymentRequest.from_cln_json(json.loads(decoded))
 
     async def get_fee_revenue(self) -> FeeRevenue:
-        logger.debug(f"CLN_GRPC: get_fee_revenue()")
+        try:
+            # status 1 == "settled"
+            req = ln.ListforwardsRequest(status=1)
+            res = await self._cln_stub.ListForwards(req)
+            day, week, month, year, total = cln_classify_fee_revenue(res.forwards)
 
-        # status 1 == "settled"
-        req = ln.ListforwardsRequest(status=1)
-        res = await self._cln_stub.ListForwards(req)
-
-        day = week = month = year = total = 0
-
-        now = time.time()
-        t_day = now - 86400.0  # 1 day
-        t_week = now - 604800.0  # 1 week
-        t_month = now - 2592000.0  # 1 month
-        t_year = now - 31536000.0  # 1 year
-
-        # TODO: performance: cache this in redis
-        for f in res.forwards:
-            received_time = f.received_time
-            fee = f.fee_msat.msat
-            total += fee
-
-            if received_time > t_day:
-                day += fee
-                week += fee
-                month += fee
-                year += fee
-            elif received_time > t_week:
-                week += fee
-                month += fee
-                year += fee
-            elif received_time > t_month:
-                month += fee
-                year += fee
-            elif received_time > t_year:
-                year += fee
-
-        return FeeRevenue(day=day, week=week, month=month, year=year, total=total)
+            return FeeRevenue(day=day, week=week, month=month, year=year, total=total)
+        except grpc.aio._call.AioRpcError as error:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
+            )
 
     async def new_address(self, input: NewAddressInput) -> str:
         logger.debug(f"CLN_GRPC: new_address(input={input})")
 
-        req = ln.NewaddrRequest()
-        res = await self._cln_stub.NewAddr(req)
-        return res.bech32
+        try:
+            req = ln.NewaddrRequest()
+            res = await self._cln_stub.NewAddr(req)
+
+            return res.bech32
+        except grpc.aio._call.AioRpcError as error:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(error)
+            )
 
     async def send_coins(self, input: SendCoinsInput) -> SendCoinsResponse:
         logger.debug(f"CLN_GRPC: send_coins(input={input})")
@@ -713,24 +711,38 @@ class LnNodeCLNgRPC(LightningNodeBase):
     async def listen_invoices(self) -> AsyncGenerator[Invoice, None]:
         logger.debug(f"CLN_GRPC: listen_invoices()")
 
-        lastpay_index = 0
-        invoices = await self.list_invoices(
-            pending_only=False,
-            index_offset=0,
-            num_max_invoices=9999999999999,
-            reversed=False,
-        )
+        try:
+            lastpay_index = 0
+            invoices = await self.list_invoices(
+                pending_only=False,
+                index_offset=0,
+                num_max_invoices=9999999999999,
+                reversed=False,
+            )
 
-        for i in invoices:  # type Invoice
-            if i.state == InvoiceState.SETTLED and i.settle_index > lastpay_index:
+            for i in invoices:  # type Invoice
+                if i.state == InvoiceState.SETTLED and i.settle_index > lastpay_index:
+                    lastpay_index = i.settle_index
+
+            while True:
+                req = ln.WaitanyinvoiceRequest(lastpay_index=lastpay_index)
+                i = await self._cln_stub.WaitAnyInvoice(req)
+                i = Invoice.from_cln_grpc(i)
                 lastpay_index = i.settle_index
+                yield i
+        except grpc.aio._call.AioRpcError as error:
+            details = error.details()
+            logger.debug(message=details)
 
-        while True:
-            req = ln.WaitanyinvoiceRequest(lastpay_index=lastpay_index)
-            i = await self._cln_stub.WaitAnyInvoice(req)
-            i = Invoice.from_cln_grpc(i)
-            lastpay_index = i.settle_index
-            yield i
+            try:
+                self._handle_base_cln_error(error)
+            except HTTPException:
+                raise
+
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unknown CLN error while listening for invoices: {details}",
+            )
 
     async def listen_forward_events(self) -> ForwardSuccessEvent:
         logger.debug(f"CLN_GRPC: listen_forward_events()")
