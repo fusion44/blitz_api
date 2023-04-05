@@ -12,6 +12,7 @@ from loguru import logger
 
 def configure_logger() -> None:
     level = dconfig("log_level", default="INFO", cast=str)
+    db_log_level = dconfig("db_log_level", default="WARNING", cast=str)
     log_file = dconfig("log_file", default="", cast=str)
 
     logger.remove()
@@ -28,8 +29,13 @@ def configure_logger() -> None:
             compression="zip",
         )
 
+    # Configure the logging handlers for Uvicorn
     logging.getLogger("uvicorn").handlers = [InterceptHandler()]
     logging.getLogger("uvicorn.access").handlers = [InterceptHandler()]
+
+    # Intercept and log SQLAlchemy logs
+    logging.getLogger("sqlalchemy").setLevel(db_log_level)
+    logging.getLogger("sqlalchemy").handlers = [InterceptHandler()]
 
 
 class Formatter:

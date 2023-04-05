@@ -15,6 +15,7 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
+from app.api.db.database import Database
 from app.api.models import ApiStartupStatus, StartupState
 from app.api.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
 from app.api.warmup import (
@@ -96,6 +97,9 @@ async def on_startup():
     await redis_plugin.init()
     register_cookie_updater()
     await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+
+    db = Database(dconfig("db_url"))
+    await db.initialize()
 
     loop = asyncio.get_event_loop()
     loop.create_task(_initialize_bitcoin())

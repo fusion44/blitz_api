@@ -27,6 +27,9 @@ googleapis-common-protos = "1.57.0"
 protobuf = "^4.21.9"
 deepdiff = "5.8.1"
 loguru = "^0.6.0"
+sqlalchemy = "^2.0.8"
+alembic = "^1.10.2"
+aiosqlite = "^0.18.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "22.10.0"
