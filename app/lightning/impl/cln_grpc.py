@@ -871,10 +871,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             h = bytes.fromhex(node_URI.split("@")[0])
             req = ln.FundchannelRequest(
                 id=h,
-                amount=lnp.AmountOrAll(
-                    amount=lnp.Amount(msat=local_funding_amount),
-                    all=False,
-                ),
+                amount=lnp.AmountOrAll(amount=lnp.Amount(msat=local_funding_amount)),
                 feerate=fee_rate,
             )
         except TypeError as e:
@@ -883,10 +880,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         try:
             res = await self._cln_stub.FundChannel(req)
-            res = res.decode("utf-8")
-
-            if "txid" in res and "channel_id" in res:
-                return res["txid"]
+            return res.txid.hex()
 
         except grpc.aio._call.AioRpcError as error:
             details = error.details()
@@ -915,6 +909,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 "Number of pending channels exceed maximum" in details
                 or "exceeds maximum chan size of 10 BTC" in details
                 or "Could not afford all using all " in details
+                or "BTC is below min chan size of" in details
             ):
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST, detail=_extract_message(details)

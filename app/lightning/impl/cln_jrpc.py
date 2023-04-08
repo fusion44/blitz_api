@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import sys
 import time
 from typing import AsyncGenerator, Dict, List, Optional, Union
@@ -87,6 +88,11 @@ class LnNodeCLNjRPC(LightningNodeBase):
             )
             sys.exit(1)
 
+        # check if the file self._socket_path exists
+        if not os.path.exists(self._socket_path):
+            logger.error(f"Socket file {self._socket_path} is not readable.")
+            sys.exit(1)
+
         logger.info(
             f"Establishing a connection to the CLN socket at {self._socket_path}"
         )
@@ -101,6 +107,15 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         logger.info("Setting up invoice waitanyinvoice subscription.")
         await self._refresh_invoice_sub(True)
+
+        info = await self.get_ln_info()
+        if info is None:
+            logger.error("Failed to get CLN node info.")
+            sys.exit(1)
+
+        logger.success(
+            f"Connected to CLN node with alias {info.alias} and pubkey {info.identity_pubkey[:10]}...{info.identity_pubkey[-10:]}"
+        )
 
         yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -482,7 +497,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def send_coins(self, input: SendCoinsInput) -> SendCoinsResponse:
-        fee_rate: calc_fee_rate_str(input.sat_per_vbyte, input.target_conf)
+        fee_rate = calc_fee_rate_str(input.sat_per_vbyte, input.target_conf)
 
         amt = "all" if input.send_all else input.amount
 

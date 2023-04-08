@@ -442,7 +442,7 @@ class Channel(BaseModel):
         # TODO: get alias and balance of the channel
         return cls(
             active=c["connected"],
-            channel_id=c["short_channel_id"],
+            channel_id=c["short_channel_id"] if "short_channel_id" in c else None,
             peer_publickey=c["peer_id"],
             peer_alias=peer_alias,
             balance_local=parse_cln_msat(c["our_amount_msat"]),
