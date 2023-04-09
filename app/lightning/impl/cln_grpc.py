@@ -181,12 +181,14 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         for o in res.outputs:
             sat = o.amount_msat.msat / 1000
-            onchain_total += sat
-            if o.status == 0:
+            if o.status == 0:  # unconfirmed
                 onchain_unconfirmed += sat
-            elif o.status == 1:
+            elif o.status == 1 and not o.reserved:  # confirmed
                 onchain_confirmed += sat
             # 2 is spent => ignore
+            # 3 is immature => not sure what to do with this
+
+        onchain_total = onchain_confirmed + onchain_unconfirmed
 
         chan_local = chan_remote = chan_pending_local = chan_pending_remote = 0
         for c in res.channels:

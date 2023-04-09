@@ -29,7 +29,11 @@ PLATFORM = config("platform", cast=str)
 ln_node = config("ln_node").lower()
 if ln_node == "lnd_grpc":
     from app.lightning.impl.lnd_grpc import LnNodeLNDgRPC as LnNode
-elif ln_node == "cln_jrpc":
+elif ln_node == "cln_jrpc" and PLATFORM == APIPlatform.RASPIBLITZ:
+    from app.lightning.impl.specializations.cln_jrpc_blitz import (
+        LnNodeCLNjRPCBlitz as LnNode,
+    )
+elif ln_node == "cln_jrpc" and PLATFORM != APIPlatform.RASPIBLITZ:
     from app.lightning.impl.cln_jrpc import LnNodeCLNjRPC as LnNode
 elif ln_node == "cln_grpc" and PLATFORM != APIPlatform.RASPIBLITZ:
     from app.lightning.impl.cln_grpc import LnNodeCLNgRPC as LnNode
