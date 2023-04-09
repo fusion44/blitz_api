@@ -134,12 +134,13 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         for o in res["outputs"]:
             sat = parse_cln_msat(o["amount_msat"]) / 1000
-            onchain_total += sat
 
             if o["status"] == "unconfirmed":
                 onchain_unconfirmed += sat
-            elif o["status"] == "confirmed":
+            elif o["status"] == "confirmed" and not o["reserved"]:
                 onchain_confirmed += sat
+
+        onchain_total = onchain_confirmed + onchain_unconfirmed
 
         for c in res["channels"]:
             our_msat = parse_cln_msat(c["our_amount_msat"])
