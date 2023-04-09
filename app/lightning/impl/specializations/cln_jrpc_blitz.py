@@ -7,7 +7,7 @@ from loguru import logger
 from starlette import status
 
 from app.api.utils import call_script2, redis_get
-from app.lightning.impl.cln_grpc import LnNodeCLNgRPC
+from app.lightning.impl.cln_jrpc import LnNodeCLNjRPC
 from app.lightning.impl.specializations.blitz_common import blitz_cln_unlock
 from app.lightning.models import (
     Channel,
@@ -28,7 +28,7 @@ from app.lightning.models import (
 )
 
 
-class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
+class LnNodeCLNjRPCBlitz(LnNodeCLNjRPC):
     # RaspiBlitz implements a lock function on top of CLN, so we need to implement this on Blitz only.
 
     _unlocked = False
@@ -36,17 +36,17 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
     _NETWORK = config("network", default="mainnet")
 
     def get_implementation_name(self) -> str:
-        return "CLN_GRPC_BLITZ"
+        return "CLN_JRPC_BLITZ"
 
     @logger.catch(exclude=(HTTPException,))
     async def initialize(self) -> AsyncGenerator[InitLnRepoUpdate, None]:
-        logging.debug("RaspiBlitz is locked, waiting for unlock...")
+        logger.debug("RaspiBlitz is locked, waiting for unlock...")
 
         while not self._unlocked:
             key = f"ln_cl_{self._NETWORK}_locked"
             res = await redis_get(key)
             if res == "0":
-                logging.debug(
+                logger.debug(
                     f"Redis key {key} indicates that RaspiBlitz has been unlocked"
                 )
 
@@ -54,7 +54,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
                 yield InitLnRepoUpdate(state=LnInitState.BOOTSTRAPPING_AFTER_UNLOCK)
                 break
             elif res == "1":
-                logging.debug(
+                logger.debug(
                     f"Redis key {key} indicates that RaspiBlitz is still locked"
                 )
 
@@ -63,7 +63,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
                     msg="Wallet locked, unlock it to enable full RPC access",
                 )
             else:
-                logging.error(f"Redis key {key} returns an unexpected value: {res}")
+                logger.error(f"Redis key {key} returns an unexpected value: {res}")
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Unknown lock status: {res}",
@@ -76,7 +76,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
             if u.state == LnInitState.DONE:
                 break
 
-        logging.info("Initialization complete.")
+        logger.info("Initialization complete.")
 
     async def get_wallet_balance(self) -> WalletBalance:
         self._check_if_locked()
@@ -160,6 +160,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
         self._check_if_locked()
         return await super().get_ln_info()
 
+    @logger.catch(exclude=(HTTPException,))
     async def unlock_wallet(self, password: str) -> bool:
         # RaspiBlitz implements a wallet lock functionality on top of CLN,
         # so we need to implement this on Blitz only
@@ -178,10 +179,19 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
             yield i
 
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         self._check_if_locked()
-        return await super().channel_open(local_funding_amount, node_URI, target_confs)
+        return await super().channel_open(
+            local_funding_amount,
+            node_URI,
+            target_confs,
+            push_amount_sat,
+        )
 
     async def peer_resolve_alias(self, node_pub: str) -> str:
         self._check_if_locked()
@@ -195,8 +205,9 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
         self._check_if_locked()
         return await super().channel_close(channel_id, force_close)
 
+    @logger.catch(exclude=(HTTPException,))
     def _check_if_locked(self):
-        logging.trace(f"_check_if_locked()")
+        logger.debug(f"_check_if_locked()")
 
         if not self._unlocked:
             raise HTTPException(
