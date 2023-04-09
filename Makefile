@@ -35,7 +35,7 @@ coverage:
 	poetry run python -m coverage html
 
 update-requirements-file:
-	poetry update && poetry export --output requirements.txt
+	poetry update && poetry export --without dev --output requirements.txt
 
 sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
