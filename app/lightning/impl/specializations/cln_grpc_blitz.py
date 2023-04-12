@@ -40,13 +40,13 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
 
     @logger.catch(exclude=(HTTPException,))
     async def initialize(self) -> AsyncGenerator[InitLnRepoUpdate, None]:
-        logging.debug("RaspiBlitz is locked, waiting for unlock...")
+        logger.debug("RaspiBlitz is locked, waiting for unlock...")
 
         while not self._unlocked:
             key = f"ln_cl_{self._NETWORK}_locked"
             res = await redis_get(key)
             if res == "0":
-                logging.debug(
+                logger.debug(
                     f"Redis key {key} indicates that RaspiBlitz has been unlocked"
                 )
 
@@ -54,7 +54,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
                 yield InitLnRepoUpdate(state=LnInitState.BOOTSTRAPPING_AFTER_UNLOCK)
                 break
             elif res == "1":
-                logging.debug(
+                logger.debug(
                     f"Redis key {key} indicates that RaspiBlitz is still locked"
                 )
 
@@ -63,7 +63,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
                     msg="Wallet locked, unlock it to enable full RPC access",
                 )
             else:
-                logging.error(f"Redis key {key} returns an unexpected value: {res}")
+                logger.error(f"Redis key {key} returns an unexpected value: {res}")
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Unknown lock status: {res}",
@@ -76,7 +76,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
             if u.state == LnInitState.DONE:
                 break
 
-        logging.info("Initialization complete.")
+        logger.info("Initialization complete.")
 
     async def get_wallet_balance(self) -> WalletBalance:
         self._check_if_locked()
@@ -196,7 +196,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
         return await super().channel_close(channel_id, force_close)
 
     def _check_if_locked(self):
-        logging.trace(f"_check_if_locked()")
+        logger.trace(f"_check_if_locked()")
 
         if not self._unlocked:
             raise HTTPException(
