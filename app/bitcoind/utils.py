@@ -5,6 +5,7 @@ from types import coroutine
 import aiohttp
 import requests
 from decouple import config
+from loguru import logger
 from starlette import status
 
 from app.bitcoind.models import BlockRpcFunc
@@ -76,38 +77,65 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
         + json.dumps(params)
         + "}"
     )
+    try:
+        async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
+            async with session.post(bitcoin_config.rpc_url, data=data) as resp:
+                return await _process_response(resp)
 
-    # TODO: Refactor this to use Exceptions
-    async with aiohttp.ClientSession(auth=auth, headers=headers) as session:
-        async with session.post(bitcoin_config.rpc_url, data=data) as resp:
-            if resp.status == status.HTTP_200_OK:
-                return await resp.json()
-            elif resp.status == status.HTTP_401_UNAUTHORIZED:
-                return {
-                    "error": "Access denied to Bitcoin Core RPC. Check if username and password is correct",
-                    "status": status.HTTP_403_FORBIDDEN,
-                }
-            elif resp.status == status.HTTP_403_FORBIDDEN:
-                return {
-                    "error": "Access denied to Bitcoin Core RPC. If this is a remote node, check if 'network.rpcallowip=0.0.0.0/0' is set.",
-                    "status": status.HTTP_403_FORBIDDEN,
-                }
-            else:
-                e = await resp.json()
-                m = e["error"]["message"]
-                if e["error"]:
-                    if "No such mempool or blockchain transaction." in m:
-                        return {
-                            "error": "No such mempool or blockchain transaction.",
-                            "status": status.HTTP_404_NOT_FOUND,
-                        }
-                    if "parameter 1 must be of length 64" in m:
-                        return {
-                            "error": m,
-                            "status": status.HTTP_400_BAD_REQUEST,
-                        }
+    except aiohttp.client_exceptions.ClientConnectionError as e:
+        return {
+            "error": f"Aiohttp client connection error: {str(e)}",
+            "status": status.HTTP_503_SERVICE_UNAVAILABLE,
+        }
 
-                return {
-                    "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
-                    "status": resp.status,
-                }
+    except aiohttp.client_exceptions.ClientError as e:
+        return {
+            "error": f"Aiohttp client error: {str(e)}",
+            "status": status.HTTP_503_SERVICE_UNAVAILABLE,
+        }
+
+
+async def _process_response(resp: aiohttp.ClientResponse):
+    if resp.status == status.HTTP_200_OK:
+        return await resp.json()
+
+    if resp.status == status.HTTP_401_UNAUTHORIZED:
+        return {
+            "error": "Access denied to Bitcoin Core RPC. Check if username and password is correct",
+            "status": status.HTTP_403_FORBIDDEN,
+        }
+
+    if resp.status == status.HTTP_403_FORBIDDEN:
+        return {
+            "error": "Access denied to Bitcoin Core RPC. If this is a remote node, check if 'network.rpcallowip=0.0.0.0/0' is set.",
+            "status": status.HTTP_403_FORBIDDEN,
+        }
+
+    e = await resp.json()
+    m = e["error"]["message"]
+
+    if e["error"]:
+        if (
+            "Loading block index" in m
+            or "Verifying blocks" in m
+            or "Starting network threads" in m
+        ):
+            return {
+                "error": "Initializing Bitcoin Core (loading, verifying blocks or starting network threads etc)",
+                "status": status.HTTP_425_TOO_EARLY,
+            }
+        if "No such mempool or blockchain transaction." in m:
+            return {
+                "error": "No such mempool or blockchain transaction.",
+                "status": status.HTTP_404_NOT_FOUND,
+            }
+        if "parameter 1 must be of length 64" in m:
+            return {
+                "error": m,
+                "status": status.HTTP_400_BAD_REQUEST,
+            }
+
+    return {
+        "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
+        "status": resp.status,
+    }

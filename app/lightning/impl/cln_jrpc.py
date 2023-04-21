@@ -98,10 +98,18 @@ class LnNodeCLNjRPC(LightningNodeBase):
         )
 
         self._loop = asyncio.get_running_loop()
-        self._reader, self._writer = await asyncio.open_unix_connection(
-            path=self._socket_path,
-            limit=_SOCKET_BUFFER_SIZE_LIMIT,
-        )
+
+        while True:
+            try:
+                self._reader, self._writer = await asyncio.open_unix_connection(
+                    path=self._socket_path,
+                    limit=_SOCKET_BUFFER_SIZE_LIMIT,
+                )
+
+                break
+            except ConnectionRefusedError:
+                logger.info("CLN ConnectionRefusedError. Retrying in 10 seconds.")
+                await asyncio.sleep(10)
 
         asyncio.create_task(self._read_loop())
 

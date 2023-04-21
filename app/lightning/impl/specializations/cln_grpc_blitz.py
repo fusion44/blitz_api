@@ -46,7 +46,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
             key = f"ln_cl_{self._NETWORK}_locked"
             res = await redis_get(key)
             if res == "0":
-                logger.debug(
+                logger.success(
                     f"Redis key {key} indicates that RaspiBlitz has been unlocked"
                 )
 

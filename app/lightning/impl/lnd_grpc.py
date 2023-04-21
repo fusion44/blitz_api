@@ -113,9 +113,11 @@ This will show more debug information.
         # Reason is that gRPC seems to only try and connect every 5 seconds to
         # the node if it is not running. To avoid the delay we create a new
         # channel each iteration.
-
         temp_channel = None
         temp_stub = None
+
+        # We want to log the wallet locked error only once to avoid spamming the log
+        wallet_locked_sent = False
         while True:
             try:
                 if temp_channel is None:
@@ -162,6 +164,12 @@ This will show more debug information.
                     await temp_channel.close()
                     temp_channel = None
                 elif "wallet locked, unlock it to enable full RPC access" in details:
+                    if not wallet_locked_sent:
+                        logger.info(
+                            "Wallet is locked. Unlock by calling /lightning/unlock-wallet"
+                        )
+
+                    wallet_locked_sent = True
                     await self._init_queue.put(
                         InitLnRepoUpdate(
                             state=LnInitState.LOCKED,
@@ -251,6 +259,7 @@ This will show more debug information.
             elif (
                 res.state == LnInitState.OFFLINE
                 or res.state == LnInitState.LOCKED
+                or res.state == LnInitState.BOOTSTRAPPING
                 or res.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
             ):
                 pass  # do nothing here
@@ -259,7 +268,7 @@ This will show more debug information.
 
             yield res
 
-        logger.info("Initialization complete.")
+        logger.success("Initialization complete.")
 
     @logger.catch(exclude=(HTTPException,))
     async def get_wallet_balance(self) -> WalletBalance:

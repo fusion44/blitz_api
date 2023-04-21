@@ -45,8 +45,10 @@ class LnNodeCLNjRPCBlitz(LnNodeCLNjRPC):
         while not self._unlocked:
             key = f"ln_cl_{self._NETWORK}_locked"
             res = await redis_get(key)
-            if res == "0":
-                logger.debug(
+            if res == "":
+                logger.info(f"Redis key {key} not yet found, waiting...")
+            elif res == "0":
+                logger.success(
                     f"Redis key {key} indicates that RaspiBlitz has been unlocked"
                 )
 
@@ -76,7 +78,7 @@ class LnNodeCLNjRPCBlitz(LnNodeCLNjRPC):
             if u.state == LnInitState.DONE:
                 break
 
-        logger.info("Initialization complete.")
+        logger.success("Initialization complete.")
 
     async def get_wallet_balance(self) -> WalletBalance:
         self._check_if_locked()
