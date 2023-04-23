@@ -105,6 +105,7 @@ If neither __target_conf__, or __sat_per_vbyte__ are set, then the internal wall
 ### Sending all onchain funds
 > ℹ️ Keep the following points in mind when sending all onchain funds:
 
+* The response object currently will state __"amount": 0__ even if __send_all__ is set to __true__ and the transaction was successfully submitted to the mempool. [GitHub issue](https://github.com/fusion44/blitz_api/issues/196)
 * If __send_all__ is set to __true__, the __amount__ field must be set to __0__.
 * If the __amount__ field is greater than __0__, the __send_all__ field must be __false__.
   * The API will return an error if neither or both conditions are met at the same time.
