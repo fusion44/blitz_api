@@ -520,12 +520,35 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
             return r
 
-        m = res["error"]["message"]
-        logger.error(m)
+        if not "message" in res["error"]:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unknown error: {res}",
+            )
+
+        details = res["error"]["message"]
+        logger.error(details)
+
+        if details and details.find("Could not parse destination address") > -1:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Could not parse destination address, destination should be a valid address.",
+            )
+        elif (
+            details
+            and details.find("UTXO") > -1
+            and details.find("already reserved") > -1
+        ):
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Server tried to use a reserved UTXO. Please submit an issue to the BlitzAPI repository.",
+            )
+        elif details and details.find("Could not afford ") > -1:
+            raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unknown error: {m}",
+            detail=f"Unknown error: {details}",
         )
 
     @logger.catch(exclude=(HTTPException,))

@@ -1248,7 +1248,7 @@ class SendCoinsResponse(BaseModel):
         ...,
         description="The base58 or bech32 encoded bitcoin address where the onchain funds where sent to",
     )
-    amount: conint(gt=0) = Query(
+    amount: conint(ge=0) = Query(
         ...,
         description="The number of bitcoin denominated in satoshis which where sent",
     )
@@ -1258,6 +1258,10 @@ class SendCoinsResponse(BaseModel):
     )
     label: str = Query(
         "", description="The label used for the transaction. Ignored by CLN backend."
+    )
+    send_all: bool = Query(
+        False,
+        description="If this transaction was a `send_all` transaction.",
     )
 
     @classmethod
@@ -1269,15 +1273,17 @@ class SendCoinsResponse(BaseModel):
             amount=abs(amount),
             fees=r.total_fees,
             label=input.label,
+            send_all=input.send_all,
         )
 
     @classmethod
     def from_cln_grpc(cls, r, input: SendCoinsInput):
         return cls(
-            txid=r.txid,
+            txid=r.txid.hex(),
             address=input.address,
             amount=input.amount,
             label=input.label,
+            send_all=input.send_all,
         )
 
     @classmethod
@@ -1287,6 +1293,7 @@ class SendCoinsResponse(BaseModel):
             address=input.address,
             amount=input.amount,
             label=input.label,
+            send_all=input.send_all,
         )
 
 

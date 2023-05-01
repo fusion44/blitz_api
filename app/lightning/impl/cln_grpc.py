@@ -595,7 +595,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             max_amt = 0
             for o in funds.outputs:
                 utxos.append(lnp.Outpoint(txid=o.txid, outnum=o.output))
-                max_amt += o.amount_msat.msat
+                max_amt += o.amount_msat.msat / 1000
 
             if not input.send_all and max_amt <= input.amount:
                 raise HTTPException(
@@ -603,12 +603,13 @@ class LnNodeCLNgRPC(LightningNodeBase):
                     detail=f"Could not afford {input.amount}sat. Not enough funds available",
                 )
 
+            amt = lnp.AmountOrAll(amount=lnp.Amount(msat=input.amount * 1000))
+            if input.send_all:
+                amt = lnp.AmountOrAll(all=True)
+
             req = ln.WithdrawRequest(
                 destination=input.address,
-                satoshi=lnp.AmountOrAll(
-                    amount=lnp.Amount(msat=input.amount),
-                    all=input.send_all,
-                ),
+                satoshi=amt,
                 minconf=input.min_confs,
                 feerate=fee_rate,
                 utxos=utxos,
