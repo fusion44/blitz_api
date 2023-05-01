@@ -511,7 +511,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         amt = "all" if input.send_all else input.amount
 
-        params = [input.address, input.amount, fee_rate]
+        params = [input.address, amt, fee_rate]
         res = await self._send_request("withdraw", params)
 
         if not "error" in res:
