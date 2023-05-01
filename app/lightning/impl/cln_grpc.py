@@ -15,6 +15,7 @@ import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
+from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.cln_utils import cln_classify_fee_revenue, parse_cln_msat
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
@@ -37,7 +38,7 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
-from app.lightning.utils import generic_grpc_error_handler
+from app.lightning.utils import alias_or_empty, generic_grpc_error_handler
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -834,8 +835,8 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
-    @logger.catch(exclude=(HTTPException,))
-    async def peer_resolve_alias(self, node_pub: str) -> str:
+    @logger.catch(exclude=(HTTPException, NodeNotFoundError))
+    async def peer_resolve_alias(self, node_pub: bytes) -> str:
         logger.trace(f"peer_resolve_alias(node_pub={node_pub})")
 
         try:
@@ -843,11 +844,13 @@ class LnNodeCLNgRPC(LightningNodeBase):
             response = await self._cln_stub.ListNodes(request)
 
             if len(response.nodes) == 0:
-                return ""
+                raise NodeNotFoundError(node_pub.hex())
 
             return str(response.nodes[0].alias)
 
         except grpc.aio._call.AioRpcError as error:
+            logger.error(error.details())
+
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -929,11 +932,14 @@ class LnNodeCLNgRPC(LightningNodeBase):
             res = await self._cln_stub.ListFunds(ln.ListfundsRequest())
             peer_ids = [c.peer_id for c in res.channels]
             peer_res = await asyncio.gather(
-                *[self.peer_resolve_alias(p) for p in peer_ids]
+                *[alias_or_empty(self.peer_resolve_alias, p) for p in peer_ids],
+                return_exceptions=True,
             )
-            channels = [
-                Channel.from_cln_grpc(c, p) for c, p in zip(res.channels, peer_res)
-            ]
+
+            channels = []
+            for c, p in zip(res.channels, peer_res):
+                channels.append(Channel.from_cln_grpc(c, p))
+
             return channels
         except grpc.aio._call.AioRpcError as error:
             raise HTTPException(

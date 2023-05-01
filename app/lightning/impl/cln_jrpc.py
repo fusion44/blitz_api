@@ -17,6 +17,7 @@ import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
+from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.cln_utils import (
     calc_fee_rate_str,
     cln_classify_fee_revenue,
@@ -43,7 +44,7 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
-from app.lightning.utils import generic_grpc_error_handler
+from app.lightning.utils import alias_or_empty, generic_grpc_error_handler
 
 _WAIT_ANY_INVOICE_ID = 0
 _SOCKET_BUFFER_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
@@ -753,7 +754,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
             detail=f"Unknown error: {message}",
         )
 
-    @logger.catch(exclude=(HTTPException,))
+    @logger.catch(exclude=(HTTPException, NodeNotFoundError))
     async def peer_resolve_alias(self, node_pub: str) -> str:
         logger.trace(f"peer_resolve_alias(node_pub={node_pub})")
 
@@ -765,11 +766,12 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if "error" in res:
             err_msg = res["error"]["message"]
             logger.error(f"Error resolving alias for node_pub={node_pub}\n{err_msg}")
-            return ""
+
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err_msg)
 
         nodes = res["result"]["nodes"]
         if len(nodes) == 0:
-            return ""
+            raise NodeNotFoundError(node_pub)
 
         return str(nodes[0]["alias"])
 
@@ -784,8 +786,14 @@ class LnNodeCLNjRPC(LightningNodeBase):
         res = res["result"]
 
         peer_ids = [c["peer_id"] for c in res["channels"]]
-        peers = await asyncio.gather(*[self.peer_resolve_alias(p) for p in peer_ids])
-        channels = [Channel.from_cln_jrpc(c, p) for c, p in zip(res["channels"], peers)]
+        peers = await asyncio.gather(
+            *[alias_or_empty(self.peer_resolve_alias, p) for p in peer_ids],
+            return_exceptions=True,
+        )
+
+        channels = []
+        for c, p in zip(res["channels"], peers):
+            channels.append(Channel.from_cln_jrpc(c, p))
 
         return channels
 
