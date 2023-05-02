@@ -338,8 +338,10 @@ class RaspiBlitzSystem(SystemBase):
         setup_phase = await redis_get("setupPhase")
         info["disks"] = []
         if setup_phase == "done":
-            total = int(await redis_get("hdd_capacity_bytes"))
-            free = int(await redis_get("hdd_free_bytes"))
+            res = await redis_get("hdd_capacity_bytes")
+            total = int(res if len(res) > 0 else 0)
+            res = await redis_get("hdd_free_bytes")
+            free = int(res if len(res) > 0 else 0)
             info["disks"] = [
                 {
                     "device": "/",
@@ -348,7 +350,9 @@ class RaspiBlitzSystem(SystemBase):
                     "partition_total_bytes": total,
                     "partition_used_bytes": total - free,
                     "partition_free_bytes": free,
-                    "partition_percent": round((100 / total) * free, 2),
+                    "partition_percent": 0
+                    if total == 0
+                    else round((100 / total) * free, 2),
                 }
             ]
 

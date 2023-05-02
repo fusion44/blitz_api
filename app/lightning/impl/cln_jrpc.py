@@ -17,6 +17,7 @@ import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
+from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.cln_utils import (
     calc_fee_rate_str,
     cln_classify_fee_revenue,
@@ -43,7 +44,7 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
-from app.lightning.utils import generic_grpc_error_handler
+from app.lightning.utils import alias_or_empty, generic_grpc_error_handler
 
 _WAIT_ANY_INVOICE_ID = 0
 _SOCKET_BUFFER_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
@@ -98,10 +99,18 @@ class LnNodeCLNjRPC(LightningNodeBase):
         )
 
         self._loop = asyncio.get_running_loop()
-        self._reader, self._writer = await asyncio.open_unix_connection(
-            path=self._socket_path,
-            limit=_SOCKET_BUFFER_SIZE_LIMIT,
-        )
+
+        while True:
+            try:
+                self._reader, self._writer = await asyncio.open_unix_connection(
+                    path=self._socket_path,
+                    limit=_SOCKET_BUFFER_SIZE_LIMIT,
+                )
+
+                break
+            except ConnectionRefusedError:
+                logger.info("CLN ConnectionRefusedError. Retrying in 10 seconds.")
+                await asyncio.sleep(10)
 
         asyncio.create_task(self._read_loop())
 
@@ -502,7 +511,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         amt = "all" if input.send_all else input.amount
 
-        params = [input.address, input.amount, fee_rate]
+        params = [input.address, amt, fee_rate]
         res = await self._send_request("withdraw", params)
 
         if not "error" in res:
@@ -512,12 +521,35 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
             return r
 
-        m = res["error"]["message"]
-        logger.error(m)
+        if not "message" in res["error"]:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unknown error: {res}",
+            )
+
+        details = res["error"]["message"]
+        logger.error(details)
+
+        if details and details.find("Could not parse destination address") > -1:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Could not parse destination address, destination should be a valid address.",
+            )
+        elif (
+            details
+            and details.find("UTXO") > -1
+            and details.find("already reserved") > -1
+        ):
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Server tried to use a reserved UTXO. Please submit an issue to the BlitzAPI repository.",
+            )
+        elif details and details.find("Could not afford ") > -1:
+            raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unknown error: {m}",
+            detail=f"Unknown error: {details}",
         )
 
     @logger.catch(exclude=(HTTPException,))
@@ -722,7 +754,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
             detail=f"Unknown error: {message}",
         )
 
-    @logger.catch(exclude=(HTTPException,))
+    @logger.catch(exclude=(HTTPException, NodeNotFoundError))
     async def peer_resolve_alias(self, node_pub: str) -> str:
         logger.trace(f"peer_resolve_alias(node_pub={node_pub})")
 
@@ -734,11 +766,12 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if "error" in res:
             err_msg = res["error"]["message"]
             logger.error(f"Error resolving alias for node_pub={node_pub}\n{err_msg}")
-            return ""
+
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err_msg)
 
         nodes = res["result"]["nodes"]
         if len(nodes) == 0:
-            return ""
+            raise NodeNotFoundError(node_pub)
 
         return str(nodes[0]["alias"])
 
@@ -753,8 +786,14 @@ class LnNodeCLNjRPC(LightningNodeBase):
         res = res["result"]
 
         peer_ids = [c["peer_id"] for c in res["channels"]]
-        peers = await asyncio.gather(*[self.peer_resolve_alias(p) for p in peer_ids])
-        channels = [Channel.from_cln_jrpc(c, p) for c, p in zip(res["channels"], peers)]
+        peers = await asyncio.gather(
+            *[alias_or_empty(self.peer_resolve_alias, p) for p in peer_ids],
+            return_exceptions=True,
+        )
+
+        channels = []
+        for c, p in zip(res["channels"], peers):
+            channels.append(Channel.from_cln_jrpc(c, p))
 
         return channels
 

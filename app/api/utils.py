@@ -1,7 +1,6 @@
 import array
 import asyncio
 import json
-import logging
 import os
 import random
 import re
@@ -11,6 +10,7 @@ from typing import Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
+from loguru import logger
 
 from app.api.sse_manager import SSEManager
 from app.external.sse_starlette import ServerSentEvent
@@ -60,9 +60,9 @@ async def redis_get(key: str) -> str:
     if not v:
         logstr = f"Key '{key}' not found in Redis DB."
         if "tor_web_addr" in key:
-            logging.info(logstr)
+            logger.info(logstr)
         else:
-            logging.warning(logstr)
+            logger.warning(logstr)
         return ""
 
     try:
@@ -215,7 +215,7 @@ async def call_script(scriptPath) -> str:
     if stdout:
         return stdout.decode()
     if stderr:
-        logging.error(stderr.decode())
+        logger.error(stderr.decode())
     return ""
 
 
@@ -254,7 +254,7 @@ async def call_sudo_script(scriptPath) -> str:
     if stdout:
         return stdout.decode()
     if stderr:
-        logging.error(stderr.decode())
+        logger.error(stderr.decode())
     return ""
 
 

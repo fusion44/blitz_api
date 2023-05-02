@@ -16,6 +16,7 @@ import app.lightning.impl.protos.lnd.router_pb2_grpc as routerrpc
 import app.lightning.impl.protos.lnd.walletunlocker_pb2 as unlocker
 import app.lightning.impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str
+from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
     Channel,
@@ -36,6 +37,7 @@ from app.lightning.models import (
     SendCoinsResponse,
     WalletBalance,
 )
+from app.lightning.utils import alias_or_empty
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -113,9 +115,11 @@ This will show more debug information.
         # Reason is that gRPC seems to only try and connect every 5 seconds to
         # the node if it is not running. To avoid the delay we create a new
         # channel each iteration.
-
         temp_channel = None
         temp_stub = None
+
+        # We want to log the wallet locked error only once to avoid spamming the log
+        wallet_locked_sent = False
         while True:
             try:
                 if temp_channel is None:
@@ -162,6 +166,12 @@ This will show more debug information.
                     await temp_channel.close()
                     temp_channel = None
                 elif "wallet locked, unlock it to enable full RPC access" in details:
+                    if not wallet_locked_sent:
+                        logger.info(
+                            "Wallet is locked. Unlock by calling /lightning/unlock-wallet"
+                        )
+
+                    wallet_locked_sent = True
                     await self._init_queue.put(
                         InitLnRepoUpdate(
                             state=LnInitState.LOCKED,
@@ -251,6 +261,7 @@ This will show more debug information.
             elif (
                 res.state == LnInitState.OFFLINE
                 or res.state == LnInitState.LOCKED
+                or res.state == LnInitState.BOOTSTRAPPING
                 or res.state == LnInitState.BOOTSTRAPPING_AFTER_UNLOCK
             ):
                 pass  # do nothing here
@@ -259,7 +270,7 @@ This will show more debug information.
 
             yield res
 
-        logger.info("Initialization complete.")
+        logger.success("Initialization complete.")
 
     @logger.catch(exclude=(HTTPException,))
     async def get_wallet_balance(self) -> WalletBalance:
@@ -803,7 +814,7 @@ This will show more debug information.
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
 
-    @logger.catch(exclude=(HTTPException,))
+    @logger.catch(exclude=(HTTPException, NodeNotFoundError))
     async def peer_resolve_alias(self, node_pub: str) -> str:
         logger.trace(f"logger.peer_resolve_alias(node_pub={node_pub})")
 
@@ -811,12 +822,16 @@ This will show more debug information.
         try:
             request = ln.NodeInfoRequest(pub_key=node_pub, include_channels=False)
             response = await self._lnd_stub.GetNodeInfo(request)
-            return str(response.node.alias)
 
+            return str(response.node.alias)
         except grpc.aio._call.AioRpcError as error:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
-            )
+            details = error.details()
+
+            if "unable to find node" in details:
+                raise NodeNotFoundError(node_pub)
+
+            logger.error(details)
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_list(self) -> List[Channel]:
@@ -829,8 +844,8 @@ This will show more debug information.
             channels = []
             for channel_grpc in response.channels:
                 channel = Channel.from_lnd_grpc(channel_grpc)
-                channel.peer_alias = await self.peer_resolve_alias(
-                    channel.peer_publickey
+                channel.peer_alias = await alias_or_empty(
+                    self.peer_resolve_alias, channel.peer_publickey
                 )
                 channels.append(channel)
 
@@ -838,8 +853,8 @@ This will show more debug information.
             response = await self._lnd_stub.PendingChannels(request)
             for channel_grpc in response.pending_open_channels:
                 channel = Channel.from_lnd_grpc_pending(channel_grpc.channel)
-                channel.peer_alias = await self.peer_resolve_alias(
-                    channel.peer_publickey
+                channel.peer_alias = await alias_or_empty(
+                    self.peer_resolve_alias, channel.peer_publickey
                 )
                 channels.append(channel)
 
