@@ -901,12 +901,17 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         logger.trace(
             (
                 f"channel_open(local_funding_amount={local_funding_amount}, "
-                f"node_URI={node_URI}, target_confs={target_confs})"
+                f"node_URI={node_URI}, target_confs={target_confs}, "
+                f"push_amount_sat={push_amount_sat})"
             )
         )
 
@@ -924,8 +929,11 @@ class LnNodeCLNgRPC(LightningNodeBase):
             h = bytes.fromhex(node_URI.split("@")[0])
             req = ln.FundchannelRequest(
                 id=h,
-                amount=lnp.AmountOrAll(amount=lnp.Amount(msat=local_funding_amount)),
+                amount=lnp.AmountOrAll(
+                    amount=lnp.Amount(msat=local_funding_amount * 1000)
+                ),
                 feerate=fee_rate,
+                push_msat=lnp.Amount(msat=push_amount_sat * 1000),
             )
         except TypeError as e:
             logger.error(f"channel_open() failed at ln.FundchannelRequest(): {e}")

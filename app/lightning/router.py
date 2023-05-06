@@ -360,10 +360,32 @@ async def send_coins_path(input: SendCoinsInput):
     },
 )
 async def open_channel_path(
-    local_funding_amount: int, node_URI: str, target_confs: int = 3
+    local_funding_amount: int = Query(
+        ..., description="The amount of satoshis to commit to the channel."
+    ),
+    node_URI: str = Query(
+        ...,
+        description=(
+            "The URI of the peer to open a channel with. "
+            "Format: <pubkey>@<host>:<port>"
+        ),
+    ),
+    target_confs: int = Query(
+        3, description="The block target for the funding transaction."
+    ),
+    push_amount_sat: int = Query(
+        # Note: LND only supports satoshis as push amount, so we do the same.
+        None,
+        description="The amount of sats to push to the peer.",
+    ),
 ):
     try:
-        return await channel_open(local_funding_amount, node_URI, target_confs)
+        return await channel_open(
+            local_funding_amount,
+            node_URI,
+            target_confs,
+            push_amount_sat,
+        )
     except HTTPException:
         raise
     except NotImplementedError as r:

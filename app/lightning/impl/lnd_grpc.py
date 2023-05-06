@@ -810,12 +810,17 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         logger.trace(
             (
                 f"logger.channel_open(local_funding_amount={local_funding_amount}, "
-                f"node_URI={node_URI}, target_confs={target_confs})"
+                f"node_URI={node_URI}, target_confs={target_confs}, "
+                f"push_amount_sat={push_amount_sat})"
             )
         )
 
@@ -845,6 +850,7 @@ This will show more debug information.
                 node_pubkey=bytes.fromhex(pubkey),
                 local_funding_amount=local_funding_amount,
                 target_conf=target_confs,
+                push_sat=push_amount_sat,
             )
             async for response in self._lnd_stub.OpenChannel(r):
                 return str(response.chan_pending.txid.hex())

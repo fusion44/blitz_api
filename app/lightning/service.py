@@ -143,7 +143,7 @@ async def send_payment(
 
 
 async def channel_open(
-    local_funding_amount: int, node_URI: str, target_confs: int
+    local_funding_amount: int, node_URI: str, target_confs: int, push_amount_sat: int
 ) -> str:
     if local_funding_amount < 1:
         raise ValueError("funding amount needs to be positive")
@@ -157,7 +157,9 @@ async def channel_open(
     if "@" not in node_URI:
         raise ValueError("node_URI must contain @ with node physical address")
 
-    res = await ln.channel_open(local_funding_amount, node_URI, target_confs)
+    res = await ln.channel_open(
+        local_funding_amount, node_URI, target_confs, push_amount_sat
+    )
     return res
 
 

@@ -712,21 +712,35 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         logger.trace(
             (
-                f"channel_open(local_funding_amount={local_funding_amount}, "
-                f"node_URI={node_URI}, target_confs={target_confs})"
+                f"logger.channel_open(local_funding_amount={local_funding_amount}, "
+                f"node_URI={node_URI}, target_confs={target_confs}, "
+                f"push_amount_sat={push_amount_sat})"
             )
         )
+        # https://lightning.readthedocs.io/lightning-fundchannel.7.html
         # fundchannel id amount [feerate] [announce] [minconf] [utxos] [push_msat]
         # [close_to] [request_amt] [compact_lease] [reserve]
 
         await self.connect_peer(node_URI)
         fee_rate = calc_fee_rate_str(None, target_confs)
         pub = node_URI.split("@")[0]
-        params = {"id": pub, "amount": local_funding_amount, "feerate": fee_rate}
+        params = {
+            "id": pub,
+            "amount": local_funding_amount,
+            "feerate": fee_rate,
+        }
+
+        if push_amount_sat is not None and push_amount_sat > 0:
+            params["push_msat"] = push_amount_sat * 1000
+
         res = await self._send_request("fundchannel", params)
 
         if "error" in res:

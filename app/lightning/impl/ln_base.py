@@ -116,7 +116,11 @@ class LightningNodeBase:
 
     @abstractmethod
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         raise NotImplementedError()
 
