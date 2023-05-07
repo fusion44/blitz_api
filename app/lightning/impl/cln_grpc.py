@@ -987,10 +987,15 @@ class LnNodeCLNgRPC(LightningNodeBase):
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
 
     @logger.catch(exclude=(HTTPException,))
-    async def channel_list(self) -> List[Channel]:
-        logger.trace("channel_list()")
+    async def channel_list(
+        self,
+        include_closed: bool,
+        peer_alias_lookup: bool,
+    ) -> List[Channel]:
+        logger.trace(f"channel_list({include_closed}, {peer_alias_lookup})")
 
         try:
+            # TODO: switch to ListPeerChannels
             res = await self._cln_stub.ListFunds(ln.ListfundsRequest())
             peer_ids = [c.peer_id for c in res.channels]
             peer_res = await asyncio.gather(

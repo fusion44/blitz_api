@@ -163,8 +163,11 @@ async def channel_open(
     return res
 
 
-async def channel_list() -> List[Channel]:
-    res = await ln.channel_list()
+async def channel_list(
+    include_closed: bool,
+    peer_alias_lookup: bool,
+) -> List[Channel]:
+    res = await ln.channel_list(include_closed, peer_alias_lookup)
     return res
 
 

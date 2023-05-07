@@ -815,20 +815,26 @@ class LnNodeCLNjRPC(LightningNodeBase):
         return str(nodes[0]["alias"])
 
     @logger.catch(exclude=(HTTPException,))
-    async def channel_list(self) -> List[Channel]:
-        logger.trace("channel_list()")
+    async def channel_list(
+        self,
+        include_closed: bool,
+        peer_alias_lookup: bool,
+    ) -> List[Channel]:
+        logger.trace(f"channel_list({include_closed}, {peer_alias_lookup})")
 
-        res = await self._send_request("listfunds")
+        res = await self._send_request("listpeerchannels")
         if "error" in res:
             self._raise_internal_server_error("listing channels", res)
 
         res = res["result"]
 
-        peer_ids = [c["peer_id"] for c in res["channels"]]
-        peers = await asyncio.gather(
-            *[alias_or_empty(self.peer_resolve_alias, p) for p in peer_ids],
-            return_exceptions=True,
-        )
+        peers = [""] * len(res["channels"])
+        if peer_alias_lookup:
+            peer_ids = [c["peer_id"] for c in res["channels"]]
+            peers = await asyncio.gather(
+                *[alias_or_empty(self.peer_resolve_alias, p) for p in peer_ids],
+                return_exceptions=True,
+            )
 
         channels = []
         for c, p in zip(res["channels"], peers):

@@ -16,10 +16,12 @@ import app.lightning.impl.protos.lnd.router_pb2_grpc as routerrpc
 import app.lightning.impl.protos.lnd.walletunlocker_pb2 as unlocker
 import app.lightning.impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str
-from app.lightning.exceptions import NodeNotFoundError
+from app.lightning.exceptions import NodeNotFoundError, OpenChannelPushAmountError
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
     Channel,
+    ChannelInitiator,
+    ChannelState,
     FeeRevenue,
     ForwardSuccessEvent,
     GenericTx,
@@ -856,9 +858,22 @@ This will show more debug information.
                 return str(response.chan_pending.txid.hex())
 
         except grpc.aio._call.AioRpcError as error:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
-            )
+            details = error.details()
+            if (
+                "amount pushed to remote peer for initial state must "
+                "be below the local funding amount"
+            ) in details:
+                raise OpenChannelPushAmountError(local_funding_amount, push_amount_sat)
+            if "EOF" in details:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        'Got "EOF" from LND. Is the peer reachable '
+                        "and the pubkey correct?"
+                    ),
+                )
+
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
 
     @logger.catch(exclude=(HTTPException, NodeNotFoundError))
     async def peer_resolve_alias(self, node_pub: str) -> str:
@@ -880,29 +895,150 @@ This will show more debug information.
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details)
 
     @logger.catch(exclude=(HTTPException,))
-    async def channel_list(self) -> List[Channel]:
-        logger.trace("logger.channel_list()")
+    async def channel_list(
+        self,
+        include_closed: bool,
+        peer_alias_lookup: bool,
+    ) -> List[Channel]:
+        logger.trace(f"channel_list({include_closed}, {peer_alias_lookup})")
 
         try:
-            request = ln.ListChannelsRequest()
-            response = await self._lnd_stub.ListChannels(request)
+            res = await asyncio.gather(
+                *[
+                    self._lnd_stub.PendingChannels(ln.PendingChannelsRequest()),
+                    self._lnd_stub.ListChannels(
+                        ln.ListChannelsRequest(peer_alias_lookup=peer_alias_lookup)
+                    ),
+                    self._lnd_stub.ClosedChannels(ln.ListChannelsRequest())
+                    if include_closed
+                    else None,
+                ]
+            )
+
+            async def _chan_data(c, state: ChannelState):
+                _channel: Channel = None
+                if state == ChannelState.NORMAL:
+                    _channel = Channel(
+                        active=c.active,
+                        state=state,
+                        # use channel point as id because thats
+                        # needed for closing the channel with lnd
+                        channel_id=c.channel_point,
+                        peer_publickey=c.remote_pubkey,
+                        balance_local=c.local_balance,
+                        balance_remote=c.remote_balance,
+                        balance_capacity=c.capacity,
+                        initiator=ChannelInitiator.from_lnd_grpc(c.initiator),
+                    )
+                elif state == ChannelState.OPENING:
+                    _channel = Channel(
+                        active=False,
+                        state=state,
+                        # use channel point as id because thats
+                        # needed for closing the channel with lnd
+                        channel_id=c.channel.channel_point,
+                        peer_publickey=c.channel.remote_node_pub,
+                        balance_local=c.channel.local_balance,
+                        balance_remote=c.channel.remote_balance,
+                        balance_capacity=c.channel.capacity,
+                        initiator=ChannelInitiator.from_lnd_grpc(c.channel.initiator),
+                    )
+                elif state == ChannelState.CLOSING:
+                    closer = ChannelInitiator.UNKNOWN
+                    if "ChanStatusLocalCloseInitiator" in c.channel.chan_status_flags:
+                        closer = ChannelInitiator.LOCAL
+                    elif (
+                        "ChanStatusRemoteCloseInitiator" in c.channel.chan_status_flags
+                    ):
+                        closer = ChannelInitiator.REMOTE
+
+                    _channel = Channel(
+                        active=False,
+                        state=state,
+                        # use channel point as id because thats
+                        # needed for closing the channel with lnd
+                        channel_id=c.channel.channel_point,
+                        peer_publickey=c.channel.remote_node_pub,
+                        balance_local=c.channel.local_balance,
+                        balance_remote=c.channel.remote_balance,
+                        balance_capacity=c.channel.capacity,
+                        initiator=ChannelInitiator.from_lnd_grpc(c.channel.initiator),
+                        closer=closer,
+                    )
+                elif state == ChannelState.FORCE_CLOSING:
+                    closer = ChannelInitiator.UNKNOWN
+                    if "ChanStatusLocalCloseInitiator" in c.channel.chan_status_flags:
+                        closer = ChannelInitiator.LOCAL
+                    elif (
+                        "ChanStatusRemoteCloseInitiator" in c.channel.chan_status_flags
+                    ):
+                        closer = ChannelInitiator.REMOTE
+
+                    _channel = Channel(
+                        active=False,
+                        state=state,
+                        # use channel point as id because thats
+                        # needed for closing the channel with lnd
+                        channel_id=c.channel.channel_point,
+                        peer_publickey=c.channel.remote_node_pub,
+                        balance_local=c.recovered_balance,
+                        balance_remote=c.channel.remote_balance,
+                        balance_capacity=c.channel.capacity,
+                        initiator=ChannelInitiator.from_lnd_grpc(c.channel.initiator),
+                        closer=closer,
+                    )
+                elif state == ChannelState.CLOSED:
+                    _channel = Channel(
+                        active=False,
+                        state=state,
+                        # use channel point as id because thats
+                        # needed for closing the channel with lnd
+                        channel_id=c.channel_point,
+                        peer_publickey=c.remote_pubkey,
+                        balance_local=c.settled_balance,
+                        balance_remote=c.capacity - c.settled_balance,
+                        balance_capacity=c.capacity,
+                        initiator=ChannelInitiator.from_lnd_grpc(c.open_initiator),
+                        closer=ChannelInitiator.from_lnd_grpc(c.close_initiator),
+                    )
+
+                if _channel is None:
+                    logger.error("Unhandled channel state {state}")
+                    return None
+
+                # LND returns "unable to lookup peer alias: alias for node
+                # not found" when peer_alias_lookup is True and node_pub is
+                # not found. We ignore this and just return an empty string
+                if (
+                    peer_alias_lookup
+                    and hasattr(c, "peer_alias")
+                    and "unable to lookup peer alias: alias for node not found"
+                    not in c.peer_alias
+                ):
+                    _channel.peer_alias = c.peer_alias
+                elif peer_alias_lookup and not hasattr(c, "peer_alias"):
+                    _channel.peer_alias = await alias_or_empty(
+                        self.peer_resolve_alias, _channel.peer_publickey
+                    )
+
+                return _channel
 
             channels = []
-            for channel_grpc in response.channels:
-                channel = Channel.from_lnd_grpc(channel_grpc)
-                channel.peer_alias = await alias_or_empty(
-                    self.peer_resolve_alias, channel.peer_publickey
-                )
-                channels.append(channel)
+            for c in res[0].pending_open_channels:
+                channels.append(await _chan_data(c, ChannelState.OPENING))
+            for c in res[0].pending_force_closing_channels:
+                channels.append(await _chan_data(c, ChannelState.FORCE_CLOSING))
+            for c in res[0].waiting_close_channels:
+                channels.append(await _chan_data(c, ChannelState.CLOSING))
 
-            request = ln.PendingChannelsRequest()
-            response = await self._lnd_stub.PendingChannels(request)
-            for channel_grpc in response.pending_open_channels:
-                channel = Channel.from_lnd_grpc_pending(channel_grpc.channel)
-                channel.peer_alias = await alias_or_empty(
-                    self.peer_resolve_alias, channel.peer_publickey
-                )
-                channels.append(channel)
+            for c in res[1].channels:  # open
+                channels.append(await _chan_data(c, ChannelState.NORMAL))
+
+            if not include_closed:
+                return channels
+
+            for c in res[2].channels:
+                channels.append(await _chan_data(c, ChannelState.CLOSED))
 
             return channels
 
@@ -918,7 +1054,10 @@ This will show more debug information.
         )
 
         if ":" not in channel_id:
-            raise ValueError("channel_id must contain : for lnd")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="channel_id must contain : for lnd",
+            )
 
         try:
             funding_txid = channel_id.split(":")[0]
@@ -929,7 +1068,7 @@ This will show more debug information.
                     funding_txid_str=funding_txid, output_index=int(output_index)
                 ),
                 force=force_close,
-                target_conf=6,
+                target_conf=None if force_close else 6,
             )
             async for response in self._lnd_stub.CloseChannel(request):
                 return str(response.close_pending.txid.hex())

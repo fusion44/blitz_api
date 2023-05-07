@@ -397,15 +397,27 @@ async def open_channel_path(
 @router.get(
     "/list-channels",
     name=f"{_PREFIX}.list-channels",
-    summary="Returns a list of open channels",
+    summary="Returns a list of all channels",
     response_model=List[Channel],
-    response_description="A list of all open channels.",
+    response_description="A list of all channels.",
     dependencies=[Depends(JWTBearer())],
     responses=responses,
 )
-async def list_channels_path():
+async def list_channels_path(
+    include_closed: bool = Query(
+        True, description="If true, then include closed channels."
+    ),
+    peer_alias_lookup: bool = Query(
+        False,
+        description=(
+            "If true, then include the peer alias of the channel. "
+            "⚠️ Enabling this flag does come with a performance cost "
+            "in the form of another roundtrip to the node."
+        ),
+    ),
+) -> List[Channel]:
     try:
-        return await channel_list()
+        return await channel_list(include_closed, peer_alias_lookup)
     except HTTPException:
         raise
     except NotImplementedError as r:
@@ -418,7 +430,10 @@ async def list_channels_path():
     "/close-channel",
     name=f"{_PREFIX}.close-channel",
     summary="close a channel",
-    description="For additional information see [LND docs](https://api.lightning.community/#closechannel)",
+    description=(
+        "For additional information see "
+        "[LND docs](https://api.lightning.community/#closechannel)"
+    ),
     dependencies=[Depends(JWTBearer())],
     response_model=str,
     responses=responses,

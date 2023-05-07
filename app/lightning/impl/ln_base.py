@@ -129,7 +129,11 @@ class LightningNodeBase:
         raise NotImplementedError()
 
     @abstractmethod
-    async def channel_list(self) -> List[Channel]:
+    async def channel_list(
+        self,
+        include_closed: bool,
+        peer_alias_lookup: bool,
+    ) -> List[Channel]:
         raise NotImplementedError()
 
     @abstractmethod
