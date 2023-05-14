@@ -22,8 +22,8 @@ This software is still considered BETA and may contain bugs. Don't expose it to 
     - [Installation](#installation-1)
     - [Sync changes to a RaspiBlitz](#sync-changes-to-a-raspiblitz)
     - [Debugging code running on a remote machine via VSCode](#debugging-code-running-on-a-remote-machine-via-vscode)
-      - [Prepare the RaspiBlitz](#prepare-the-raspiblitz)
       - [Prepare local machine](#prepare-local-machine)
+      - [Prepare the RaspiBlitz](#prepare-the-raspiblitz)
     - [Unit / Integration testing](#unit--integration-testing)
       - [Run the tests with pytest](#run-the-tests-with-pytest)
       - [Run tests and generate a coverage](#run-tests-and-generate-a-coverage)
@@ -144,11 +144,6 @@ and then copy the JWT Auth string returned to `Authorize` in the top section of 
 ### Debugging code running on a remote machine via VSCode
 To debug Python code that is running on another machine, like a RaspiBlitz, follow these steps.
 
-#### Prepare the RaspiBlitz
-* SSH into the Blitz, and run `sudo -i -u blitzapi`
-* `cd blitz_api`
-* Finally run `make enable-remote-debugging`
-
 #### Prepare local machine
 * run `make install-dev`.
 * open the `.vscode/launch.json` file and change the host to your remote machines IP
@@ -166,6 +161,12 @@ To debug Python code that is running on another machine, like a RaspiBlitz, foll
 * execute `make sync-to-blitz`
 * Make sure to chose `Attach` in the RUN AND DEBUG windows of VSCode
 * Hit F5 and voila you should be connected to your RaspiBlitz and debug code remotely
+
+#### Prepare the RaspiBlitz
+* SSH into the Blitz, and run `sudo -i -u blitzapi`
+* `cd blitz_api`
+* Finally run `make enable-remote-debugging`
+
 
 Refer to [this documentation](https://code.visualstudio.com/docs/python/debugging#_debugging-by-attaching-over-a-network-connection) to learn how to setup VSCode correctly.
 
