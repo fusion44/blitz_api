@@ -21,6 +21,9 @@ This software is still considered BETA and may contain bugs. Don't expose it to 
   - [Development](#development)
     - [Installation](#installation-1)
     - [Sync changes to a RaspiBlitz](#sync-changes-to-a-raspiblitz)
+    - [Debugging code running on a remote machine via VSCode](#debugging-code-running-on-a-remote-machine-via-vscode)
+      - [Prepare the RaspiBlitz](#prepare-the-raspiblitz)
+      - [Prepare local machine](#prepare-local-machine)
     - [Unit / Integration testing](#unit--integration-testing)
       - [Run the tests with pytest](#run-the-tests-with-pytest)
       - [Run tests and generate a coverage](#run-tests-and-generate-a-coverage)
@@ -137,6 +140,34 @@ To test the backend API then call the SwaggerUI: `http://[LOCALIP]/api/v1/docs` 
 and then copy the JWT Auth string returned to `Authorize` in the top section of the SwaggerUI.
 
 *You can also now test the RaspiBlitz WebUI against the API by running it locally on your dev laptop when you configure it to use the backend API of your RaspiBlitz.*
+
+### Debugging code running on a remote machine via VSCode
+To debug Python code that is running on another machine, like a RaspiBlitz, follow these steps.
+
+#### Prepare the RaspiBlitz
+* SSH into the Blitz, and run `sudo -i -u blitzapi`
+* `cd blitz_api`
+* Finally run `make enable-remote-debugging`
+
+#### Prepare local machine
+* run `make install-dev`.
+* open the `.vscode/launch.json` file and change the host to your remote machines IP
+  * ```json
+      "connect": {
+        "host": "192.168.1.49",
+        "port": 5678
+      }
+      ```
+* open your `.env_sample` file and replace the line `# remote_debugging=false` with `remote_debugging=true`
+  <details>
+    This is necessary because we're going to synchronize the local source with the remote node. The blitz_api service will be restarted on the remote node. Any changes to the `.env' file will be overwritten by the setup script on the Blitz. This script will use the `.env_sample` file as a base and fill it with data. This way we can trick the Blitz into enabling this setting every time we change something without the Blitz explicitly supporting it.
+  </details>
+* make sure you follow the steps in the [Sync changes to a RaspiBlitz](#sync-changes-to-a-raspiblitz) section
+* execute `make sync-to-blitz`
+* Make sure to chose `Attach` in the RUN AND DEBUG windows of VSCode
+* Hit F5 and voila you should be connected to your RaspiBlitz and debug code remotely
+
+Refer to [this documentation](https://code.visualstudio.com/docs/python/debugging#_debugging-by-attaching-over-a-network-connection) to learn how to setup VSCode correctly.
 
 ### Unit / Integration testing
 

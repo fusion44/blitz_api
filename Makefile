@@ -48,3 +48,12 @@ generate-client-libs:
 
 docker-regtest-image:
 	docker build -f Dockerfile.regtest -t blitz_api .
+
+remote-debugging-help:
+	bash scripts/remote_debugging.sh help
+
+enable-remote-debugging:
+	bash scripts/remote_debugging.sh enable
+
+disable-remote-debugging:
+	bash scripts/remote_debugging.sh disable
