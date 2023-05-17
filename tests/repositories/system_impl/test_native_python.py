@@ -16,10 +16,10 @@ async def test_match_password(monkeypatch):
     )
 
     res = await npy.match_password(ok)
-    assert res == True
+    assert res is True
 
     res = await npy.match_password(nok)
-    assert res == False
+    assert res is False
 
     with pytest.raises(ValidationError) as exc_info:
         # Should be 8 characters

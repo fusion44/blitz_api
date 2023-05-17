@@ -332,7 +332,8 @@ async def warmup_new_connections():
         api_startup_status.bitcoin != StartupState.DONE
         and api_startup_status.lightning != StartupState.DONE
     ):
-        # send only the most minimal available data without Bitcoin Core and Lightning running
+        # send only the most minimal available data without
+        # Bitcoin Core and Lightning running
         res = await get_hardware_info()
         for id in new_connections:
             await _send_sse_event(id, SSE.HARDWARE_INFO, res),

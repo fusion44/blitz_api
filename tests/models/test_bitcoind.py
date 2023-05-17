@@ -1,4 +1,11 @@
-from app.bitcoind.models import *
+from app.bitcoind.models import (
+    Bip9Statistics,
+    BlockchainInfo,
+    BtcInfo,
+    BtcLocalAddress,
+    BtcNetwork,
+    NetworkInfo,
+)
 
 blockhain_info = {
     "chain": "main",

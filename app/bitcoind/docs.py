@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 blocks_sub_doc = """
 Similar to Bitcoin Core getblock
 

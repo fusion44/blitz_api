@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi.exceptions import HTTPException
+from loguru import logger
 from starlette import status
 
 from app.api.utils import call_script2, redis_get
@@ -22,8 +23,11 @@ async def blitz_cln_unlock(network: str, password: str) -> bool:
     )
 
     if res.return_code == 0:
-        logging.debug(
-            f"CLN_GRPC_BLITZ: Unlock script successfully called via API. Waiting for Redis {key} to be set."
+        logger.debug(
+            (
+                "CLN_GRPC_BLITZ: Unlock script successfully called via API. Waiting "
+                f"for Redis {key} to be set."
+            )
         )
 
         # success: exit 0
@@ -38,8 +42,12 @@ async def blitz_cln_unlock(network: str, password: str) -> bool:
             await asyncio.sleep(INTERVAL)
             total_wait_time += INTERVAL
 
-        logging.debug(
-            f"CLN_GRPC_BLITZ: Unlock script called successfully but redis key {key} indicates that RaspiBlitz is still locked. Stopped watching after polling for 60s for an unlock signal."
+        logger.debug(
+            (
+                "CLN_GRPC_BLITZ: Unlock script called successfully but redis key "
+                f"{key} indicates that RaspiBlitz is still locked. Stopped watching "
+                "after polling for 60s for an unlock signal."
+            )
         )
 
         raise HTTPException(
@@ -47,12 +55,14 @@ async def blitz_cln_unlock(network: str, password: str) -> bool:
             detail="Unknown error while trying to unlock.",
         )
     elif res.return_code == 1:
-        logging.error("CLN_GRPC_BLITZ: Unknown error while trying to unlock.")
-        logging.error(f"CLN_GRPC_BLITZ: {res.__str__()}")
+        logger.error("CLN_GRPC_BLITZ: Unknown error while trying to unlock.")
+        logger.error(f"CLN_GRPC_BLITZ: {res.__str__()}")
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unknown error while trying to unlock. See the API logs for more info.",
+            detail=(
+                "Unknown error while trying to unlock. See the API logs for more info."
+            ),
         )
     elif res.return_code == 2:
         # wrong password: exit 2

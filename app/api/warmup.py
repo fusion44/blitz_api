@@ -49,10 +49,14 @@ async def get_full_client_warmup_data() -> List:
         if isinstance(r, HTTPException):
             if r.status_code == status.HTTP_501_NOT_IMPLEMENTED:
                 logger.trace(f"Not implemented Error in warmup data {i}: {r.detail}")
-            # TODO: find a better way to handle this, client receives an error but disguised
-            # as a valid response. For example:
+            # TODO: find a better way to handle this, client receives an error but
+            # disguised as a valid response. For example:
             # event: installed_app_status
-            # data: {"status_code": 501, "detail": "Not available in native python mode.", "headers": null}
+            # data: {
+            #   "status_code": 501,
+            #   "detail": "Not available in native python mode.",
+            #   "headers": null
+            # }
             res[i] = r
         elif isinstance(r, Exception):
             logger.error(f"Error in warmup data {i}: {r}")

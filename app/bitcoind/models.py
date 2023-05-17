@@ -33,7 +33,9 @@ class BtcNetwork(BaseModel):
     reachable: bool = Query(..., description="Is the network reachable?")
     proxy: Optional[str] = Query(
         "",
-        description="host:port of the proxy that is used for this network, or empty if none",
+        description=(
+            "host:port of the proxy that is used for this network, or empty if none"
+        ),
     )
     proxy_randomize_credentials: bool = Query(
         ..., description="Whether randomized credentials are used"
@@ -67,7 +69,10 @@ class BtcLocalAddress(BaseModel):
 class RawTransaction(BaseModel):
     in_active_chain: Union[None, bool] = Query(
         None,
-        description='Whether specified block is in the active chain or not (only present with explicit "blockhash" argument)',
+        description=(
+            "Whether specified block is in the active chain or not (only present with "
+            "explicit 'blockhash' argument)"
+        ),
     )
     txid: str = Query(..., description="The transaction id (same as provided)")
     hash: str = Query(
@@ -77,7 +82,9 @@ class RawTransaction(BaseModel):
     size: int = Query(..., description="The serialized transaction size")
     vsize: int = Query(
         ...,
-        description="The virtual transaction size (differs from size for witness transactions)",
+        description=(
+            "The virtual transaction size (differs from size for witness transactions)"
+        ),
     )
     weight: int = Query(
         ..., description="The transaction's weight (between vsize*4 - 3 and vsize*4)"
@@ -138,7 +145,10 @@ class NetworkInfo(BaseModel):
     )
     incremental_fee: int = Query(
         ...,
-        description="Minimum fee increment for mempool limiting or BIP 125 replacement in BTC/kB",
+        description=(
+            "Minimum fee increment for mempool limiting or BIP 125 "
+            "replacement in BTC/kB"
+        ),
     )
     local_addresses: List[BtcLocalAddress] = Query(
         [], description="List of local addresses"
@@ -177,19 +187,29 @@ class Bip9Statistics(BaseModel):
     )
     threshold: int = Query(
         ...,
-        description="The number of blocks with the version bit set required to activate the feature",
+        description=(
+            "The number of blocks with the version bit set required to activate "
+            "the feature"
+        ),
     )
     elapsed: int = Query(
         ...,
-        description="The number of blocks elapsed since the beginning of the current period",
+        description=(
+            "The number of blocks elapsed since the beginning of the current period"
+        ),
     )
     count: int = Query(
         ...,
-        description="The number of blocks with the version bit set in the current period",
+        description=(
+            "The number of blocks with the version bit set in the current period"
+        ),
     )
     possible: bool = Query(
         ...,
-        description="False if there are not enough blocks left in this period to pass activation threshold",
+        description=(
+            "False if there are not enough blocks left in this period to "
+            "pass activation threshold"
+        ),
     )
 
     @classmethod
@@ -206,19 +226,28 @@ class Bip9Statistics(BaseModel):
 class Bip9Data(BaseModel):
     status: str = Query(
         ...,
-        description="""One of "defined", "started", "locked_in", "active", "failed" """,
+        description='One of "defined", "started", "locked_in", "active", "failed"',
     )
     bit: int = Query(
         None,
-        description="the bit(0-28) in the block version field used to signal this softfork(only for `started` status)",
+        description=(
+            "the bit(0-28) in the block version field used to signal this "
+            "softfork(only for `started` status)"
+        ),
     )
     start_time: int = Query(
         ...,
-        description="The minimum median time past of a block at which the bit gains its meaning",
+        description=(
+            "The minimum median time past of a block at which the bit gains "
+            "its meaning"
+        ),
     )
     timeout: int = Query(
         ...,
-        description="The median time past of a block at which the deployment is considered failed if not yet locked in",
+        description=(
+            "The median time past of a block at which the deployment is "
+            "considered failed if not yet locked in"
+        ),
     )
     since: int = Query(
         ..., description="Height of the first block to which the status applies"
@@ -228,11 +257,17 @@ class Bip9Data(BaseModel):
     )
     statistics: Bip9Statistics = Query(
         None,
-        description="numeric statistics about BIP9 signalling for a softfork(only for `started` status)",
+        description=(
+            "numeric statistics about BIP9 signalling for a "
+            "softfork(only for `started` status)"
+        ),
     )
     height: int = Query(
         None,
-        description="Height of the first block which the rules are or will be enforced(only for `buried` type, or `bip9` type with `active` status)",
+        description=(
+            "Height of the first block which the rules are or will be "
+            "enforced(only for `buried` type, or `bip9` type with `active` status)"
+        ),
     )
     active: bool = Query(
         None,
@@ -261,14 +296,19 @@ class SoftFork(BaseModel):
     type: str = Query(..., description='One of "buried", "bip9"')
     active: bool = Query(
         ...,
-        description="True **if** the rules are enforced for the mempool and the next block",
+        description=(
+            "True **if** the rules are enforced for the mempool and the next block"
+        ),
     )
     bip9: Bip9Data = Query(
         None, description='Status of bip9 softforks(only for "bip9" type)'
     )
     height: int = Query(
         None,
-        description="Height of the first block which the rules are or will be enforced (only for `buried` type, or `bip9` type with `active` status)",
+        description=(
+            "Height of the first block which the rules are or will be enforced "
+            "(only for `buried` type, or `bip9` type with `active` status)"
+        ),
     )
 
     @classmethod
@@ -286,7 +326,10 @@ class BlockchainInfo(BaseModel):
     chain: str = Query(..., description="Current network name(main, test, regtest)")
     blocks: int = Query(
         ...,
-        description="The height of the most-work fully-validated chain. The genesis block has height 0",
+        description=(
+            "The height of the most-work fully-validated chain. "
+            "The genesis block has height 0"
+        ),
     )
     headers: int = Query(
         ..., description="The current number of headers we have validated"
@@ -312,15 +355,22 @@ class BlockchainInfo(BaseModel):
     pruned: bool = Query(..., description="If the blocks are subject to pruning")
     prune_height: int = Query(
         None,
-        description="Lowest-height complete block stored(only present if pruning is enabled)",
+        description=(
+            "Lowest-height complete block stored(only present if pruning is enabled)"
+        ),
     )
     automatic_pruning: bool = Query(
         None,
-        description="Whether automatic pruning is enabled(only present if pruning is enabled)",
+        description=(
+            "Whether automatic pruning is enabled(only present if pruning is enabled)"
+        ),
     )
     prune_target_size: int = Query(
         None,
-        description="The target size used by pruning(only present if automatic pruning is enabled)",
+        description=(
+            "The target size used by pruning(only present if automatic pruning is "
+            "enabled)"
+        ),
     )
     warnings: str = Query(..., description="Any network and blockchain warnings")
     softforks: List[SoftFork] = Query(..., description="Status of softforks")
@@ -345,12 +395,12 @@ class BlockchainInfo(BaseModel):
             chainwork=r["chainwork"],
             size_on_disk=r["size_on_disk"],
             pruned=r["pruned"],
-            pruned_height=None if not "pruneheight" in r else r["pruneheight"],
+            pruned_height=None if "pruneheight" not in r else r["pruneheight"],
             automatic_pruning=None
-            if not "automatic_pruning" in r
+            if "automatic_pruning" not in r
             else r["automatic_pruning"],
             prune_target_size=None
-            if not "prune_target_size" in r
+            if "prune_target_size" not in r
             else r["prune_target_size"],
             warnings=r["warnings"],
             softforks=softforks,
@@ -361,7 +411,10 @@ class BtcInfo(BaseModel):
     # Info regarding bitcoind
     blocks: int = Query(
         ...,
-        description="The height of the most-work fully-validated chain. The genesis block has height 0",
+        description=(
+            "The height of the most-work fully-validated chain. "
+            "The genesis block has height 0"
+        ),
     )
     headers: int = Query(
         ..., description="The current number of headers we have validated"

@@ -42,10 +42,10 @@ elif ln_node == "cln_grpc" and PLATFORM == APIPlatform.RASPIBLITZ:
         LnNodeCLNgRPCBlitz as LnNode,
     )
 elif ln_node == "none":
-    logger.info(f"lightning was explicitly turned off")
+    logger.info("lightning was explicitly turned off")
 elif ln_node == "":
     ln_node = "none"
-    logger.info(f"lightning is not set yet")
+    logger.info("lightning is not set yet")
 else:
     logger.error(f"config: unknown lightning node: {ln_node}")
     raise RuntimeError(f"unknown lightning node type: {ln_node}")
@@ -154,7 +154,7 @@ async def channel_open(
     if len(node_URI) == 0:
         raise ValueError("node_URI cant be empty")
 
-    if not "@" in node_URI:
+    if "@" not in node_URI:
         raise ValueError("node_URI must contain @ with node physical address")
 
     res = await ln.channel_open(local_funding_amount, node_URI, target_confs)
@@ -252,9 +252,9 @@ async def _handle_forward_event_listener():
         await asyncio.sleep(FWD_GATHER_INTERVAL)
 
         if len(_fwd_successes) > 0:
-            l = _fwd_successes
+            sending_successes = _fwd_successes
             _fwd_successes = []
-            await broadcast_sse_msg(SSE.LN_FORWARD_SUCCESSES, l)
+            await broadcast_sse_msg(SSE.LN_FORWARD_SUCCESSES, sending_successes)
 
         _schedule_wallet_balance_update()
         rev = await get_fee_revenue()

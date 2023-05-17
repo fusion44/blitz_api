@@ -31,7 +31,7 @@ HW_INFO_YIELD_TIME = system.get_hardware_info_yield_time()
 async def change_password(type: Optional[str], old_password: str, new_password: str):
     try:
         return await system.change_password(type, old_password, new_password)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -40,7 +40,7 @@ async def change_password(type: Optional[str], old_password: str, new_password: 
 async def get_system_info() -> SystemInfo:
     try:
         return await system.get_system_info()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -49,7 +49,7 @@ async def get_system_info() -> SystemInfo:
 async def get_hardware_info() -> map:
     try:
         return await system.get_hardware_info()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -58,7 +58,7 @@ async def get_hardware_info() -> map:
 async def get_connection_info() -> ConnectionInfo:
     try:
         return await system.get_connection_info()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -72,7 +72,7 @@ async def shutdown(reboot: bool) -> bool:
 
     try:
         return await system.shutdown(reboot=reboot)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -90,7 +90,7 @@ async def subscribe_hardware_info(request: Request):
 async def get_debug_logs_raw() -> RawDebugLogData:
     try:
         return await system.get_debug_logs_raw()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -115,7 +115,7 @@ async def register_hardware_info_gatherer():
 async def login(i: LoginInput) -> Dict[str, str]:
     try:
         return await system.login(i)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])

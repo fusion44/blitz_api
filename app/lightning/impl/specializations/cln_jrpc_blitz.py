@@ -6,7 +6,7 @@ from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
 
-from app.api.utils import call_script2, redis_get
+from app.api.utils import redis_get
 from app.lightning.impl.cln_jrpc import LnNodeCLNjRPC
 from app.lightning.impl.specializations.blitz_common import blitz_cln_unlock
 from app.lightning.models import (
@@ -29,7 +29,8 @@ from app.lightning.models import (
 
 
 class LnNodeCLNjRPCBlitz(LnNodeCLNjRPC):
-    # RaspiBlitz implements a lock function on top of CLN, so we need to implement this on Blitz only.
+    # RaspiBlitz implements a lock function on top of CLN, so we need to implement
+    # this on Blitz only.
 
     _unlocked = False
 
@@ -209,7 +210,7 @@ class LnNodeCLNjRPCBlitz(LnNodeCLNjRPC):
 
     @logger.catch(exclude=(HTTPException,))
     def _check_if_locked(self):
-        logger.debug(f"_check_if_locked()")
+        logger.debug("_check_if_locked()")
 
         if not self._unlocked:
             raise HTTPException(

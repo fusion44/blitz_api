@@ -2,20 +2,15 @@ import asyncio
 import json
 import os
 import sys
-import time
 from typing import AsyncGenerator, Dict, List, Optional, Union
 
 import decouple
-import grpc
 from decouple import config
 from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
 
-import app.lightning.impl.protos.cln.node_pb2 as ln
-import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
-import app.lightning.impl.protos.cln.primitives_pb2 as lnp
-from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
+from app.api.utils import SSE, broadcast_sse_msg, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
 from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.cln_utils import (
@@ -35,7 +30,6 @@ from app.lightning.models import (
     LnInfo,
     LnInitState,
     NewAddressInput,
-    OnchainAddressType,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -44,7 +38,7 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
-from app.lightning.utils import alias_or_empty, generic_grpc_error_handler
+from app.lightning.utils import alias_or_empty
 
 _WAIT_ANY_INVOICE_ID = 0
 _SOCKET_BUFFER_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
@@ -74,7 +68,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
         logger.info("Initializing CLN JSON-RPC implementation.")
         if self._initialized:
             logger.warning(
-                "Connection already initialized. This function must not be called twice."
+                (
+                    "Connection already initialized. This function must not be "
+                    "called twice."
+                )
             )
             yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -85,7 +82,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
         except decouple.UndefinedValueError as e:
             logger.debug(e)
             logger.error(
-                f"CLN JSON-RPC implementation set, but cln_jrpc_path is missing from the config file."
+                (
+                    "CLN JSON-RPC implementation set, but cln_jrpc_path is missing "
+                    "from the config file."
+                )
             )
             sys.exit(1)
 
@@ -123,7 +123,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
             sys.exit(1)
 
         logger.success(
-            f"Connected to CLN node with alias {info.alias} and pubkey {info.identity_pubkey[:10]}...{info.identity_pubkey[-10:]}"
+            (
+                f"Connected to CLN node with alias {info.alias} and "
+                f"pubkey {info.identity_pubkey[:10]}...{info.identity_pubkey[-10:]}"
+            )
         )
 
         yield InitLnRepoUpdate(state=LnInitState.DONE)
@@ -260,12 +263,12 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if reversed:
             tx.reverse()
 
-        l = len(tx)
-        for invoice in range(l):
+        num_tx = len(tx)
+        for invoice in range(num_tx):
             tx[invoice].index = invoice
 
         if max_tx == 0:
-            max_tx = l
+            max_tx = num_tx
 
         return tx[index_offset : index_offset + max_tx]
 
@@ -278,7 +281,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
         reversed: bool,
     ):
         logger.trace(
-            f"list_invoices({pending_only}, {index_offset}, {num_max_invoices}, {reversed})"
+            (
+                f"list_invoices({pending_only}, {index_offset}, "
+                f"{num_max_invoices}, {reversed})"
+            )
         )
 
         res = await self._send_request("listinvoices")
@@ -286,7 +292,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if "error" in res:
             self._raise_internal_server_error("listing invoices", res)
 
-        if not "result" in res or not "invoices" in res["result"]:
+        if "result" not in res or "invoices" not in res["result"]:
             logger.error(f"Got no error and no invoices key result: {res}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -374,14 +380,15 @@ class LnNodeCLNjRPC(LightningNodeBase):
         reversed: bool,
     ):
         logger.trace(
-            f"list_payments({include_incomplete}, {index_offset}, {max_payments}, {reversed})"
+            f"list_payments({include_incomplete}, {index_offset}, "
+            f"{max_payments}, {reversed})"
         )
 
         res = await self._send_request("listpays")
         if "error" in res:
             self._raise_internal_server_error("listing payments", res)
 
-        if not "result" in res or not "pays" in res["result"]:
+        if "result" not in res or "pays" not in res["result"]:
             logger.error(f"Got no error and no pays key result: {res}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -424,7 +431,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         params = [value_msat, pid, memo, expiry]
         res = await self._send_request("invoice", params)
 
-        if not "error" in res:
+        if "error" not in res:
             res = res["result"]
             return Invoice(
                 payment_request=res["bolt11"],
@@ -456,7 +463,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         params = [pay_req]
         res = await self._send_request("decodepay", params)
 
-        if not "error" in res:
+        if "error" not in res:
             res = res["result"]
             req = PaymentRequest.from_cln_json(res)
             self._bolt11_cache[pay_req] = req
@@ -475,7 +482,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         params = ["settled"]  # only list settled forwards
         res = await self._send_request("listforwards", params)
 
-        if not "error" in res:
+        if "error" not in res:
             res = res["result"]
             day, week, month, year, total = cln_classify_fee_revenue(res["forwards"])
 
@@ -493,7 +500,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
     async def new_address(self, input: NewAddressInput) -> str:
         res = await self._send_request("newaddr")
 
-        if not "error" in res:
+        if "error" not in res:
             res = res["result"]
             return res["bech32"]
 
@@ -514,14 +521,14 @@ class LnNodeCLNjRPC(LightningNodeBase):
         params = [input.address, amt, fee_rate]
         res = await self._send_request("withdraw", params)
 
-        if not "error" in res:
+        if "error" not in res:
             res = res["result"]
             r = SendCoinsResponse.from_cln_json(res, input)
             await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
 
             return r
 
-        if not "message" in res["error"]:
+        if "message" not in res["error"]:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Unknown error: {res}",
@@ -533,7 +540,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if details and details.find("Could not parse destination address") > -1:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail="Could not parse destination address, destination should be a valid address.",
+                detail=(
+                    "Could not parse destination address, destination should be "
+                    "a valid address."
+                ),
             )
         elif (
             details
@@ -542,7 +552,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
         ):
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Server tried to use a reserved UTXO. Please submit an issue to the BlitzAPI repository.",
+                detail=(
+                    "Server tried to use a reserved UTXO. Please submit an "
+                    "issue to the BlitzAPI repository."
+                ),
             )
         elif details and details.find("Could not afford ") > -1:
             raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
@@ -591,7 +604,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         }
         res = await self._send_request("pay", params)
 
-        if not "error" in res:
+        if "error" not in res:
             res = res["result"]
             return Payment.from_cln_jrpc(res)
 
@@ -622,7 +635,9 @@ class LnNodeCLNjRPC(LightningNodeBase):
         ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail="amount must not be specified when paying a non-zero amount invoice",
+                detail=(
+                    "amount must not be specified when paying a non-zero amount invoice"
+                ),
             )
 
         logger.error(message)
@@ -641,7 +656,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def unlock_wallet(self, password: str) -> bool:
-        logger.trace(f"unlock_wallet(password=wedontlogpasswords)")
+        logger.trace("unlock_wallet(password=wedontlogpasswords)")
 
         # Core Lightning doesn't lock wallets,
         # so we don't need to do anything here
@@ -700,9 +715,13 @@ class LnNodeCLNjRPC(LightningNodeBase):
         self, local_funding_amount: int, node_URI: str, target_confs: int
     ) -> str:
         logger.trace(
-            f"channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
+            (
+                f"channel_open(local_funding_amount={local_funding_amount}, "
+                f"node_URI={node_URI}, target_confs={target_confs})"
+            )
         )
-        # fundchannel id amount [feerate] [announce] [minconf] [utxos] [push_msat] [close_to] [request_amt] [compact_lease] [reserve]
+        # fundchannel id amount [feerate] [announce] [minconf] [utxos] [push_msat]
+        # [close_to] [request_amt] [compact_lease] [reserve]
 
         await self.connect_peer(node_URI)
         fee_rate = calc_fee_rate_str(None, target_confs)
@@ -731,14 +750,20 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if "Unknown peer" in message:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="We where able to connect to the peer but CLN can't find it when opening a channel.",
+                detail=(
+                    "We where able to connect to the peer but CLN can't find it "
+                    "when opening a channel."
+                ),
             )
 
         if "Owning subdaemon openingd died" in message:
             # https://github.com/ElementsProject/lightning/issues/2798#issuecomment-511205719
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail="Likely the peer didn't like our channel opening proposal and disconnected from us.",
+                detail=(
+                    "Likely the peer didn't like our channel opening proposal "
+                    "and disconnected from us."
+                ),
             )
 
         if (
@@ -843,14 +868,12 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         res = await self._send_request("connect", [uri])
 
-        if not "error" in res:
+        if "error" not in res:
             return True
 
         message = res["error"]["message"]
 
         if "All addresses failed" in message:
-            message = details.split('message: "')[1]
-
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail=message,
@@ -955,7 +978,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
                     if i.state is not InvoiceState.SETTLED:
                         continue
 
-                    if i.settle_index != None and i.settle_index < self.lastpay_index:
+                    if (
+                        i.settle_index is not None
+                        and i.settle_index < self.lastpay_index
+                    ):
                         break
 
                     self.lastpay_index = i.settle_index

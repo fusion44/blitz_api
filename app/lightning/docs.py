@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 tx_id_desc = """
 Unique identifier for this transaction.
 

@@ -42,9 +42,9 @@ from app.lightning.utils import alias_or_empty
 
 @logger.catch(exclude=(HTTPException,))
 def _check_if_locked(error):
-    logger.debug(f"logger._check_if_locked()")
+    logger.debug("logger._check_if_locked()")
 
-    if error.details() != None and error.details().find("wallet locked") > -1:
+    if error.details() is not None and error.details().find("wallet locked") > -1:
         raise HTTPException(
             status.HTTP_423_LOCKED,
             detail="Wallet is locked. Unlock via /lightning/unlock-wallet",
@@ -160,7 +160,10 @@ This will show more debug information.
                     await self._init_queue.put(
                         InitLnRepoUpdate(
                             state=LnInitState.BOOTSTRAPPING,
-                            msg="Connected but waiting to start, RPC services not available",
+                            msg=(
+                                "Connected but waiting to start, RPC services "
+                                "not available"
+                            ),
                         )
                     )
                     await temp_channel.close()
@@ -168,7 +171,10 @@ This will show more debug information.
                 elif "wallet locked, unlock it to enable full RPC access" in details:
                     if not wallet_locked_sent:
                         logger.info(
-                            "Wallet is locked. Unlock by calling /lightning/unlock-wallet"
+                            (
+                                "Wallet is locked. Unlock by calling "
+                                "/lightning/unlock-wallet"
+                            )
                         )
 
                     wallet_locked_sent = True
@@ -182,14 +188,17 @@ This will show more debug information.
                         await temp_channel.close()
                         temp_channel = None
                 elif (
-                    "the RPC server is in the process of starting up, but not yet ready to accept calls"
-                    in details
-                ):
+                    "the RPC server is in the process of starting up, but not yet "
+                    "ready to accept calls"
+                ) in details:
                     # message from LND AFTER unlocking the wallet
                     await self._init_queue.put(
                         InitLnRepoUpdate(
                             state=LnInitState.BOOTSTRAPPING_AFTER_UNLOCK,
-                            msg="The RPC server is in the process of starting up, but not yet ready to accept calls",
+                            msg=(
+                                "The RPC server is in the process of starting up, "
+                                "but not yet ready to accept calls"
+                            ),
                         )
                     )
                 else:
@@ -207,7 +216,10 @@ This will show more debug information.
 
         if self._initialized:
             logger.warning(
-                "Connection already initialized. This function must not be called twice."
+                (
+                    "Connection already initialized. "
+                    "This function must not be called twice."
+                )
             )
             yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -248,7 +260,7 @@ This will show more debug information.
             ):
                 task.cancel()
 
-                if self._channel == None:
+                if self._channel is None:
                     # if res == _API_WALLET_UNLOCK_EVENT the endpoint function will have
                     # created the channel for us.
                     self._create_stubs()
@@ -295,7 +307,10 @@ This will show more debug information.
         self, successful_only: bool, index_offset: int, max_tx: int, reversed: bool
     ) -> List[GenericTx]:
         logger.trace(
-            f"logger.list_all_tx(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+            (
+                f"logger.list_all_tx(successful_only={successful_only}, "
+                f"index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+            )
         )
 
         # TODO: find a better caching strategy
@@ -348,12 +363,12 @@ This will show more debug information.
             if reversed:
                 tx.reverse()
 
-            l = len(tx)
-            for i in range(l):
+            current_tx = len(tx)
+            for i in range(current_tx):
                 tx[i].index = i
 
             if max_tx == 0:
-                max_tx = l
+                max_tx = current_tx
 
             return tx[index_offset : index_offset + max_tx]
         except grpc.aio._call.AioRpcError as error:
@@ -410,7 +425,11 @@ This will show more debug information.
         reversed: bool,
     ):
         logger.trace(
-            f"logger.list_payments(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
+            (
+                f"logger.list_payments(include_incomplete={include_incomplete}, "
+                f"index_offset{index_offset}, max_payments={max_payments}, "
+                f"reversed={reversed})"
+            )
         )
 
         try:
@@ -437,7 +456,10 @@ This will show more debug information.
         is_keysend: bool = False,
     ) -> Invoice:
         logger.trace(
-            f"logger.add_invoice(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
+            (
+                f"logger.add_invoice(value_msat={value_msat}, memo={memo}, "
+                f"expiry={expiry}, is_keysend={is_keysend})"
+            )
         )
 
         try:
@@ -482,7 +504,7 @@ This will show more debug information.
         except grpc.aio._call.AioRpcError as error:
             _check_if_locked(error)
             if (
-                error.details() != None
+                error.details() is not None
                 and error.details().find("checksum failed.") > -1
             ):
                 raise HTTPException(
@@ -495,7 +517,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def get_fee_revenue(self) -> FeeRevenue:
-        logger.trace(f"logger.get_fee_revenue()")
+        logger.trace("logger.get_fee_revenue()")
 
         req = ln.FeeReportRequest()
         res = await self._lnd_stub.FeeReport(req)
@@ -552,7 +574,10 @@ This will show more debug information.
             if details and details.find("invalid bech32 string") > -1:
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
-                    detail="Could not parse destination address, destination should be a valid address.",
+                    detail=(
+                        "Could not parse destination address, destination "
+                        "should be a valid address."
+                    ),
                 )
             elif details and details.find("insufficient funds available") > -1:
                 raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
@@ -570,7 +595,11 @@ This will show more debug information.
         amount_msat: Optional[int] = None,
     ) -> Payment:
         logger.trace(
-            f"logger.send_payment(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
+            (
+                f"logger.send_payment(pay_req={pay_req}, "
+                f"timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, "
+                f"amount_msat={amount_msat})"
+            )
         )
 
         try:
@@ -589,14 +618,14 @@ This will show more debug information.
         except grpc.aio._call.AioRpcError as error:
             _check_if_locked(error)
             if (
-                error.details() != None
+                error.details() is not None
                 and error.details().find("invalid bech32 string") > -1
             ):
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
                 )
             elif (
-                error.details() != None
+                error.details() is not None
                 and error.details().find("OPENSSL_internal:CERTIFICATE_VERIFY_FAILED.")
                 > -1
             ):
@@ -605,7 +634,7 @@ This will show more debug information.
                     detail="Invalid LND credentials. SSL certificate verify failed.",
                 )
             elif (
-                error.details() != None
+                error.details() is not None
                 and error.details().find(
                     "amount must be specified when paying a zero amount invoice"
                 )
@@ -616,18 +645,21 @@ This will show more debug information.
                     detail="amount must be specified when paying a zero amount invoice",
                 )
             elif (
-                error.details() != None
+                error.details() is not None
                 and error.details().find(
-                    "amount must not be specified when paying a non-zero  amount invoice"
+                    "amount must not be specified when paying a non-zero amount invoice"
                 )
                 > -1
             ):
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
-                    detail="amount must not be specified when paying a non-zero amount invoice",
+                    detail=(
+                        "amount must not be specified when paying a non-zero "
+                        "amount invoice"
+                    ),
                 )
             elif (
-                error.details() != None
+                error.details() is not None
                 and error.details().find("invoice is already paid") > -1
             ):
                 raise HTTPException(
@@ -640,7 +672,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def get_ln_info(self) -> LnInfo:
-        logger.trace(f"logger.get_ln_info()")
+        logger.trace("logger.get_ln_info()")
 
         if not self._initialized:
             raise HTTPException(
@@ -659,7 +691,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def _wait_wallet_fully_ready(self):
-        logger.trace(f"logger._wait_wallet_fully_ready()")
+        logger.trace("logger._wait_wallet_fully_ready()")
 
         # This must only be called after unlocking the wallet.
 
@@ -667,22 +699,28 @@ This will show more debug information.
             try:
                 info = await self._lnd_stub.GetInfo(ln.GetInfoRequest())
 
-                if info != None:
+                if info is not None:
                     logger.debug(
-                        f"logger._wait_wallet_fully_ready() breaking out of wait ready loop"
+                        (
+                            "logger._wait_wallet_fully_ready() breaking out of "
+                            "wait ready loop"
+                        )
                     )
                     break
             except grpc.aio._call.AioRpcError as error:
                 details = error.details()
                 if (
-                    "the RPC server is in the process of starting up, but not yet ready to accept calls"
-                    in details
-                ):
+                    "the RPC server is in the process of starting up, but not yet "
+                    "ready to accept calls"
+                ) in details:
                     # message from LND AFTER unlocking the wallet
                     await self._init_queue.put(
                         InitLnRepoUpdate(
                             state=LnInitState.BOOTSTRAPPING_AFTER_UNLOCK,
-                            msg="The RPC server is in the process of starting up, but not yet ready to accept calls",
+                            msg=(
+                                "The RPC server is in the process of starting up, "
+                                "but not yet ready to accept calls"
+                            ),
                         )
                     )
                     await asyncio.sleep(0.1)
@@ -692,7 +730,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def unlock_wallet(self, password: str) -> bool:
-        logger.trace(f"logger.unlock_wallet(password=wedontlogpasswords)")
+        logger.trace("logger.unlock_wallet(password=wedontlogpasswords)")
 
         try:
             if self._channel is None:
@@ -718,7 +756,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_invoices(self) -> AsyncGenerator[Invoice, None]:
-        logger.trace(f"logger.listen_invoices()")
+        logger.trace("logger.listen_invoices()")
 
         request = ln.InvoiceSubscription()
         try:
@@ -732,7 +770,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_forward_events(self) -> ForwardSuccessEvent:
-        logger.trace(f"logger.listen_forward_events()")
+        logger.trace("logger.listen_forward_events()")
 
         request = router.SubscribeHtlcEventsRequest()
         try:
@@ -744,7 +782,7 @@ This will show more debug information.
 
                 evt = str(e)
                 failed_event = "forward_fail_event" in evt or "link_fail_event" in evt
-                if not e.incoming_htlc_id in _fwd_cache and not failed_event:
+                if e.incoming_htlc_id not in _fwd_cache and not failed_event:
                     _fwd_cache[e.incoming_htlc_id] = e
                 elif e.incoming_htlc_id in _fwd_cache and not failed_event:
                     if hasattr(e, "settle_event") and len(e.settle_event.preimage) > 0:
@@ -775,7 +813,10 @@ This will show more debug information.
         self, local_funding_amount: int, node_URI: str, target_confs: int
     ) -> str:
         logger.trace(
-            f"logger.channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
+            (
+                f"logger.channel_open(local_funding_amount={local_funding_amount}, "
+                f"node_URI={node_URI}, target_confs={target_confs})"
+            )
         )
 
         try:
@@ -792,7 +833,7 @@ This will show more debug information.
                 await self._lnd_stub.ConnectPeer(r)
             except grpc.aio._call.AioRpcError as error:
                 if (
-                    error.details() != None
+                    error.details() is not None
                     and error.details().find("already connected to peer") > -1
                 ):
                     logger.debug(f"already connected to peer {pubkey}")
@@ -806,7 +847,6 @@ This will show more debug information.
                 target_conf=target_confs,
             )
             async for response in self._lnd_stub.OpenChannel(r):
-                # TODO: this is still some bytestring that needs correct conversion to a string txid (ok OK for now)
                 return str(response.chan_pending.txid.hex())
 
         except grpc.aio._call.AioRpcError as error:
@@ -835,7 +875,7 @@ This will show more debug information.
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_list(self) -> List[Channel]:
-        logger.trace(f"logger.channel_list()")
+        logger.trace("logger.channel_list()")
 
         try:
             request = ln.ListChannelsRequest()
@@ -871,7 +911,7 @@ This will show more debug information.
             f"logger.channel_close(channel_id={channel_id}, force_close={force_close})"
         )
 
-        if not ":" in channel_id:
+        if ":" not in channel_id:
             raise ValueError("channel_id must contain : for lnd")
 
         try:
@@ -886,7 +926,6 @@ This will show more debug information.
                 target_conf=6,
             )
             async for response in self._lnd_stub.CloseChannel(request):
-                # TODO: this is still some bytestring that needs correct conversion to a string txid (ok OK for now)
                 return str(response.close_pending.txid.hex())
 
         except grpc.aio._call.AioRpcError as error:

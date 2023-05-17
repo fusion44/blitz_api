@@ -51,7 +51,10 @@ async def initialize_bitcoin_repo() -> bool:
                 logger.error(e.detail)
 
             logger.debug(
-                f"Connected to Bitcoin Core but it seems to be initializing, waiting 2 seconds... \n{e.detail}"
+                (
+                    "Connected to Bitcoin Core but it seems to be "
+                    f"initializing, waiting 2 seconds... \n{e.detail}"
+                )
             )
 
             await asyncio.sleep(2)
@@ -61,7 +64,7 @@ async def initialize_bitcoin_repo() -> bool:
 async def get_blockchain_info() -> BlockchainInfo:
     result = await bitcoin_rpc_async("getblockchaininfo")
 
-    if result["error"] != None:
+    if result["error"] is not None:
         raise HTTPException(result["status"], detail=result["error"])
 
     return BlockchainInfo.from_rpc(result["result"])
@@ -74,7 +77,7 @@ async def estimate_fee(
 ) -> int:
     result = await bitcoin_rpc_async("estimatesmartfee", [target_conf, mode])
 
-    if result["error"] != None:
+    if result["error"] is not None:
         raise HTTPException(result["status"], detail=result["error"])
 
     if "errors" in result["result"]:
@@ -96,7 +99,7 @@ async def estimate_fee(
 async def get_network_info() -> NetworkInfo:
     result = await bitcoin_rpc_async("getnetworkinfo")
 
-    if result["error"] != None:
+    if result["error"] is not None:
         raise HTTPException(result["status"], detail=result["error"])
 
     return NetworkInfo.from_rpc(result["result"])
@@ -106,7 +109,7 @@ async def get_network_info() -> NetworkInfo:
 async def get_raw_transaction(txid: str) -> RawTransaction:
     result = await bitcoin_rpc_async("getrawtransaction", [txid, 1])
 
-    if result["error"] == None:
+    if result["error"] is None:
         return RawTransaction.from_rpc(result["result"])
 
     if "No such mempool or blockchain transaction." in result["error"]:
@@ -183,7 +186,7 @@ async def _handle_gather_bitcoin_status():
     while True:
         try:
             info = await get_btc_info()
-            if info == None:
+            if info is None:
                 continue
 
             info.verification_progress = round(info.verification_progress, 2)

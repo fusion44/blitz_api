@@ -3,7 +3,6 @@ from typing import Optional
 
 from decouple import config
 from fastapi import Query
-from fastapi.param_functions import Query
 from pydantic import BaseModel
 from pydantic.types import constr
 
@@ -66,7 +65,9 @@ class SystemInfo(BaseModel):
     # and the Lightning Implementation
     chain: str = Query(
         ...,
-        description="The current chain this node is connected to (mainnet, testnet or signet)",
+        description=(
+            "The current chain this node is connected to (mainnet, testnet or signet)"
+        ),
     )
 
 

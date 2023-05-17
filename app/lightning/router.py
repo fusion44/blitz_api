@@ -54,7 +54,9 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Lightning"])
 
 responses = {
     423: {
-        "description": "LND only: Wallet is locked. Unlock via /lightning/unlock-wallet."
+        "description": (
+            "LND only: Wallet is locked. Unlock via /lightning/unlock-wallet."
+        )
     }
 }
 
@@ -78,7 +80,7 @@ async def addinvoice(
 ):
     try:
         return await add_invoice(memo, value_msat, expiry, is_keysend)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -96,7 +98,7 @@ async def addinvoice(
 async def getwalletbalance():
     try:
         return await get_wallet_balance()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -106,10 +108,11 @@ async def getwalletbalance():
     "/get-fee-revenue",
     name=f"{_PREFIX}.get-fee-revenue",
     summary="Returns the daily, weekly and monthly fee revenue earned.",
-    description="""
-Currently, year and total fees are always null. Backends don't return these values by default.
-Implementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/issues/64).
-    """,
+    description=(
+        "Currently, year and total fees are always null. "
+        "Backends don't return these values by default. Implementation in BlitzAPI "
+        "remains a [to-do](https://github.com/fusion44/blitz_api/issues/64)."
+    ),
     dependencies=[Depends(JWTBearer())],
     response_model=FeeRevenue,
     responses=responses,
@@ -117,7 +120,7 @@ Implementation in BlitzAPI is a [to-do](https://github.com/fusion44/blitz_api/is
 async def get_fee_revenue_path() -> FeeRevenue:
     try:
         return await get_fee_revenue()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -127,9 +130,11 @@ async def get_fee_revenue_path() -> FeeRevenue:
     "/list-all-tx",
     name=f"{_PREFIX}.list-all-tx",
     summary="Lists all on-chain transactions, payments and invoices in the wallet",
-    description="""Returns a list with all on-chain transaction, payments and invoices combined into one list.
-    The index of each tx is only valid for each identical set of parameters.
-    """,
+    description=(
+        "Returns a list with all on-chain transaction, payments and invoices "
+        "combined into one list. The index of each tx is only valid for each identical "
+        "set of parameters. "
+    ),
     dependencies=[Depends(JWTBearer())],
     response_model=List[GenericTx],
     responses=responses,
@@ -137,24 +142,36 @@ async def get_fee_revenue_path() -> FeeRevenue:
 async def list_all_tx_path(
     successful_only: bool = Query(
         False,
-        description="If set, only successful transaction will be returned in the response.",
+        description=(
+            "If set, only successful transaction will be returned in the response."
+        ),
     ),
     index_offset: int = Query(
         0,
-        description="The index of an transaction that will be used as either the start or end of a query to determine which invoices should be returned in the response.",
+        description=(
+            "The index of an transaction that will be used as either the "
+            "start or end of a query to determine which invoices should be returned in "
+            "the response."
+        ),
     ),
     max_tx: int = Query(
         0,
-        description="The max number of transaction to return in the response to this query. Will return all transactions when set to 0 or null.",
+        description=(
+            "The max number of transaction to return in the response to "
+            "this query. Will return all transactions when set to 0 or null."
+        ),
     ),
     reversed: bool = Query(
         False,
-        description="If set, the transactions returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards.",
+        description=(
+            "If set, the transactions returned will result from seeking backwards "
+            "from the specified index offset. This can be used to paginate backwards."
+        ),
     ),
 ):
     try:
         return await list_all_tx(successful_only, index_offset, max_tx, reversed)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -172,19 +189,31 @@ async def list_all_tx_path(
 async def list_invoices_path(
     pending_only: bool = Query(
         False,
-        description="If set, only invoices that are not settled and not canceled will be returned in the response.",
+        description=(
+            "If set, only invoices that are not settled and not canceled "
+            "will be returned in the response."
+        ),
     ),
     index_offset: int = Query(
         0,
-        description="The index of an invoice that will be used as either the start or end of a query to determine which invoices should be returned in the response.",
+        description=(
+            "The index of an invoice that will be used as either the start or end "
+            "of a query to determine which invoices should be returned in the response."
+        ),
     ),
     num_max_invoices: int = Query(
         0,
-        description="The max number of invoices to return in the response to this query. Will return all invoices when set to 0 or null.",
+        description=(
+            "The max number of invoices to return in the response to this query. "
+            "This will return all invoices when set to 0 or null."
+        ),
     ),
     reversed: bool = Query(
         False,
-        description="If set, the invoices returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards.",
+        description=(
+            "If set, the invoices returned will result from seeking backwards "
+            "from the specified index offset. This can be used to paginate backwards."
+        ),
     ),
 ):
     try:
@@ -194,7 +223,7 @@ async def list_invoices_path(
             num_max_invoices,
             reversed,
         )
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -212,7 +241,7 @@ async def list_invoices_path(
 async def list_on_chain_tx_path():
     try:
         return await list_on_chain_tx()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -221,7 +250,9 @@ async def list_on_chain_tx_path():
 @router.get(
     "/list-payments",
     name=f"{_PREFIX}.list-payments",
-    summary="Returns a list of all outgoing payments. Modeled after LND implementation.",
+    summary=(
+        "Returns a list of all outgoing payments. Modeled after LND implementation."
+    ),
     response_model=List[Payment],
     response_description="A list of all payments made.",
     dependencies=[Depends(JWTBearer())],
@@ -230,26 +261,45 @@ async def list_on_chain_tx_path():
 async def list_payments_path(
     include_incomplete: bool = Query(
         True,
-        description="If true, then return payments that have not yet fully completed. This means that pending payments, as well as failed payments will show up if this field is set to true. This flag doesn't change the meaning of the indices, which are tied to individual payments.",
+        description=(
+            "If true, then return payments that have not yet fully completed. "
+            "This means that pending payments, as well as failed payments will show up "
+            "if this field is set to true. This flag doesn't change the meaning of the "
+            "indices, which are tied to individual payments."
+        ),
     ),
     index_offset: int = Query(
         0,
-        description="The index of a payment that will be used as either the start or end of a query to determine which payments should be returned in the response. The index_offset is exclusive. In the case of a zero index_offset, the query will start with the oldest payment when paginating forwards, or will end with the most recent payment when paginating backwards.",
+        description=(
+            "The index of a payment that will be used as either the start or "
+            "end of a query to determine which payments should be returned in the "
+            "response. The index_offset is exclusive. In the case of a zero "
+            "index_offset, the query will start with the oldest payment when "
+            "paginating forwards, or will end with the most recent payment when "
+            "paginating backwards."
+        ),
     ),
     max_payments: int = Query(
         0,
-        description="The maximal number of payments returned in the response to this query.",
+        description=(
+            "The maximal number of payments returned in the response to this query."
+        ),
     ),
     reversed: bool = Query(
         False,
-        description="If set, the payments returned will result from seeking backwards from the specified index offset. This can be used to paginate backwards. The order of the returned payments is always oldest first (ascending index order).",
+        description=(
+            "If set, the payments returned will result from seeking backwards "
+            "from the specified index offset. This can be used to paginate backwards. "
+            "The order of the returned payments is always oldest first (ascending "
+            "index order)."
+        ),
     ),
 ):
     try:
         return await list_payments(
             include_incomplete, index_offset, max_payments, reversed
         )
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -268,7 +318,7 @@ async def list_payments_path(
 async def new_address_path(input: NewAddressInput):
     try:
         return await new_address(input)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -290,7 +340,7 @@ async def new_address_path(input: NewAddressInput):
 async def send_coins_path(input: SendCoinsInput):
     try:
         return await send_coins(input=input)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -314,7 +364,7 @@ async def open_channel_path(
 ):
     try:
         return await channel_open(local_funding_amount, node_URI, target_confs)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -334,7 +384,7 @@ async def open_channel_path(
 async def list_channels_path():
     try:
         return await channel_list()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -354,7 +404,7 @@ async def list_channels_path():
 async def close_channel_path(channel_id: str, force_close: bool):
     try:
         return await channel_close(channel_id, force_close)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -372,15 +422,19 @@ async def close_channel_path(channel_id: str, force_close: bool):
     response_model=Payment,
     responses={
         400: {
-            "description": """
-Possible error messages:
-* invalid bech32 string
-* amount must be specified when paying a zero amount invoice
-* amount must not be specified when paying a non-zero amount invoice
-"""
+            "description": (
+                "Possible error messages:"
+                "* invalid bech32 string"
+                "* amount must be specified when paying a zero amount invoice"
+                "* amount must not be specified when paying a non-zero amount invoice"
+            )
         },
         409: {
-            "description": "[LND only] When attempting to pay an already paid invoice. CLN will return the payment object of the previously paid invoice. Info: [GitHub](https://github.com/fusion44/blitz_api/issues/131)",
+            "description": (
+                "[LND only] When attempting to pay an already paid invoice. "
+                "CLN will return the payment object of the previously paid invoice. "
+                "Info: [GitHub](https://github.com/fusion44/blitz_api/issues/131)"
+            ),
         },
         423: responses[423],
     },
@@ -393,7 +447,7 @@ async def sendpayment(
 ):
     try:
         return await send_payment(pay_req, timeout_seconds, fee_limit_msat, amount_msat)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -411,7 +465,7 @@ async def sendpayment(
 async def get_info():
     try:
         return await get_ln_info()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -420,7 +474,10 @@ async def get_info():
 @router.get(
     "/get-info-lite",
     name=f"{_PREFIX}.get-info-lite",
-    summary="Get lightweight current lightning info. Less verbose version of /lightning/get-info",
+    summary=(
+        "Get lightweight current lightning info. "
+        "Less verbose version of /lightning/get-info"
+    ),
     dependencies=[Depends(JWTBearer())],
     status_code=status.HTTP_200_OK,
     response_model=LightningInfoLite,
@@ -429,7 +486,7 @@ async def get_info():
 async def get_ln_info_lite_path():
     try:
         return await get_ln_info_lite()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -438,9 +495,16 @@ async def get_ln_info_lite_path():
 @router.get(
     "/decode-pay-req",
     name=f"{_PREFIX}.decode-pay-req",
-    summary="DecodePayReq takes an encoded payment request string and attempts to decode it, returning a full description of the conditions encoded within the payment request.",
+    summary=(
+        "DecodePayReq takes an encoded payment request string and attempts to "
+        "decode it, returning a full description of the conditions encoded within the "
+        "payment request."
+    ),
     response_model=PaymentRequest,
-    response_description="A fully decoded payment request or a HTTP status 400 if the payment request cannot be decoded.",
+    response_description=(
+        "A fully decoded payment request or a HTTP status 400 if the "
+        "payment request cannot be decoded."
+    ),
     dependencies=[Depends(JWTBearer())],
     responses=responses,
 )
@@ -449,7 +513,7 @@ async def get_decode_pay_request(
 ):
     try:
         return await decode_pay_request(pay_req)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -464,7 +528,10 @@ async def get_decode_pay_request(
     dependencies=[Depends(JWTBearer())],
     responses={
         401: {
-            "description": "Either JWT token is not ok OR wallet password is wrong, observe the detail message."
+            "description": (
+                "Either JWT token is not ok OR wallet password is wrong, "
+                "observe the detail message."
+            )
         },
         412: {"description": "Wallet already unlocked"},
     },
@@ -472,7 +539,7 @@ async def get_decode_pay_request(
 async def unlock_wallet_path(input: UnlockWalletInput) -> bool:
     try:
         return await unlock_wallet(input.password)
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])

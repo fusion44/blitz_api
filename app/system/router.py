@@ -43,7 +43,7 @@ async def login_path(i: LoginInput, response: Response):
         token = await login(i)
         response.set_cookie("access_token", token)
         return token
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -67,12 +67,15 @@ def refresh_token():
     response_description="if 200 OK - password change worked",
     dependencies=[Depends(JWTBearer())],
 )
-async def change_password(
+async def change_password_impl(
     old_password: str,
     new_password: str,
     type: Optional[str] = Query(
         None,
-        description=' ℹ️ Used in **RaspiBlitz only**. Password A, B or C. Must be one of `["a", "b", "c"]`',
+        description=(
+            "ℹ️ Used in **RaspiBlitz only**. Password A, B or C. "
+            'Must be one of `["a", "b", "c"]`'
+        ),
     ),
 ):
     return await change_password(type, old_password, new_password)
@@ -91,7 +94,7 @@ async def change_password(
 async def get_system_info_path():
     try:
         return await get_system_info()
-    except HTTPException as r:
+    except HTTPException:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
@@ -140,7 +143,10 @@ async def get_debug_logs_raw_route() -> RawDebugLogData:
     "/hardware-info-sub",
     name=f"{_PREFIX}.hardware-info-sub",
     summary="Subscribe to hardware status information.",
-    response_description=f"Yields a JSON string with hardware information every {HW_INFO_YIELD_TIME} seconds:\n"
+    response_description=(
+        "Yields a JSON string with hardware information "
+        f"every {HW_INFO_YIELD_TIME} seconds\n"
+    )
     + get_hw_info_json,
     dependencies=[Depends(JWTBearer())],
 )

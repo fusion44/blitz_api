@@ -5,7 +5,6 @@ from types import coroutine
 import aiohttp
 import requests
 from decouple import config
-from loguru import logger
 from starlette import status
 
 from app.bitcoind.models import BlockRpcFunc
@@ -101,13 +100,19 @@ async def _process_response(resp: aiohttp.ClientResponse):
 
     if resp.status == status.HTTP_401_UNAUTHORIZED:
         return {
-            "error": "Access denied to Bitcoin Core RPC. Check if username and password is correct",
+            "error": (
+                "Access denied to Bitcoin Core RPC. Check if "
+                "username and password is correct"
+            ),
             "status": status.HTTP_403_FORBIDDEN,
         }
 
     if resp.status == status.HTTP_403_FORBIDDEN:
         return {
-            "error": "Access denied to Bitcoin Core RPC. If this is a remote node, check if 'network.rpcallowip=0.0.0.0/0' is set.",
+            "error": (
+                "Access denied to Bitcoin Core RPC. If this is a remote node, "
+                "check if 'network.rpcallowip=0.0.0.0/0' is set."
+            ),
             "status": status.HTTP_403_FORBIDDEN,
         }
 
@@ -121,7 +126,10 @@ async def _process_response(resp: aiohttp.ClientResponse):
             or "Starting network threads" in m
         ):
             return {
-                "error": "Initializing Bitcoin Core (loading, verifying blocks or starting network threads etc)",
+                "error": (
+                    "Initializing Bitcoin Core (loading, verifying "
+                    "blocks or starting network threads etc)"
+                ),
                 "status": status.HTTP_425_TOO_EARLY,
             }
         if "No such mempool or blockchain transaction." in m:
