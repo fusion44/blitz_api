@@ -37,8 +37,10 @@ class JWTBearer(HTTPBearer):
 
         try:
             payload = decodeJWT(jwtoken)
-        except:
+        except:  # noqa: E722
             payload = None
+
         if payload:
             isTokenValid = True
+
         return isTokenValid

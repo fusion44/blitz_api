@@ -29,7 +29,10 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Bitcoin Core"])
 @router.get(
     "/btc-info",
     name=f"{_PREFIX}.btc-info",
-    description="Get general information about bitcoin core. Combines most important information from `getblockchaininfo` and `getnetworkinfo`",
+    description=(
+        "Get general information about bitcoin core. Combines most important "
+        "information from `getblockchaininfo` and `getnetworkinfo`"
+    ),
     dependencies=[Depends(JWTBearer())],
     response_model=BtcInfo,
 )

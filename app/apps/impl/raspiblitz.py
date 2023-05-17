@@ -1,3 +1,5 @@
+# ruff: noqa: E722
+
 import asyncio
 import json
 import os
@@ -15,7 +17,8 @@ from app.apps.impl.apps_base import AppsBase
 available_app_ids = {
     "btc-rpc-explorer",
     "rtl",
-    # Specter is deactivated for now because it uses its own self signed HTTPS cert that makes trouble in Chrome on last test
+    # Specter is deactivated for now because it uses its own self signed HTTPS cert that
+    # makes trouble in Chrome on last test
     # "specter",
     "btcpayserver",
     "lnbits",
@@ -35,7 +38,7 @@ class RaspiBlitzApps(AppsBase):
         if app_id not in available_app_ids:
             return {
                 "id": f"{app_id}",
-                "error": f"appID not in list",
+                "error": "appID not in list",
             }
         script_call = (
             os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
@@ -148,7 +151,8 @@ class RaspiBlitzApps(AppsBase):
         while True:
             status = "online" if switch else "offline"
             app_list = [
-                # Specter is deactivated for now because it uses its own self signed HTTPS cert that makes trouble in Chrome on last test
+                # Specter is deactivated for now because it uses its own self signed
+                # HTTPS cert that makes trouble in Chrome on last test
                 # also see: app/constants.py where specter is deactivated
                 # {"id": "specter", "name": "Specter Desktop", "status": status},
                 {"id": "sphinx", "name": "Sphinx Chat", "status": status},
@@ -162,7 +166,7 @@ class RaspiBlitzApps(AppsBase):
             switch = not switch
 
     async def install_app_sub(self, app_id: str):
-        if not app_id in available_app_ids:
+        if app_id not in available_app_ids:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail=app_id + "install script does not exist / is not supported",
@@ -179,7 +183,7 @@ class RaspiBlitzApps(AppsBase):
         return jsonable_encoder({"id": app_id})
 
     async def uninstall_app_sub(self, app_id: str, delete_data: bool):
-        if not app_id in available_app_ids:
+        if app_id not in available_app_ids:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="script not exist/supported"
             )
@@ -198,7 +202,8 @@ class RaspiBlitzApps(AppsBase):
         return jsonable_encoder({"id": app_id})
 
     async def run_bonus_script(self, app_id: str, params: str):
-        # to satisfy CodeQL: test again against predefined array and don't use 'user value'
+        # to satisfy CodeQL: test again against predefined array and
+        # don't use 'user value'
         tested_app_id = ""
         for id in available_app_ids:
             if id == app_id:
@@ -221,30 +226,31 @@ class RaspiBlitzApps(AppsBase):
         if stdout:
             logging.debug(f"[stdout]\n{stdout.decode()}")
         else:
-            logging.debug(f"NO [stdout]")
+            logging.debug("NO [stdout]")
         if stderr:
             logging.debug(f"[stderr]\n{stderr.decode()}")
         else:
-            logging.debug(f"NO [stderr]")
+            logging.debug("NO [stderr]")
 
         # create log file
         logFileName = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
         logging.info(f"WRITING LOG FILE: {logFileName}")
         with open(logFileName, "w", encoding="utf-8") as f:
             f.write(f"API triggered script: {cmd}\n")
-            f.write(f"###### STDOUT #######\n")
+            f.write("###### STDOUT #######\n")
             if stdout:
                 f.write(stdout.decode())
-            f.write(f"\n###### STDERR #######\n")
+            f.write("\n###### STDERR #######\n")
             if stderr:
                 f.write(stderr.decode())
 
         # sending final feedback event
-        logging.debug(f"SENDING RESULT EVENT ...")
+        logging.debug("SENDING RESULT EVENT ...")
         if stdout:
             stdoutData = parse_key_value_text(stdout.decode())
             logging.debug(f"PARSED STDOUT DATA: {stdoutData}")
-            # when there is a defined error message (if multiple it wil lbe the last one)
+            # when there is a defined error message (if multiple it will
+            # be the last one)
             if "error" in stdoutData:
                 logging.error(
                     f"FOUND `error=` returned by script: {stdoutData['error']}"
@@ -258,9 +264,10 @@ class RaspiBlitzApps(AppsBase):
                         "details": stdoutData["error"],
                     },
                 )
-            # when there is no result (e.g. result="OK") at the end of install script stdout - consider also script had error
-            elif not "result" in stdoutData:
-                logging.error(f"NO `result=` returned by script:")
+            # when there is no result (e.g. result="OK") at the end of install script
+            # stdout - consider also script had error
+            elif "result" not in stdoutData:
+                logging.error("NO `result=` returned by script:")
                 await broadcast_sse_msg(
                     SSE.INSTALL_APP,
                     {
@@ -277,7 +284,7 @@ class RaspiBlitzApps(AppsBase):
 
                 # in case of script error
                 if updatedAppData["error"] != "":
-                    logging.warning(f"Error Detected ...")
+                    logging.warning("Error Detected ...")
                     logging.warning(f"updatedAppData: {updatedAppData}")
                     await broadcast_sse_msg(
                         SSE.INSTALL_APP,

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import sys
-import time
 from typing import AsyncGenerator, List, Optional
 
 import grpc
@@ -29,7 +28,6 @@ from app.lightning.models import (
     LnInfo,
     LnInitState,
     NewAddressInput,
-    OnchainAddressType,
     OnChainTransaction,
     Payment,
     PaymentRequest,
@@ -55,11 +53,14 @@ async def _make_local_call(cmd: str):
     )
     stdout, stderr = await proc.communicate()
 
-    if stderr != None and stderr != b"":
+    if stderr is not None and stderr != b"":
         err = stderr.decode()
         if "lightning-cli: Connecting to 'lightning-rpc': Permission denied" in err:
             logger.critical(
-                "Unable to connect to lightning-cli: Permission denied. Is the lightning-rpc socket readable for the API user?"
+                (
+                    "Unable to connect to lightning-cli: Permission denied. "
+                    "Is the lightning-rpc socket readable for the API user?"
+                )
             )
 
             raise HTTPException(
@@ -69,19 +70,28 @@ async def _make_local_call(cmd: str):
 
         if "lightning-cli: Moving into" in err and "No such file or directory" in err:
             logger.critical(
-                "Unable to connect to lightning-cli: No such file or directory. Is the lightning-rpc socket available to the API user?"
+                (
+                    "Unable to connect to lightning-cli: No such file or directory. "
+                    "Is the lightning-rpc socket available to the API user?"
+                )
             )
 
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unable to connect to lightning-cli: API Can't access lightning-cli.",
+                detail=(
+                    "Unable to connect to lightning-cli: "
+                    "API Can't access lightning-cli.",
+                ),
             )
 
         logger.critical(f"Unable to connect to lightning-cli: {err}")
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to connect to lightning-cli: Unknown error. Please consult the logs.",
+            detail=(
+                "Unable to connect to lightning-cli: "
+                "Unknown error. Please consult the logs."
+            ),
         )
     return stdout, stderr
 
@@ -108,7 +118,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
         logger.info("Establishing a connection to the CLN daemon ...")
         if self._initialized:
             logger.warning(
-                "Connection already initialized. This function must not be called twice."
+                (
+                    "Connection already initialized. "
+                    "This function must not be called twice."
+                )
             )
             yield InitLnRepoUpdate(state=LnInitState.DONE)
 
@@ -241,7 +254,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
         self, successful_only: bool, index_offset: int, max_tx: int, reversed: bool
     ) -> List[GenericTx]:
         logger.trace(
-            f"list_all_tx(successful_only={successful_only}, index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+            (
+                f"list_all_tx(successful_only={successful_only}, "
+                f"index_offset={index_offset}, max_tx={max_tx}, reversed={reversed})"
+            )
         )
 
         list_invoice_req = ln.ListinvoicesRequest()
@@ -300,12 +316,12 @@ class LnNodeCLNgRPC(LightningNodeBase):
             if reversed:
                 tx.reverse()
 
-            l = len(tx)
-            for invoice in range(l):
+            tx_length = len(tx)
+            for invoice in range(tx_length):
                 tx[invoice].index = invoice
 
             if max_tx == 0:
-                max_tx = l
+                max_tx = tx_length
 
             return tx[index_offset : index_offset + max_tx]
         except grpc.aio._call.AioRpcError as error:
@@ -359,7 +375,9 @@ class LnNodeCLNgRPC(LightningNodeBase):
         if len(res) == 0:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No response from CLN while trying to list account income events",
+                detail=(
+                    "No response from CLN while trying to list account income events"
+                ),
             )
 
         decoded = res[0].decode()
@@ -428,7 +446,11 @@ class LnNodeCLNgRPC(LightningNodeBase):
         reversed: bool,
     ):
         logger.trace(
-            f"list_payments(include_incomplete={include_incomplete}, index_offset{index_offset}, max_payments={max_payments}, reversed={reversed})"
+            (
+                f"list_payments(include_incomplete={include_incomplete}, "
+                f"index_offset{index_offset}, max_payments={max_payments}, "
+                f"reversed={reversed})"
+            )
         )
         try:
             req = ln.ListpaysRequest()
@@ -463,7 +485,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
         is_keysend: bool = False,
     ) -> Invoice:
         logger.trace(
-            f"add_invoice(value_msat={value_msat}, memo={memo}, expiry={expiry}, is_keysend={is_keysend})"
+            (
+                f"add_invoice(value_msat={value_msat}, memo={memo}, "
+                f"expiry={expiry}, is_keysend={is_keysend})"
+            )
         )
 
         if value_msat < 0:
@@ -510,36 +535,34 @@ class LnNodeCLNgRPC(LightningNodeBase):
     @logger.catch(exclude=(HTTPException,))
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
         logger.trace(f"decode_pay_request(pay_req={pay_req})")
-        try:
-            res = await _make_local_call(f"decodepay bolt11={pay_req}")
 
-            if not res:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Unknown CLN error decoding pay request",
-                )
+        res = await _make_local_call(f"decodepay bolt11={pay_req}")
 
-            if len(res) == 0:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="No response from CLN decoding pay request",
-                )
+        if not res:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unknown CLN error decoding pay request",
+            )
 
-            decoded = res[0].decode()
+        if len(res) == 0:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No response from CLN decoding pay request",
+            )
 
-            if "Invalid bolt11: Bad bech32 string" in decoded:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid bolt11: Bad bech32 string",
-                )
+        decoded = res[0].decode()
 
-            return PaymentRequest.from_cln_json(json.loads(decoded))
-        except e:
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str())
+        if "Invalid bolt11: Bad bech32 string" in decoded:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Invalid bolt11: Bad bech32 string",
+            )
+
+        return PaymentRequest.from_cln_json(json.loads(decoded))
 
     @logger.catch(exclude=(HTTPException,))
     async def get_fee_revenue(self) -> FeeRevenue:
-        logger.trace(f"get_fee_revenue()")
+        logger.trace("get_fee_revenue()")
         try:
             # status 1 == "settled"
             req = ln.ListforwardsRequest(status=1)
@@ -575,13 +598,13 @@ class LnNodeCLNgRPC(LightningNodeBase):
         logger.trace(f"send_coins(input={input})")
 
         fee_rate: lnp.Feerate = None
-        if input.sat_per_vbyte != None and input.sat_per_vbyte > 0:
+        if input.sat_per_vbyte is not None and input.sat_per_vbyte > 0:
             fee_rate = lnp.Feerate(perkw=input.sat_per_vbyte)
-        elif input.target_conf != None and input.target_conf == 1:
+        elif input.target_conf is not None and input.target_conf == 1:
             fee_rate = lnp.Feerate(urgent=True)
-        elif input.target_conf != None and input.target_conf >= 2:
+        elif input.target_conf is not None and input.target_conf >= 2:
             fee_rate = lnp.Feerate(normal=True)
-        elif input.target_conf != None and input.target_conf >= 10:
+        elif input.target_conf is not None and input.target_conf >= 10:
             fee_rate = lnp.Feerate(slow=True)
 
         try:
@@ -589,7 +612,9 @@ class LnNodeCLNgRPC(LightningNodeBase):
             if len(funds.outputs) == 0:
                 raise HTTPException(
                     status.HTTP_412_PRECONDITION_FAILED,
-                    detail=f"Could not afford {input.amount}sat. No UTXOs available at all",
+                    detail=(
+                        f"Could not afford {input.amount}sat. No UTXOs available at all"
+                    ),
                 )
 
             utxos = []
@@ -601,7 +626,12 @@ class LnNodeCLNgRPC(LightningNodeBase):
             if not input.send_all and max_amt <= input.amount:
                 raise HTTPException(
                     status.HTTP_412_PRECONDITION_FAILED,
-                    detail=f"Could not afford {input.amount}sat. Not enough funds available",
+                    detail=(
+                        (
+                            f"Could not afford {input.amount}sat. "
+                            "Not enough funds available"
+                        )
+                    ),
                 )
 
             amt = lnp.AmountOrAll(amount=lnp.Amount(msat=input.amount * 1000))
@@ -626,7 +656,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
             if details and details.find("Could not parse destination address") > -1:
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
-                    detail="Could not parse destination address, destination should be a valid address.",
+                    detail=(
+                        "Could not parse destination address, "
+                        " destination should be a valid address."
+                    ),
                 )
             elif (
                 details
@@ -635,7 +668,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
             ):
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Server tried to use a reserved UTXO. Please submit an issue to the BlitzAPI repository.",
+                    detail=(
+                        "Server tried to use a reserved UTXO. "
+                        "Please submit an issue to the BlitzAPI repository."
+                    ),
                 )
             elif details and details.find("insufficient funds available") > -1:
                 raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, detail=details)
@@ -651,10 +687,13 @@ class LnNodeCLNgRPC(LightningNodeBase):
         amount_msat: Optional[int] = None,
     ) -> Payment:
         logger.trace(
-            f"send_payment(pay_req={pay_req}, timeout_seconds={timeout_seconds}, fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
+            (
+                f"send_payment(pay_req={pay_req}, timeout_seconds={timeout_seconds}, "
+                f"fee_limit_msat={fee_limit_msat}, amount_msat={amount_msat})"
+            )
         )
 
-        amt = lnp.Amount(msat=amount_msat) if amount_msat != None else None
+        amt = lnp.Amount(msat=amount_msat) if amount_msat is not None else None
         fee_limit = lnp.Amount(msat=fee_limit_msat)
         req = ln.PayRequest(
             bolt11=pay_req,
@@ -692,7 +731,12 @@ class LnNodeCLNgRPC(LightningNodeBase):
             if "amount_msat parameter unnecessary" in details:
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
-                    detail="amount must not be specified when paying a non-zero amount invoice",
+                    detail=(
+                        (
+                            "amount must not be specified when paying "
+                            "a non-zero amount invoice"
+                        )
+                    ),
                 )
 
             generic_grpc_error_handler(error)
@@ -701,7 +745,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def get_ln_info(self) -> LnInfo:
-        logger.trace(f"get_ln_info()")
+        logger.trace("get_ln_info()")
 
         req = ln.GetinfoRequest()
         try:
@@ -723,7 +767,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def unlock_wallet(self, password: str) -> bool:
-        logger.trace(f"unlock_wallet(password=wedontlogpasswords)")
+        logger.trace("unlock_wallet(password=wedontlogpasswords)")
 
         # Core Lightning doesn't lock wallets,
         # so we don't need to do anything here
@@ -731,7 +775,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_invoices(self) -> AsyncGenerator[Invoice, None]:
-        logger.trace(f"listen_invoices()")
+        logger.trace("listen_invoices()")
         try:
             lastpay_index = 0
             invoices = await self.list_invoices(
@@ -767,7 +811,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def listen_forward_events(self) -> ForwardSuccessEvent:
-        logger.trace(f"listen_forward_events()")
+        logger.trace("listen_forward_events()")
 
         # CLN has no subscription to forwarded events.
         # We must poll instead.
@@ -796,7 +840,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         try:
             req = ln.ConnectRequest(id=uri)
-            res = await self._cln_stub.ConnectPeer(req)
+            await self._cln_stub.ConnectPeer(req)
 
             return True
         except grpc.aio._call.AioRpcError as error:
@@ -860,7 +904,10 @@ class LnNodeCLNgRPC(LightningNodeBase):
         self, local_funding_amount: int, node_URI: str, target_confs: int
     ) -> str:
         logger.trace(
-            f"channel_open(local_funding_amount={local_funding_amount}, node_URI={node_URI}, target_confs={target_confs})"
+            (
+                f"channel_open(local_funding_amount={local_funding_amount}, "
+                f"node_URI={node_URI}, target_confs={target_confs})"
+            )
         )
 
         await self.connect_peer(node_URI)
@@ -901,14 +948,21 @@ class LnNodeCLNgRPC(LightningNodeBase):
             if "Unknown peer" in details:
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="We where able to connect to the peer but CLN can't find it when opening a channel.",
+                    detail=(
+                        "We where able to connect to the peer but CLN "
+                        "can't find it when opening a channel."
+                    ),
                 )
 
             if "Owning subdaemon openingd died" in details:
                 # https://github.com/ElementsProject/lightning/issues/2798#issuecomment-511205719
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
-                    detail="Likely the peer didn't like our channel opening proposal and disconnected from us.",
+                    detail=(
+                        "Likely the peer didn't like our channel "
+                        "opening proposal and disconnected from us. More info:"
+                        "https://github.com/ElementsProject/lightning/issues/2798#issuecomment-511205719"
+                    ),
                 )
 
             if (
@@ -926,7 +980,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
     @logger.catch(exclude=(HTTPException,))
     async def channel_list(self) -> List[Channel]:
-        logger.trace(f"channel_list()")
+        logger.trace("channel_list()")
 
         try:
             res = await self._cln_stub.ListFunds(ln.ListfundsRequest())

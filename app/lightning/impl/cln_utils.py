@@ -11,13 +11,13 @@ def calc_fee_rate_str(sat_per_vbyte, target_conf) -> str:
     # internal estimates: normal is the default.
 
     fee_rate: str = ""
-    if sat_per_vbyte != None and sat_per_vbyte > 0:
+    if sat_per_vbyte is not None and sat_per_vbyte > 0:
         fee_rate = f"{sat_per_vbyte}perkw"
-    elif target_conf != None and target_conf == 1:
+    elif target_conf is not None and target_conf == 1:
         fee_rate = "urgent"
-    elif target_conf != None and target_conf >= 2:
+    elif target_conf is not None and target_conf >= 2:
         fee_rate = "normal"
-    elif target_conf != None and target_conf >= 10:
+    elif target_conf is not None and target_conf >= 10:
         fee_rate = "slow"
 
     return fee_rate

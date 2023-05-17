@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 get_hw_info_json = """
 ```JSON
 {

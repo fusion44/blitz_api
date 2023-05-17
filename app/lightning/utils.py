@@ -1,5 +1,5 @@
 import grpc
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from loguru import logger
 
 from app.lightning.exceptions import NodeNotFoundError
@@ -16,7 +16,7 @@ async def alias_or_empty(func, node_pub: str) -> str:
     logger.debug(f"alias_or_empty({node_pub})")
 
     if not node_pub:
-        logger.debug(f"alias_or_empty('') -> ''")
+        logger.debug("alias_or_empty('') -> ''")
 
         return ""
 

@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime
 from functools import partial
-from typing import Any, AsyncIterable, Callable, Coroutine, Dict, Optional, Union
+from typing import Any, Callable, Coroutine, Dict, Optional, Union
 
 import anyio
 from starlette.background import BackgroundTask
@@ -74,8 +74,8 @@ class ServerSentEvent:
             specifying the reconnection time in milliseconds. If a non-integer
             value is specified, the field is ignored.
         :param str comment: A colon as the first character of a line is essence
-            a comment, and is ignored. Usually used as a ping message to keep connecting.
-            If set, this will be a comment message.
+            a comment, and is ignored. Usually used as a ping message to keep
+            connecting. f set, this will be a comment message.
         """
         self.data = data
         self.event = event
@@ -244,15 +244,16 @@ class EventSourceResponse(Response):
         self._ping_interval = value
 
     async def _ping(self, send: Send) -> None:
-        # Legacy proxy servers are known to, in certain cases, drop HTTP connections after a short timeout.
-        # To protect against such proxy servers, authors can send a custom (ping) event
-        # every 15 seconds or so.
+        # Legacy proxy servers are known to, in certain cases, drop HTTP connections
+        # after a short timeout. To protect against such proxy servers, authors can
+        # send a custom (ping) event every 15 seconds or so.
         # Alternatively one can send periodically a comment line
         # (one starting with a ':' character)
         while self.active:
             await anyio.sleep(self._ping_interval)
             if self.ping_message_factory:
-                assert isinstance(self.ping_message_factory, Callable)  # type: ignore  # https://github.com/python/mypy/issues/6864
+                # https://github.com/python/mypy/issues/6864
+                assert isinstance(self.ping_message_factory, Callable)  # type: ignore
             ping = (
                 ServerSentEvent(datetime.utcnow(), event="ping").encode()
                 if self.ping_message_factory is None

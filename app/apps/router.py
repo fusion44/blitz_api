@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from fastapi.params import Depends
 from loguru import logger
 from pydantic import BaseModel
@@ -44,7 +44,7 @@ async def get_single_status(id):
     dependencies=[Depends(JWTBearer())],
 )
 @logger.catch(exclude=(HTTPException,))
-async def get_status():
+async def get_status_sub():
     return EventSourceResponse(repo.get_app_status_sub())
 
 

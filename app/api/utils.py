@@ -30,7 +30,11 @@ class ProcessResult:
         self.stderr = stderr
 
     def __str__(self) -> str:
-        return f"ProcessResult: \nreturn_code: {self.return_code} \nstdout: {self.stdout} \nstderr: {self.stderr}"
+        return (
+            f"ProcessResult: \nreturn_code: {self.return_code}\n"
+            f"stdout: {self.stdout}\n"
+            f"stderr: {self.stderr}"
+        )
 
 
 def build_sse_event(event: str, json_data: Optional[Dict]):
@@ -72,9 +76,10 @@ async def redis_get(key: str) -> str:
 
 
 # TODO
-# idea is to have a second redis channel called system, that the API subscribes to. If for example
-# the 'state' value gets changed by the _cache.sh script, it should publish this to this channel
-# so the API can forward the change to thru the SSE to the WebUI
+# idea is to have a second redis channel called system, that the API subscribes to.
+# If for example the 'state' value gets changed by the _cache.sh script, it should
+# publish this to this channel so the API can forward the change to thru the SSE to
+# the WebUI
 
 
 class SSE:
@@ -169,11 +174,13 @@ def next_push_id() -> str:
     """Generates a unique random 20 character long string id
 
     * They're based on timestamp so that they sort *after* any existing ids.
-    * They contain 72-bits of random data after the timestamp so that IDs won't collide with other clients' IDs.
-    * They sort *lexicographically* (so the timestamp is converted to characters that will sort properly).
-    * They're monotonically increasing.  Even if you generate more than one in the same timestamp, the
-      latter ones will sort after the former ones.  We do this by using the previous random bits
-      but "incrementing" them by 1 (only in the case of a timestamp collision).
+    * They contain 72-bits of random data after the timestamp so that IDs won't collide
+    * with other clients' IDs. They sort *lexicographically* (so the timestamp is
+    * converted to characters that will sort properly).
+    * They're monotonically increasing.  Even if you generate more than one in the same
+    * timestamp, the latter ones will sort after the former ones.  We do this by using
+    * the previous random bits but "incrementing" them by 1 (only in the case of a
+    * timestamp collision).
     """
     return pid_gen.next_id()
 

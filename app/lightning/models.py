@@ -104,11 +104,17 @@ class FeeRevenue(BaseModel):
     month: int = Query(..., description="Fee revenue earned in the last month")
     year: int = Query(
         None,
-        description="Fee revenue earned in the last year. Might be null if not implemented by backend.",
+        description=(
+            "Fee revenue earned in the last year."
+            "Might be null if not implemented by backend."
+        ),
     )
     total: int = Query(
         None,
-        description="Fee revenue earned in the last year. Might be null if not implemented by backend",
+        description=(
+            "Fee revenue earned in the last year."
+            "Might be null if not implemented by backend"
+        ),
     )
 
     @classmethod
@@ -131,27 +137,43 @@ class FeeRevenue(BaseModel):
 class ForwardSuccessEvent(BaseModel):
     timestamp_ns: int = Query(
         ...,
-        description="The number of nanoseconds elapsed since January 1, 1970 UTC when this circuit was completed.",
+        description=(
+            "The number of nanoseconds elapsed since "
+            "January 1, 1970 UTC when this circuit was completed."
+        ),
     )
     chan_id_in: str = Query(
         ...,
-        description="The incoming channel ID that carried the HTLC that created the circuit.",
+        description=(
+            "The incoming channel ID that carried the HTLC that created the circuit."
+        ),
     )
     chan_id_out: str = Query(
         ...,
-        description="The outgoing channel ID that carried the preimage that completed the circuit.",
+        description=(
+            "The outgoing channel ID that carried the "
+            "preimage that completed the circuit."
+        ),
     )
     amt_in_msat: int = Query(
         ...,
-        description="The total amount (in millisatoshis) of the incoming HTLC that created half the circuit.",
+        description=(
+            "The total amount (in millisatoshis) of the "
+            "incoming HTLC that created half the circuit."
+        ),
     )
     amt_out_msat: str = Query(
         ...,
-        description="The total amount (in millisatoshis) of the outgoing HTLC that created the second half of the circuit.",
+        description=(
+            "The total amount (in millisatoshis) of the "
+            "outgoing HTLC that created the second half of the circuit."
+        ),
     )
     fee_msat: int = Query(
         ...,
-        description="The total fee (in millisatoshis) that this payment circuit carried.",
+        description=(
+            "The total fee (in millisatoshis) that this payment circuit carried."
+        ),
     )
 
     @classmethod
@@ -305,16 +327,18 @@ class InvoiceHTLC(BaseModel):
 
     amp: Amp = Query(
         None,
-        description="Details relevant to AMP HTLCs, only populated if this is an AMP HTLC.",
+        description=(
+            "Details relevant to AMP HTLCs, only populated if this is an AMP HTLC."
+        ),
     )
 
     @classmethod
     def from_lnd_grpc(cls, h) -> "InvoiceHTLC":
         def _crecords(recs):
-            l = []
+            record_list = []
             for r in recs:
-                l.append(CustomRecordsEntry.from_lnd_grpc(r))
-            return l
+                record_list.append(CustomRecordsEntry.from_lnd_grpc(r))
+            return record_list
 
         return cls(
             chan_id=h.chan_id,
@@ -344,7 +368,10 @@ class HopHint(BaseModel):
 
     fee_proportional_millionths: int = Query(
         ...,
-        description="The fee rate of the channel for sending one satoshi across it denominated in msat",
+        description=(
+            "The fee rate of the channel for sending one"
+            "satoshi across it denominated in msat"
+        ),
     )
 
     cltv_expiry_delta: int = Query(
@@ -375,7 +402,10 @@ class HopHint(BaseModel):
 class RouteHint(BaseModel):
     hop_hints: List[HopHint] = Query(
         [],
-        description="A list of hop hints that when chained together can assist in reaching a specific destination.",
+        description=(
+            "A list of hop hints that when chained together can assist in "
+            "reaching a specific destination."
+        ),
     )
 
     @classmethod
@@ -404,7 +434,9 @@ class Channel(BaseModel):
     def from_lnd_grpc(cls, c) -> "Channel":
         return cls(
             active=c.active,
-            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
+            # use channel point as id because thats needed
+            # for closing the channel with lnd
+            channel_id=c.channel_point,
             peer_publickey=c.remote_pubkey,
             peer_alias="n/a",
             balance_local=c.local_balance,
@@ -416,7 +448,9 @@ class Channel(BaseModel):
     def from_lnd_grpc_pending(cls, c) -> "Channel":
         return cls(
             active=False,
-            channel_id=c.channel_point,  # use channel point as id because thats needed for closing the channel with lnd
+            # use channel point as id because thats needed
+            # for closing the channel with lnd
+            channel_id=c.channel_point,
             peer_publickey=c.remote_node_pub,
             peer_alias="n/a",
             balance_local=-1,
@@ -429,7 +463,9 @@ class Channel(BaseModel):
         # TODO: get alias and balance of the channel
         return cls(
             active=c.connected,
-            channel_id=c.short_channel_id,  # use channel point as id because thats needed for closing the channel with lnd
+            # use channel point as id because thats needed
+            #  for closing the channel with lnd
+            channel_id=c.short_channel_id,
             peer_publickey=c.peer_id.hex(),
             peer_alias=peer_alias,
             balance_local=c.our_amount_msat.msat,
@@ -455,13 +491,20 @@ class Channel(BaseModel):
 class Invoice(BaseModel):
     memo: str = Query(
         None,
-        description="""Optional memo to attach along with the invoice. Used for record keeping purposes for the invoice's creator,
-        and will also be set in the description field of the encoded payment request if the description_hash field is not being used.""",
+        description=(
+            "Optional memo to attach along with the invoice. "
+            "Used for record keeping purposes for the invoice's creator, "
+            "and will also be set in the description field of the encoded payment "
+            "request if the description_hash field is not being used."
+        ),
     )
 
     r_preimage: str = Query(
         None,
-        description="""The hex-encoded preimage(32 byte) which will allow settling an incoming HTLC payable to this preimage.""",
+        description=(
+            "The hex-encoded preimage(32 byte) which will allow settling "
+            "an incoming HTLC payable to this preimage."
+        ),
     )
 
     r_hash: str = Query(None, description="The hash of the preimage.")
@@ -479,25 +522,29 @@ class Invoice(BaseModel):
 
     settle_date: int = Query(
         None,
-        description="When this invoice was settled. Not available with pending invoices.",
+        description=(
+            "When this invoice was settled. " "Not available with pending invoices."
+        ),
     )
 
     expiry_date: int = Query(None, description="The time at which this invoice expires")
 
     payment_request: str = Query(
         None,
-        description="""A bare-bones invoice for a payment within the
-    Lightning Network. With the details of the invoice, the sender has all the data necessary to
-    send a payment to the recipient.
-    """,
+        description=(
+            "A bare-bones invoice for a payment within the "
+            "Lightning Network. With the details of the invoice, the sender "
+            "has all the data necessary to send a payment to the recipient."
+        ),
     )
 
     description_hash: str = Query(
         None,
-        description="""
-    Hash(SHA-256) of a description of the payment. Used if the description of payment(memo) is too
-    long to naturally fit within the description field of an encoded payment request.
-    """,
+        description=(
+            "Hash(SHA-256) of a description of the payment. Used if the description of "
+            "payment(memo) is too long to naturally fit within the description field "
+            "of an encoded payment request."
+        ),
     )
 
     expiry: int = Query(
@@ -509,65 +556,76 @@ class Invoice(BaseModel):
 
     cltv_expiry: int = Query(
         None,
-        description="Delta to use for the time-lock of the CLTV extended to the final hop.",
+        description=(
+            "Delta to use for the time-lock of the CLTV extended to the final hop."
+        ),
     )
 
     route_hints: List[RouteHint] = Query(
         None,
-        description="""
-    Route hints that can each be individually used to assist in reaching the invoice's destination.
-    """,
+        description=(
+            "Route hints that can each be individually used to assist "
+            "in reaching the invoice's destination."
+        ),
     )
 
     private: bool = Query(
         None,
-        description="Whether this invoice should include routing hints for private channels.",
+        description=(
+            "Whether this invoice should include routing hints for private channels."
+        ),
     )
 
     add_index: str = Query(
         ...,
-        description="""
-The index of this invoice. Each newly created invoice will increment this index making it monotonically increasing.
-CLN and LND handle ids differently. LND will generate an auto incremented integer id, while CLN will use a user supplied string id.
-To unify both, we auto generate an id for CLN and use the add_index for LND.
-
-For `LND` this will be an `integer` in string form. This is auto generated by LND.
-
-For `CLN` this will be a `string`. If the invoice was generated by BlitzAPI, this will be a
-[Firebase-like PushID](https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68).
-If generated by some other method, it'll be the string supplied by the user at the time of creation of the invoice.
-""",
+        description=(
+            "The index of this invoice. Each newly created invoice will increment this "
+            "index making it monotonically increasing. CLN and LND handle ids "
+            "differently. LND will generate an auto incremented integer id, while CLN "
+            "will use a user supplied string id. To unify both, we auto generate an id "
+            "for CLN and use the add_index for LND."
+            ""
+            "For `LND` this will be an `integer` in string form. This is auto "
+            "generated by LND. "
+            ""
+            "For `CLN` this will be a `string`. If the invoice was generated by "
+            "BlitzAPI, this will be a [Firebase-like PushID]"
+            "(https://firebase.blog/posts/2015/02/the-2120-ways-to-ensure-unique_68). "
+            "If generated by some other method, it'll be the string supplied by the "
+            "user at the time of creation of the invoice."
+        ),
     )
 
     settle_index: int = Query(
         None,
-        description="""
-        The "settle" index of this invoice. Each newly settled invoice will  increment this index making it monotonically increasing.
-    """,
+        description=(
+            "The `settle` index of this invoice. Each newly settled invoice will "
+            "increment this index making it monotonically increasing. "
+        ),
     )
 
     amt_paid_sat: int = Query(
         None,
-        description="""
-    The amount that was accepted for this invoice, in satoshis. This
-    will ONLY be set if this invoice has been settled. We provide
-    this field as if the invoice was created with a zero value,
-    then we need to record what amount was ultimately accepted.
-    Additionally, it's possible that the sender paid MORE that
-    was specified in the original invoice. So we'll record that here as well.
-    """,
+        description=(
+            "The amount that was accepted for this invoice, in satoshis. This "
+            "will ONLY be set if this invoice has been settled. We provide "
+            "this field as if the invoice was created with a zero value, "
+            "then we need to record what amount was ultimately accepted. "
+            "Additionally, it's possible that the sender paid MORE that "
+            "was specified in the original invoice. So we'll record that here as well."
+        ),
     )
 
     amt_paid_msat: int = Query(
         None,
-        description="""
-    The amount that was accepted for this invoice, in millisatoshis.
-    This will ONLY be set if this invoice has been settled. We
-    provide this field as if the invoice was created with a zero value,
-    then we need to record what amount was ultimately accepted. Additionally,
-    it's possible that the sender paid MORE that was specified in the
-    original invoice. So we'll record that here as well.
-    """,
+        description=(
+            "The amount that was accepted for this invoice, in millisatoshis. "
+            "This will ONLY be set if this invoice has been settled. We "
+            "provide this field as if the invoice was created with a zero value, "
+            "then we need to record what amount was ultimately accepted. Additionally, "
+            "it's possible that the sender paid MORE that was specified in the "
+            "original invoice. So we'll record that here as well."
+        ),
     )
 
     state: InvoiceState = Query(..., description="The state the invoice is in.")
@@ -582,13 +640,19 @@ If generated by some other method, it'll be the string supplied by the user at t
 
     is_keysend: bool = Query(
         None,
-        description="[LND only] Indicates if this invoice was a spontaneous payment that arrived via keysend[EXPERIMENTAL].",
+        description=(
+            "[LND only] Indicates if this invoice was a spontaneous payment "
+            "that arrived via keysend[EXPERIMENTAL]."
+        ),
     )
 
     payment_addr: str = Query(
         None,
-        description=""" The payment address of this invoice. This value will be used in MPP payments,
-    and also for newer invoices that always require the MPP payload for added end-to-end security.""",
+        description=(
+            "The payment address of this invoice. This value will be used "
+            "in MPP payments, and also for newer invoices that always require the MPP "
+            "payload for added end-to-end security."
+        ),
     )
 
     is_amp: bool = Query(
@@ -598,22 +662,13 @@ If generated by some other method, it'll be the string supplied by the user at t
     @classmethod
     def from_lnd_grpc(cls, i) -> "Invoice":
         def _route_hints(hints):
-            l = []
-            for h in hints:
-                l.append(RouteHint.from_lnd_grpc((h)))
-            return l
+            return [RouteHint.from_lnd_grpc(h) for h in hints]
 
         def _htlcs(htlcs):
-            l = []
-            for h in htlcs:
-                l.append(InvoiceHTLC.from_lnd_grpc(h))
-            return l
+            return [InvoiceHTLC.from_lnd_grpc(h) for h in htlcs]
 
         def _features(features):
-            l = []
-            for k in features:
-                l.append(FeaturesEntry.from_lnd_grpc(k, features[k]))
-            return l
+            return [FeaturesEntry.from_lnd_grpc(k, features[k]) for k in features]
 
         return cls(
             memo=i.memo,
@@ -788,7 +843,8 @@ class PaymentFailureReason(str, Enum):
 
 
 class ChannelUpdate(BaseModel):
-    # The signature that validates the announced data and proves the ownership of node id.
+    # The signature that validates the announced data and proves the ownership
+    # of node id.
     signature: str
 
     # The target chain that this channel was opened within. This value should be the
@@ -805,25 +861,29 @@ class ChannelUpdate(BaseModel):
     timestamp: int
 
     # The bitfield that describes whether optional fields are present in this update.
-    # Currently, the least-significant bit must be set to 1 if the optional field MaxHtlc is present.
+    # Currently, the least-significant bit must be set to 1 if the optional
+    # field MaxHtlc is present.
     message_flags: int
 
-    # The bitfield that describes additional meta-data concerning how the update is to be interpreted.
-    # Currently, the least-significant bit must be set to 0 if the creating node corresponds to the
-    # first node in the previously sent channel announcement and 1 otherwise. If the second bit is set,
-    # then the channel is set to be disabled.
+    # The bitfield that describes additional meta-data concerning how the update is to
+    # be interpreted. Currently, the least-significant bit must be set to 0 if the
+    # creating node corresponds to the first node in the previously sent channel
+    # announcement and 1 otherwise. If the second bit is set, then the channel is set
+    # to be disabled.
     channel_flags: int
 
-    # The minimum number of blocks this node requires to be added to the expiry of HTLCs.
-    # This is a security parameter determined by the node operator. This value represents the
-    # required gap between the time locks of the incoming and outgoing HTLC's set to this node.
+    # The minimum number of blocks this node requires to be added to the expiry
+    # of HTLCs. This is a security parameter determined by the node operator.
+    # This value represents the required gap between the time locks of the
+    # incoming and outgoing HTLC's set to this node.
     time_lock_delta: int
 
     # The minimum HTLC value which will be accepted.
     htlc_minimum_msat: int
 
     # The base fee that must be used for incoming HTLC's to this particular channel.
-    # This value will be tacked onto the required for a payment independent of the size of the payment.
+    # This value will be tacked onto the required for a payment independent of the
+    # size of the payment.
     base_fee: int
 
     # The fee rate that will be charged per millionth of a satoshi.
@@ -832,10 +892,11 @@ class ChannelUpdate(BaseModel):
     # The maximum HTLC value which will be accepted.
     htlc_maximum_msat: int
 
-    # The set of data that was appended to this message, some of which we may not actually know how to
-    # iterate or parse. By holding onto this data, we ensure that we're able to properly validate the
-    # set of signatures that cover these new fields, and ensure we're able to make upgrades to the
-    # network in a forwards compatible manner.
+    # The set of data that was appended to this message, some of which we may not
+    # actually know how to iterate or parse. By holding onto this data, we ensure that
+    # we're able to properly validate the set of signatures that cover these new fields,
+    # and ensure we're able to make upgrades to the network in a forwards compatible
+    # manner.
     extra_opaque_data: str
 
     @classmethod
@@ -873,9 +934,9 @@ class Hop(BaseModel):
     # the payment can be executed without relying on a copy of the channel graph.
     pub_key: str
 
-    # If set to true, then this hop will be encoded using the new variable length TLV format.
-    # Note that if any custom tlv_records below are specified, then this field MUST be set
-    # to true for them to be encoded properly.
+    # If set to true, then this hop will be encoded using the new variable length TLV
+    # format. Note that if any custom tlv_records below are specified, then this field
+    # MUST be set to true for them to be encoded properly.
     tlv_payload: bool
 
     @classmethod
@@ -933,16 +994,10 @@ class Route(BaseModel):
     @classmethod
     def from_lnd_grpc(cls, r):
         def _crecords(recs):
-            l = []
-            for r in recs:
-                l.append(CustomRecordsEntry(r))
-            return l
+            return [CustomRecordsEntry.from_lnd_grpc(r) for r in recs]
 
         def _get_hops(hops) -> List[Hop]:
-            l = []
-            for h in hops:
-                l.append(Hop.from_lnd_grpc(h))
-            return l
+            return [Hop.from_lnd_grpc(h) for h in hops]
 
         mpp = None
         if hasattr(r, "mpp_record"):
@@ -1114,10 +1169,7 @@ class Payment(BaseModel):
     @classmethod
     def from_lnd_grpc(cls, p) -> "Payment":
         def _get_attempts(attempts):
-            l = []
-            for a in attempts:
-                l.append(HTLCAttempt.from_lnd_grpc(a))
-            return l
+            return [HTLCAttempt.from_lnd_grpc(a) for a in attempts]
 
         return cls(
             payment_hash=p.payment_hash,
@@ -1167,11 +1219,11 @@ class Payment(BaseModel):
 class NewAddressInput(BaseModel):
     type: OnchainAddressType = Query(
         ...,
-        description="""
-Address-types has to be one of:
-* p2wkh:  Pay to witness key hash (bech32)
-* np2wkh: Pay to nested witness key hash
-    """,
+        description=(
+            "Address-types has to be one of: "
+            "* p2wkh:  Pay to witness key hash (bech32) "
+            "* np2wkh: Pay to nested witness key hash"
+        ),
     )
 
 
@@ -1182,35 +1234,52 @@ class UnlockWalletInput(BaseModel):
 class SendCoinsInput(BaseModel):
     address: str = Query(
         ...,
-        description="The base58 or bech32 encoded bitcoin address to send coins to on-chain",
+        description=(
+            "The base58 or bech32 encoded bitcoin address to send coins to on-chain"
+        ),
     )
     target_conf: int = Query(
         None,
-        description="The number of blocks that the transaction *should* confirm in, will be used for fee estimation",
+        description=(
+            "The number of blocks that the transaction *should* confirm in, "
+            "will be used for fee estimation"
+        ),
     )
     sat_per_vbyte: int = Query(
         None,
-        description="A manual fee expressed in sat/vbyte that should be used when crafting the transaction (default: 0)",
+        description=(
+            "A manual fee expressed in sat/vbyte that should be used when "
+            "crafting the transaction (default: 0)"
+        ),
     )
     min_confs: int = Query(
         1,
-        description="The minimum number of confirmations each one of your outputs used for the transaction must satisfy",
+        description=(
+            "The minimum number of confirmations each one of your outputs "
+            "used for the transaction must satisfy"
+        ),
     )
     label: str = Query(
         "", description="A label for the transaction. Ignored by CLN backend."
     )
     send_all: bool = Query(
         False,
-        description="Send all available on-chain funds from the wallet. Will be executed `amount` is **0**",
+        description=(
+            "Send all available on-chain funds from the wallet. Will be "
+            "executed `amount` is **0**"
+        ),
     )
     amount: conint(ge=0) = Query(
         0,
-        description="The number of bitcoin denominated in satoshis to send. Must not be set when `send_all` is true.",
+        description=(
+            "The number of bitcoin denominated in satoshis to send. Must not "
+            "be set when `send_all` is true."
+        ),
     )
 
     @validator("amount", pre=True, always=True)
     def check_amount_or_send_all(cls, amount, values):
-        if amount == None:
+        if amount is None:
             amount = 0
 
         send_all = values.get("send_all") if "send_all" in values else False
@@ -1221,7 +1290,10 @@ class SendCoinsInput(BaseModel):
         if amount == 0 and not send_all:
             # neither amount nor send_all is set
             raise ValueError(
-                "Either amount or send_all must be set. Please review the documentation."
+                (
+                    "Either amount or send_all must be set. "
+                    "Please review the documentation."
+                )
             )
 
         if amount > 0 and not send_all:
@@ -1231,7 +1303,10 @@ class SendCoinsInput(BaseModel):
         if amount > 0 and send_all:
             # amount is set and send_all is true
             raise ValueError(
-                "Amount and send_all must not be set at the same time. Please review the documentation."
+                (
+                    "Amount and send_all must not be set at the same time. "
+                    "Please review the documentation."
+                )
             )
 
         if amount == 0 and send_all:
@@ -1239,14 +1314,17 @@ class SendCoinsInput(BaseModel):
             return amount
 
         # normally this should never be reached
-        raise ValueError(f"Unknown input.")
+        raise ValueError("Unknown input.")
 
 
 class SendCoinsResponse(BaseModel):
     txid: str = Query(..., description="The transaction ID for this onchain payment")
     address: str = Query(
         ...,
-        description="The base58 or bech32 encoded bitcoin address where the onchain funds where sent to",
+        description=(
+            "The base58 or bech32 encoded bitcoin address where the onchain "
+            "funds where sent to"
+        ),
     )
     amount: conint(ge=0) = Query(
         ...,
@@ -1254,7 +1332,9 @@ class SendCoinsResponse(BaseModel):
     )
     fees: conint(ge=0) = Query(
         None,
-        description="The number of bitcoin denominated in satoshis which where paid as fees",
+        description=(
+            "The number of bitcoin denominated in satoshis which where paid as fees"
+        ),
     )
     label: str = Query(
         "", description="The label used for the transaction. Ignored by CLN backend."
@@ -1266,7 +1346,7 @@ class SendCoinsResponse(BaseModel):
 
     @classmethod
     def from_lnd_grpc(cls, r, input: SendCoinsInput):
-        amount = input.amount if input.send_all == False else r.amount
+        amount = input.amount if input.send_all is False else r.amount
         return cls(
             txid=r.tx_hash,
             address=input.address,
@@ -1340,27 +1420,42 @@ class LnInfo(BaseModel):
 
     block_height: int = Query(
         ...,
-        description="The node's current view of the height of the best block. Only available with LND.",
+        description=(
+            "The node's current view of the height of the best block. "
+            "Only available with LND."
+        ),
     )
 
     block_hash: str = Query(
         "",
-        description="The node's current view of the hash of the best block. Only available with LND.",
+        description=(
+            "The node's current view of the hash of the best block. "
+            "Only available with LND."
+        ),
     )
 
     best_header_timestamp: int = Query(
         None,
-        description="Timestamp of the block best known to the wallet. Only available with LND.",
+        description=(
+            "Timestamp of the block best known to the wallet. "
+            "Only available with LND."
+        ),
     )
 
     synced_to_chain: bool = Query(
         None,
-        description="Whether the wallet's view is synced to the main chain. Only available with LND.",
+        description=(
+            "Whether the wallet's view is synced to the main chain. "
+            "Only available with LND."
+        ),
     )
 
     synced_to_graph: bool = Query(
         None,
-        description="Whether we consider ourselves synced with the public channel graph. Only available with LND.",
+        description=(
+            "Whether we consider ourselves synced with the public channel "
+            "graph. Only available with LND."
+        ),
     )
 
     chains: List[Chain] = Query(
@@ -1371,7 +1466,10 @@ class LnInfo(BaseModel):
 
     features: List[FeaturesEntry] = Query(
         [],
-        description="Features that our node has advertised in our init message node announcements and invoices. Not yet implemented with CLN",
+        description=(
+            "Features that our node has advertised in our init message node "
+            "announcements and invoices. Not yet implemented with CLN"
+        ),
     )
 
     def __eq__(self, other):
@@ -1510,7 +1608,9 @@ class LightningInfoLite(BaseModel):
     )
     synced_to_graph: bool = Query(
         None,
-        description="Whether we consider ourselves synced with the public channel graph.",
+        description=(
+            "Whether we consider ourselves synced with " "the public channel graph."
+        ),
     )
 
     @classmethod
@@ -1533,14 +1633,14 @@ class LightningInfoLite(BaseModel):
 class WalletBalance(BaseModel):
     onchain_confirmed_balance: int = Query(
         ...,
-        description="Confirmed onchain balance (more than three confirmations) in sat",
+        description="Confirmed onchain balance (more than 3 confirmations) in sat",
     )
     onchain_total_balance: int = Query(
         ..., description="Total combined onchain balance in sat"
     )
     onchain_unconfirmed_balance: int = Query(
         ...,
-        description="Unconfirmed onchain balance (less than three confirmations) in sat",
+        description="Unconfirmed onchain balance (less than 3 confirmations) in sat",
     )
     channel_local_balance: int = Query(
         ..., description="Sum of channels local balances in msat"
@@ -1630,10 +1730,6 @@ class PaymentRequest(BaseModel):
 
         features = []
         # TODO: Map CLN's feature advertisements to LND's
-        # if "features" in r:
-        #     features = [
-        #         FeaturesEntry.from_cln_json(k, r["features"][k]) for k in r["features"]
-        #     ]
 
         return cls(
             currency="" if "currency" not in r else r["currency"],
@@ -1666,10 +1762,6 @@ class PaymentRequest(BaseModel):
 
         features = []
         # TODO: Map CLN's feature advertisements to LND's
-        # if "features" in r:
-        #     features = [
-        #         FeaturesEntry.from_cln_json(k, r["features"][k]) for k in r["features"]
-        #     ]
 
         dhash = ""
         if hasattr(r, "payment_hash"):
@@ -1770,11 +1862,17 @@ class GenericTx(BaseModel):
     id: str = Query(..., description=docs.tx_id_desc)
     category: TxCategory = Query(
         ...,
-        description="Whether this is an onchain (**onchain**) or lightning (**ln**) transaction.",
+        description=(
+            "Whether this is an onchain (**onchain**) or lightning (**ln**) "
+            "transaction."
+        ),
     )
     type: TxType = Query(
         ...,
-        description="Whether this is an outgoing (**send**) transaction or an incoming (**receive**) transaction.",
+        description=(
+            "Whether this is an outgoing (**send**) transaction or an "
+            "incoming(**receive**) transaction."
+        ),
     )
     amount: int = Query(..., description=docs.tx_amount_desc)
     time_stamp: int = Query(..., description=docs.tx_time_stamp_desc)
@@ -1782,11 +1880,16 @@ class GenericTx(BaseModel):
     status: TxStatus = Query(..., description=docs.tx_status_desc)
     block_height: int = Query(
         None,
-        description="Block height, if included in a block. Only applicable for category **onchain**.",
+        description=(
+            "Block height, if included in a block. Only applicable for "
+            "category **onchain**."
+        ),
     )
     num_confs: Union[int, None] = Query(
         ge=0,
-        description="Number of confirmations. Only applicable for category **onchain**.",
+        description=(
+            "Number of confirmations. Only applicable for category **onchain**."
+        ),
     )
     total_fees: int = Query(None, description="Total fees paid for this transaction")
 
@@ -1824,7 +1927,9 @@ class GenericTx(BaseModel):
         if confs < 0:
             confs = 0
             logging.warning(
-                f"Got negative confirmation count of for {tx.tx_hash}\nCalc:{current_block_height} - {tx.block_height} = {confs}"
+                f"""Got negative confirmation count of for {tx.tx_hash}\n
+                Calc:{current_block_height} - {tx.block_height} = {confs}
+                """
             )
 
         s = TxStatus.SUCCEEDED if confs > 0 else TxStatus.IN_FLIGHT

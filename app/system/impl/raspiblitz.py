@@ -145,7 +145,7 @@ class RaspiBlitzSystem(SystemBase):
         data_lnd_zeus_connection_string = ""
         if lightning == "lnd":
             key_value_text = await call_script(
-                "/home/admin/config.scripts/bonus.lndconnect.sh zeus-android tor key-value"
+                "/home/admin/config.scripts/bonus.lndconnect.sh zeus-android tor key-value"  # noqa: E501
             )
             key_value = parse_key_value_text(key_value_text)
             if "lndconnect" in key_value.keys():
@@ -208,7 +208,7 @@ class RaspiBlitzSystem(SystemBase):
     async def change_password(self, type: str, old_password: str, new_password: str):
         # check just allowed type values
         type = type.lower()
-        if not type in ["a", "b", "c"]:
+        if type not in ["a", "b", "c"]:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail=f"unknown password type: {type}"
             )
@@ -225,7 +225,7 @@ class RaspiBlitzSystem(SystemBase):
 
         # first check if old password is correct
         result = await call_script(
-            f'/home/admin/config.scripts/blitz.passwords.sh check {type} "{old_password}"'
+            f'/home/admin/config.scripts/blitz.passwords.sh check {type} "{old_password}"'  # noqa: E501
         )
         data = parse_key_value_text(result)
         if not data["correct"] == "1":
@@ -239,7 +239,7 @@ class RaspiBlitzSystem(SystemBase):
         )
         if type == "c":
             # will set password c of both lnd & core lightning if installed/activated
-            script_call = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'
+            script_call = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'  # noqa: E501
         result = await call_sudo_script(script_call)
         data = parse_key_value_text(result)
 
@@ -298,8 +298,8 @@ class RaspiBlitzSystem(SystemBase):
         loads = (await redis_get("system_cpu_load")).split(",")
         iloads = []
         total = 0
-        for l in loads:
-            value = float(l)
+        for load in loads:
+            value = float(load)
             total += value
             iloads.append(value)
         info["cpu_overall_percent"] = round(total / len(loads), 2)
