@@ -3,7 +3,9 @@ from enum import Enum
 from typing import List, Optional, Union
 
 from deepdiff import DeepDiff
+from fastapi import HTTPException
 from fastapi.param_functions import Query
+from loguru import logger
 from pydantic import BaseModel, validator
 from pydantic.types import conint
 
@@ -1318,10 +1320,13 @@ class LnInfo(BaseModel):
         ..., description="The SHA1 commit hash that the daemon is compiled with."
     )
 
-    identity_pubkey: str = Query("The identity pubkey of the current node.")
+    identity_pubkey: str = Query(
+        ..., description="The identity pubkey of the current node."
+    )
 
     identity_uri: str = Query(
-        "The complete URI (pubkey@physicaladdress:port) the current node."
+        ...,
+        description="The complete URI (pubkey@physicaladdress:port) the current node.",
     )
 
     alias: str = Query(..., description="The alias of the node.")
@@ -1431,14 +1436,25 @@ class LnInfo(BaseModel):
         #     _features.append(FeaturesEntry.from_cln_json(i["our_features"][k], k))
 
         _uris = []
-        for b in i["binding"]:
-            _uris.append(f"{b['address']}:{b['port']}")
+        pubkey = i["id"]
+        if "binding" in i:
+            for b in i["binding"]:
+                _uris.append(f"{pubkey}@{b['address']}:{b['port']}")
+
+        if "address" in i:
+            for b in i["address"]:
+                _uris.append(f"{pubkey}@{b['address']}:{b['port']}")
+
+        uri = ""
+        if len(_uris) > 0:
+            uri = _uris[0]
 
         return LnInfo(
             implementation=implementation,
             version=i["version"],
             commit_hash=i["version"].split("-")[-1],
-            identity_pubkey=i["id"],
+            identity_pubkey=pubkey,
+            identity_uri=uri,
             alias=i["alias"],
             color=i["color"],
             num_pending_channels=i["num_pending_channels"],
@@ -1514,6 +1530,7 @@ class LightningInfoLite(BaseModel):
     )
 
     @classmethod
+    @logger.catch(exclude=(HTTPException,))
     def from_lninfo(cls, info: LnInfo):
         return cls(
             implementation=info.implementation,
