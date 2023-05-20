@@ -267,7 +267,7 @@ class RaspiBlitzApps(AppsBase):
                         "id": app_id,
                         "mode": mode,
                         "result": "fail",
-                        "details": "install script did not ran thru",
+                        "details": "install script threw an error",
                     },
                 )
             # nothing above consider success
@@ -304,6 +304,7 @@ class RaspiBlitzApps(AppsBase):
                                 "details": stdoutData["result"],
                             },
                         )
+                        await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
                     else:
                         logging.error(f"FAIL - {app_id} was not installed")
                         logging.debug(f"updatedAppData: {updatedAppData}")
@@ -317,8 +318,17 @@ class RaspiBlitzApps(AppsBase):
                                 "details": "install was not effective",
                             },
                         )
+                        await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
 
                 elif mode == "off":
+                    await broadcast_sse_msg(
+                        SSE.INSTALL_APP,
+                        {
+                            "id": app_id,
+                            "mode": mode,
+                            "result": "win"
+                        },
+                    )
                     await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
 
                     if not updatedAppData["installed"]:
