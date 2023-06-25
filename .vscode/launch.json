@@ -6,9 +6,26 @@
       "type": "python",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["app.main:app"],
+      "args": [
+        "app.main:app"
+      ],
       "jinja": true,
       "justMyCode": false
+    },
+    {
+      "name": "Attach",
+      "type": "python",
+      "request": "attach",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "."
+        }
+      ],
+      "connect": {
+        "host": "192.168.1.49",
+        "port": 5678
+      }
     }
   ]
 }

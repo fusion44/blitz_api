@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 from decouple import config as dconfig
 from fastapi import FastAPI, Request
@@ -46,6 +47,24 @@ from app.system.service import get_hardware_info, register_hardware_info_gathere
 
 configure_logger()
 
+
+remote_debugging = dconfig("remote_debugging", cast=bool, default=False)
+if remote_debugging:
+    logger.warning(
+        (
+            "Remote debugging is enabled, this can be a security issue. "
+            "Only enable on development machines."
+        )
+    )
+    remote_debugging_port = dconfig("remote_debugging_port", cast=int, default=5678)
+
+    try:
+        import debugpy
+    except ImportError:
+        logger.error("Remote debugging is enabled, but debugpy is not installed.")
+        sys.exit(1)
+
+    debugpy.listen(("0.0.0.0", remote_debugging_port))
 
 node_type = dconfig("ln_node").lower()
 if node_type == "":
