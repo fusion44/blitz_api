@@ -51,7 +51,10 @@ configure_logger()
 remote_debugging = dconfig("remote_debugging", cast=bool, default=False)
 if remote_debugging:
     logger.warning(
-        "Remote debugging is enabled, this can be a security issue. Only enable on development machines."
+        (
+            "Remote debugging is enabled, this can be a security issue. "
+            "Only enable on development machines."
+        )
     )
     remote_debugging_port = dconfig("remote_debugging_port", cast=int, default=5678)
 
