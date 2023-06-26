@@ -23,6 +23,6 @@ repos:
       - id: isort
         args: ["--profile", "black", "--filter-files"]
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: 'v0.0.267'
+    rev: 'v0.0.275'
     hooks:
       - id: ruff
