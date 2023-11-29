@@ -8,7 +8,7 @@
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forSystems = systems: f:
         nixpkgs.lib.genAttrs systems
-        (system: f system (import nixpkgs { inherit system; overlays = [ poetry2nix.overlay self.overlays.default ]; }));
+        (system: f system (import nixpkgs { inherit system; overlay = [ poetry2nix.overlay self.overlays.default ]; }));
       forAllSystems = forSystems supportedSystems;
       projectName = "blitz_api";
     in
@@ -22,6 +22,7 @@
             pre-commit
             black
             isort
+            ruff
           ];
         };
       });
