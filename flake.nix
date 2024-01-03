@@ -14,16 +14,32 @@
     in
     {
       devShells = forAllSystems (system: pkgs: {
-        default = pkgs.mkShell {
+       default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            python39Packages.pytest
-            python39Packages.coverage
+            stdenv.cc.cc.lib
+            python311Packages.pytest
+            python311Packages.coverage
+            python311Packages.venvShellHook
             poetry
+            poetryPlugins.poetry-plugin-export
             pre-commit
             black
             isort
             ruff
+            ruff-lsp
+            pyright
           ];
+          venvDir = "./.venv";
+          src = null;
+          postVenv = ''
+            unset SOURCE_DATE_EPOCH
+          '';
+          postShellHook = ''
+            unset SOURCE_DATE_EPOCH
+            unset LD_PRELOAD
+
+            PYTHONPATH=$PWD/$venvDir/${pkgs.python311.sitePackages}:$PYTHONPATH
+          '';
         };
       });
       overlays = {
@@ -35,7 +51,7 @@
         default = self.packages.${system}.${projectName};
         ${projectName} = pkgs.poetry2nix.mkPoetryApplication {
           projectDir = ./.;
-          python = pkgs.python39;
+          python = pkgs.python311;
         };
       });
     };
