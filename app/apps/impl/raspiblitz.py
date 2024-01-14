@@ -25,6 +25,7 @@ available_app_ids = {
     "mempool",
     "thunderhub",
     "jam",
+    "electrs",
 }
 
 
@@ -97,6 +98,7 @@ class RaspiBlitzApps(AppsBase):
                         "isIndexed": data["isIndexed"],
                         "indexInfo": data["indexInfo"],
                     }
+
                 return {
                     "id": app_id,
                     "version": version,
@@ -124,6 +126,16 @@ class RaspiBlitzApps(AppsBase):
                 "id": f"{app_id}",
                 "error": f"script result processing error: {script_call}",
             }
+
+    async def get_app_status_advanced(self, app_id):
+        if app_id not in available_app_ids:
+            return {
+                "id": f"{app_id}",
+                "error": "appID not in list",
+            }
+
+        if app_id == "electrs":
+            return _do_electrs_status_advanced()
 
     async def get_app_status(self):
         appStatusList: List = []
@@ -346,3 +358,39 @@ class RaspiBlitzApps(AppsBase):
                     logging.debug(f"updatedAppData: {updatedAppData}")
                     logging.debug(f"params: {params}")
                     return
+
+
+async def _do_electrs_status_advanced():
+    app_id = "electrs"
+    script_call = (
+        os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
+        + " status"
+    )
+
+    try:
+        result = await call_sudo_script(script_call)
+    except:
+        # script had error or was not able to deliver all requested data fields
+        logging.warning(f"error on calling: {script_call}")
+        return {
+            "id": f"{app_id}",
+            "error": f"script not working for api: {script_call}",
+        }
+
+    try:
+        data = parse_key_value_text(result)
+    except:
+        logging.warning(f"error on parsing: {result}")
+        return {
+            "id": f"{app_id}",
+            "error": f"script result parsing error: {script_call}",
+        }
+
+    if "initialSynced" not in data:
+        logging.warning(f"error on calling: {script_call}")
+        return {
+            "id": app_id,
+            "error": f"script not working for api: {script_call}",
+        }
+
+    return {"initialSynced": data["initialSynced"]}

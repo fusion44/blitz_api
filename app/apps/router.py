@@ -37,6 +37,20 @@ async def get_single_status(id):
 
 
 @router.get(
+    "/status_advanced/{id}",
+    name=f"{_PREFIX}/status_advanced",
+    summary="""Get the advanced status of a single app by id.
+Some apps might give status information that is computationally to
+expensive to include in the normal status endpoint.
+    """,
+    dependencies=[Depends(JWTBearer())],
+)
+@logger.catch(exclude=(HTTPException,))
+async def get_single_status_advanced(id):
+    return await repo.get_app_status_single_advanced(id)
+
+
+@router.get(
     "/status-sub",
     name=f"{_PREFIX}/status-sub",
     summary="Subscribe to status changes of currently installed apps.",
