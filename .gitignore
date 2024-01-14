@@ -6,6 +6,8 @@ htmlcov
 scripts/sync_to_blitz.personal.sh
 docker/.env
 .venv
+pyrightconfig.json
 
 # Nix
 result
+

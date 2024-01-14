@@ -31,6 +31,11 @@
           ];
           venvDir = "./.venv";
           src = null;
+          shellHook = ''
+            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc
+            ]}
+          '';
           postVenv = ''
             unset SOURCE_DATE_EPOCH
           '';
