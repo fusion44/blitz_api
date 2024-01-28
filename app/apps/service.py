@@ -25,7 +25,7 @@ async def get_app_status():
 
 
 async def get_app_status_advanced(app_id: str):
-    return await apps.get_app_status_single_advanced(app_id)
+    return await apps.get_app_status_advanced(app_id)
 
 
 async def get_app_status_sub():

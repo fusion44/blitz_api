@@ -129,13 +129,15 @@ class RaspiBlitzApps(AppsBase):
 
     async def get_app_status_advanced(self, app_id):
         if app_id not in available_app_ids:
-            return {
-                "id": f"{app_id}",
-                "error": "appID not in list",
-            }
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"App id invalid. Available app ids: {available_app_ids}",
+            )
 
         if app_id == "electrs":
-            return _do_electrs_status_advanced()
+            return await _do_electrs_status_advanced()
+
+        return {}
 
     async def get_app_status(self):
         appStatusList: List = []
@@ -393,4 +395,4 @@ async def _do_electrs_status_advanced():
             "error": f"script not working for api: {script_call}",
         }
 
-    return {"initialSynced": data["initialSynced"]}
+    return {"initialSyncDone": data["initialSynced"] == 1}
