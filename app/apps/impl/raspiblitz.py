@@ -395,4 +395,4 @@ async def _do_electrs_status_advanced():
             "error": f"script not working for api: {script_call}",
         }
 
-    return {"initialSyncDone": data["initialSynced"] == 1}
+    return {"initialSyncDone": data["initialSynced"] == '1'}
