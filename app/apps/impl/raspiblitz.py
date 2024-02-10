@@ -366,7 +366,7 @@ async def _do_electrs_status_advanced():
     app_id = "electrs"
     script_call = (
         os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
-        + " status"
+        + " status showAddress"
     )
 
     try:
@@ -388,6 +388,18 @@ async def _do_electrs_status_advanced():
             "error": f"script result parsing error: {script_call}",
         }
 
+    if data["serviceInstalled"] == "0":
+        return {
+            "id": app_id,
+            "error": "Service not installed.",
+        }
+
+    if data["serviceRunning"] == "0":
+        return {
+            "id": app_id,
+            "error": "Service installed, but not running.",
+        }
+
     if "initialSynced" not in data:
         logging.warning(f"error on calling: {script_call}")
         return {
@@ -395,4 +407,12 @@ async def _do_electrs_status_advanced():
             "error": f"script not working for api: {script_call}",
         }
 
-    return {"initialSyncDone": data["initialSynced"] == "1"}
+    return {
+        "version": data["version"],
+        "localIP": data["localIP"],
+        "publicIP": data["publicIP"],
+        "portTCP": data["portTCP"],
+        "portSSL": data["portSSL"],
+        "TORaddress": data["TORaddress"],
+        "initialSyncDone": data["initialSynced"] == "1",
+    }
