@@ -102,9 +102,9 @@ class RawTransaction(BaseModel):
     @classmethod
     def from_rpc(cls, tx):
         return cls(
-            in_active_chain=tx["in_active_chain"]
-            if "in_active_chain" in tx.keys()
-            else None,
+            in_active_chain=(
+                tx["in_active_chain"] if "in_active_chain" in tx.keys() else None
+            ),
             txid=tx["txid"] if "txid" in tx.keys() else "",
             hash=tx["hash"] if "hash" in tx.keys() else "",
             size=tx["size"] if "size" in tx.keys() else 0,
@@ -283,9 +283,9 @@ class Bip9Data(BaseModel):
             timeout=r["timeout"],
             since=r["since"],
             min_activation_height=r["min_activation_height"],
-            statistics=Bip9Statistics.from_rpc(r["statistics"])
-            if "statistics" in r
-            else None,
+            statistics=(
+                Bip9Statistics.from_rpc(r["statistics"]) if "statistics" in r else None
+            ),
             height=r["height"] if "height" in r else None,
             active=r["active"] if "active" in r else None,
         )
@@ -396,12 +396,12 @@ class BlockchainInfo(BaseModel):
             size_on_disk=r["size_on_disk"],
             pruned=r["pruned"],
             pruned_height=None if "pruneheight" not in r else r["pruneheight"],
-            automatic_pruning=None
-            if "automatic_pruning" not in r
-            else r["automatic_pruning"],
-            prune_target_size=None
-            if "prune_target_size" not in r
-            else r["prune_target_size"],
+            automatic_pruning=(
+                None if "automatic_pruning" not in r else r["automatic_pruning"]
+            ),
+            prune_target_size=(
+                None if "prune_target_size" not in r else r["prune_target_size"]
+            ),
             warnings=r["warnings"],
             softforks=softforks,
         )

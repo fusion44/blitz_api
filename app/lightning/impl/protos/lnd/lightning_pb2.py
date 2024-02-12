@@ -32,15 +32,15 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _SENDREQUEST.fields_by_name["outgoing_chan_id"]._options = None
     _SENDREQUEST.fields_by_name["outgoing_chan_id"]._serialized_options = b"0\001"
     _SENDTOROUTEREQUEST.fields_by_name["payment_hash_string"]._options = None
-    _SENDTOROUTEREQUEST.fields_by_name[
-        "payment_hash_string"
-    ]._serialized_options = b"\030\001"
+    _SENDTOROUTEREQUEST.fields_by_name["payment_hash_string"]._serialized_options = (
+        b"\030\001"
+    )
     _ESTIMATEFEEREQUEST_ADDRTOAMOUNTENTRY._options = None
     _ESTIMATEFEEREQUEST_ADDRTOAMOUNTENTRY._serialized_options = b"8\001"
     _ESTIMATEFEERESPONSE.fields_by_name["feerate_sat_per_byte"]._options = None
-    _ESTIMATEFEERESPONSE.fields_by_name[
-        "feerate_sat_per_byte"
-    ]._serialized_options = b"\030\001"
+    _ESTIMATEFEERESPONSE.fields_by_name["feerate_sat_per_byte"]._serialized_options = (
+        b"\030\001"
+    )
     _SENDMANYREQUEST_ADDRTOAMOUNTENTRY._options = None
     _SENDMANYREQUEST_ADDRTOAMOUNTENTRY._serialized_options = b"8\001"
     _SENDMANYREQUEST.fields_by_name["sat_per_byte"]._options = None
@@ -70,13 +70,13 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _GETINFORESPONSE.fields_by_name["testnet"]._options = None
     _GETINFORESPONSE.fields_by_name["testnet"]._serialized_options = b"\030\001"
     _CLOSECHANNELREQUEST.fields_by_name["sat_per_byte"]._options = None
-    _CLOSECHANNELREQUEST.fields_by_name[
-        "sat_per_byte"
-    ]._serialized_options = b"\030\001"
+    _CLOSECHANNELREQUEST.fields_by_name["sat_per_byte"]._serialized_options = (
+        b"\030\001"
+    )
     _OPENCHANNELREQUEST.fields_by_name["node_pubkey_string"]._options = None
-    _OPENCHANNELREQUEST.fields_by_name[
-        "node_pubkey_string"
-    ]._serialized_options = b"\030\001"
+    _OPENCHANNELREQUEST.fields_by_name["node_pubkey_string"]._serialized_options = (
+        b"\030\001"
+    )
     _OPENCHANNELREQUEST.fields_by_name["sat_per_byte"]._options = None
     _OPENCHANNELREQUEST.fields_by_name["sat_per_byte"]._serialized_options = b"\030\001"
     _PENDINGCHANNELSRESPONSE.fields_by_name["pending_closing_channels"]._options = None
@@ -94,13 +94,13 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _QUERYROUTESREQUEST_DESTCUSTOMRECORDSENTRY._options = None
     _QUERYROUTESREQUEST_DESTCUSTOMRECORDSENTRY._serialized_options = b"8\001"
     _QUERYROUTESREQUEST.fields_by_name["ignored_edges"]._options = None
-    _QUERYROUTESREQUEST.fields_by_name[
-        "ignored_edges"
-    ]._serialized_options = b"\030\001"
+    _QUERYROUTESREQUEST.fields_by_name["ignored_edges"]._serialized_options = (
+        b"\030\001"
+    )
     _QUERYROUTESREQUEST.fields_by_name["outgoing_chan_id"]._options = None
-    _QUERYROUTESREQUEST.fields_by_name[
-        "outgoing_chan_id"
-    ]._serialized_options = b"0\001"
+    _QUERYROUTESREQUEST.fields_by_name["outgoing_chan_id"]._serialized_options = (
+        b"0\001"
+    )
     _EDGELOCATOR.fields_by_name["channel_id"]._options = None
     _EDGELOCATOR.fields_by_name["channel_id"]._serialized_options = b"0\001"
     _HOP_CUSTOMRECORDSENTRY._options = None

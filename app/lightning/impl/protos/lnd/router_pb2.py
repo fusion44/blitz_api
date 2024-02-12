@@ -28,9 +28,9 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _SENDPAYMENTREQUEST_DESTCUSTOMRECORDSENTRY._options = None
     _SENDPAYMENTREQUEST_DESTCUSTOMRECORDSENTRY._serialized_options = b"8\001"
     _SENDPAYMENTREQUEST.fields_by_name["outgoing_chan_id"]._options = None
-    _SENDPAYMENTREQUEST.fields_by_name[
-        "outgoing_chan_id"
-    ]._serialized_options = b"\030\0010\001"
+    _SENDPAYMENTREQUEST.fields_by_name["outgoing_chan_id"]._serialized_options = (
+        b"\030\0010\001"
+    )
     _BUILDROUTEREQUEST.fields_by_name["outgoing_chan_id"]._options = None
     _BUILDROUTEREQUEST.fields_by_name["outgoing_chan_id"]._serialized_options = b"0\001"
     _FORWARDHTLCINTERCEPTREQUEST_CUSTOMRECORDSENTRY._options = None

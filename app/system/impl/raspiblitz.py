@@ -350,9 +350,9 @@ class RaspiBlitzSystem(SystemBase):
                     "partition_total_bytes": total,
                     "partition_used_bytes": total - free,
                     "partition_free_bytes": free,
-                    "partition_percent": 0
-                    if total == 0
-                    else round((100 / total) * free, 2),
+                    "partition_percent": (
+                        0 if total == 0 else round((100 / total) * free, 2)
+                    ),
                 }
             ]
 
