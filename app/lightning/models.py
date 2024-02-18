@@ -716,12 +716,16 @@ class Invoice(BaseModel):
             settle_date=i["paid_at"] if "paid_at" in i else None,
             payment_request=i["bolt11"],
             settle_index=i["pay_index"] if "pay_index" in i else None,
-            amt_paid_sat=parse_cln_msat(i["amount_received_msat"]) / 1000
-            if "amount_received_msat" in i
-            else None,
-            amt_paid_msat=parse_cln_msat(i["amount_received_msat"])
-            if "amount_received_msat" in i
-            else None,
+            amt_paid_sat=(
+                parse_cln_msat(i["amount_received_msat"]) / 1000
+                if "amount_received_msat" in i
+                else None
+            ),
+            amt_paid_msat=(
+                parse_cln_msat(i["amount_received_msat"])
+                if "amount_received_msat" in i
+                else None
+            ),
             state=InvoiceState.from_cln_json(i["status"]),
         )
 
@@ -1756,9 +1760,9 @@ class PaymentRequest(BaseModel):
             timestamp=r["created_at"],
             expiry=0 if "expiry" not in r else r["expiry"],
             description="" if "description" not in r else r["description"],
-            description_hash=""
-            if "description_hash" not in r
-            else r["description_hash"],
+            description_hash=(
+                "" if "description_hash" not in r else r["description_hash"]
+            ),
             fallback_addr="" if "fallbacks" not in r else r["fallbacks"][0],
             cltv_expiry=r["min_final_cltv_expiry"],
             route_hints=routes,
@@ -2099,8 +2103,10 @@ class GenericTx(BaseModel):
             time_stamp=payment.created_at,
             amount=-payment.amount_msat.msat if amount is None else -amount,
             status=status,
-            total_fees=payment.amount_sent_msat.msat - payment.amount_msat.msat
-            if fees is None
-            else fees,
+            total_fees=(
+                payment.amount_sent_msat.msat - payment.amount_msat.msat
+                if fees is None
+                else fees
+            ),
             comment=comment,
         )
