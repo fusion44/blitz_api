@@ -106,3 +106,19 @@ class ConnectionInfo(BaseModel):
     )
     cl_rest_macaroon: str = Query("", description="core lightning rest macaroon")
     cl_rest_onion: str = Query("", description="core lightning rest onion address")
+
+
+class SubSystemHealthInfo(BaseModel):
+    name: str = Query(..., description="Name of the subsystem")
+    health: bool = Query(..., description="Whether this system is healthy or not")
+    message: str = Query(
+        "", description="Optional message describing the systems health"
+    )
+
+
+class SystemHealthInfo(BaseModel):
+    healthy: bool = Query(..., description="")
+    message: str = Query("", description="")
+    subsystems: list[SubSystemHealthInfo] = Query(
+        [], description="Health information of running subsystems"
+    )

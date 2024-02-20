@@ -10,6 +10,7 @@ from app.system.models import (
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
+    SystemHealthInfo,
     SystemInfo,
 )
 
@@ -40,6 +41,15 @@ async def change_password(type: Optional[str], old_password: str, new_password: 
 async def get_system_info() -> SystemInfo:
     try:
         return await system.get_system_info()
+    except HTTPException:
+        raise
+    except NotImplementedError as r:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+
+
+async def system_health(verbose: bool) -> SystemHealthInfo:
+    try:
+        return await system.get_system_health(verbose)
     except HTTPException:
         raise
     except NotImplementedError as r:

@@ -13,7 +13,13 @@ from app.system.docs import (
     get_debug_logs_raw_summary,
     get_hw_info_json,
 )
-from app.system.models import ConnectionInfo, LoginInput, RawDebugLogData, SystemInfo
+from app.system.models import (
+    ConnectionInfo,
+    LoginInput,
+    RawDebugLogData,
+    SystemInfo,
+    SystemHealthInfo,
+)
 from app.system.service import (
     HW_INFO_YIELD_TIME,
     change_password,
@@ -24,6 +30,7 @@ from app.system.service import (
     login,
     shutdown,
     subscribe_hardware_info,
+    system_health,
 )
 
 _PREFIX = "system"
@@ -152,6 +159,21 @@ async def get_debug_logs_raw_route() -> RawDebugLogData:
 )
 async def hw_info_sub(request: Request):
     return EventSourceResponse(subscribe_hardware_info(request))
+
+
+@router.get(
+    "/health",
+    name=f"{_PREFIX}.health",
+    summary="Returns info about the systems health",
+    dependencies=[Depends(JWTBearer())],
+)
+async def get_system_health(
+    verbose: bool = Query(
+        False,
+        description="Returns info about each subsytem running on this node if true. Currently not implemented.",
+    ),
+) -> SystemHealthInfo:
+    return await system_health(verbose)
 
 
 @router.post(
