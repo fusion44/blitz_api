@@ -1,63 +1,35 @@
 {
-  inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    poetry2nix.url = "github:nix-community/poetry2nix";
-  };
-  outputs = { self, nixpkgs, poetry2nix }@inputs:
-    let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
-      forSystems = systems: f:
-        nixpkgs.lib.genAttrs systems
-        (system: f system (import nixpkgs { inherit system; overlay = [ poetry2nix.overlay self.overlays.default ]; }));
-      forAllSystems = forSystems supportedSystems;
-      projectName = "blitz_api";
-    in
-    {
-      devShells = forAllSystems (system: pkgs: {
-       default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            stdenv.cc.cc.lib
-            python311Packages.pytest
-            python311Packages.coverage
-            python311Packages.venvShellHook
-            poetry
-            poetryPlugins.poetry-plugin-export
-            pre-commit
-            black
-            isort
-            ruff
-            ruff-lsp
-            pyright
-          ];
-          venvDir = "./.venv";
-          src = null;
-          shellHook = ''
-            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc
-            ]}
-          '';
-          postVenv = ''
-            unset SOURCE_DATE_EPOCH
-          '';
-          postShellHook = ''
-            unset SOURCE_DATE_EPOCH
-            unset LD_PRELOAD
+  description = "Application packaged using poetry2nix";
 
-            PYTHONPATH=$PWD/$venvDir/${pkgs.python311.sitePackages}:$PYTHONPATH
-          '';
-        };
-      });
-      overlays = {
-        default = final: prev: {
-          ${projectName} = self.packages.${final.hostPlatform.system}.${projectName};
-        };
-      };
-      packages = forAllSystems (system: pkgs: {
-        default = self.packages.${system}.${projectName};
-        ${projectName} = pkgs.poetry2nix.mkPoetryApplication {
-          projectDir = ./.;
-          python = pkgs.python311;
-        };
-      });
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    poetry2nix = {
+      url = "github:fusion44/poetry2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
+  };
+
+  outputs = { self, nixpkgs, flake-utils, poetry2nix }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        # see https://github.com/nix-community/poetry2nix/tree/master#api for more functions and examples.
+        pkgs = nixpkgs.legacyPackages.${system};
+        inherit (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
+      in
+      {
+        packages = {
+          myapp = mkPoetryApplication { projectDir = self; };
+          default = self.packages.${system}.myapp;
+        };
+
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [ self.packages.${system}.myapp ];
+          packages = with pkgs; [
+            poetry
+            pyright
+            sshpass
+          ];
+        };
+      });
 }
