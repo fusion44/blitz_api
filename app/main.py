@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from contextlib import asynccontextmanager
 
 from decouple import config as dconfig
 from fastapi import FastAPI, Request
@@ -36,7 +37,6 @@ from app.bitcoind.service import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
-from app.external.fastapi_versioning import VersionedFastAPI
 from app.lightning.models import LnInitState
 from app.lightning.router import router as ln_router
 from app.lightning.service import initialize_ln_repo, register_lightning_listener
@@ -76,24 +76,37 @@ class AppSettings(RedisSettings):
     api_name: str = str(__name__)
 
 
-unversioned_app = FastAPI()
 config = get_config()
 
-unversioned_app.include_router(app_router)
-unversioned_app.include_router(bitcoin_router)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # setup
+    await redis_plugin.init_app(app, config=config)
+    await redis_plugin.init()
+    register_cookie_updater()
+    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
+    loop = asyncio.get_event_loop()
+    loop.create_task(_initialize_bitcoin())
+    loop.create_task(_initialize_lightning())
+    await register_all_handlers()
+    handle_local_cookie()
+
+    yield
+
+    # cleanup
+    await redis_plugin.terminate()
+    remove_local_cookie()
+
+
+app = FastAPI()
+app.include_router(app_router)
+app.include_router(bitcoin_router)
 if node_type != "none":
-    unversioned_app.include_router(ln_router)
-unversioned_app.include_router(system_router)
+    app.include_router(ln_router)
+app.include_router(system_router)
 if setup_router is not None:
-    unversioned_app.include_router(setup_router)
-
-
-app = VersionedFastAPI(
-    unversioned_app,
-    version_format="{major}",
-    prefix_format="/v{major}",
-    enable_latest=True,
-)
+    app.include_router(setup_router)
 
 origins = [
     "http://localhost",
@@ -109,29 +122,14 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def on_startup():
-    await redis_plugin.init_app(app, config=config)
-    await redis_plugin.init()
-    register_cookie_updater()
-    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
-
-    loop = asyncio.get_event_loop()
-    loop.create_task(_initialize_bitcoin())
-    loop.create_task(_initialize_lightning())
-
-    await register_all_handlers()
-    handle_local_cookie()
-
-
 api_startup_status = ApiStartupStatus()
 
 
 async def _set_startup_status(
-    bitcoin: StartupState = None,
-    bitcoin_msg: str = None,
-    lightning: StartupState = None,
-    lightning_msg: str = None,
+    bitcoin: None | StartupState = None,
+    bitcoin_msg: None | str = None,
+    lightning: None | StartupState = None,
+    lightning_msg: None | str = None,
 ):
     # We must know when both bitcoin and lightning are initialized
     # to trigger the warmup method for new SSE clients
@@ -146,7 +144,7 @@ async def _set_startup_status(
 
     loop = asyncio.get_event_loop()
     loop.create_task(warmup_new_connections())
-    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.dict())
+    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
 
 
 @logger.catch
@@ -220,16 +218,11 @@ async def _initialize_lightning():
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
 
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    await redis_plugin.terminate()
-    remove_local_cookie()
-
-
 @app.get("/")
 def index(req: Request):
+
     return RedirectResponse(
-        req.url_for("latest", path="docs"),
+        "/api/docs",
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
@@ -270,7 +263,7 @@ async def stream(request: Request):
     new_connections.append(id)
 
     await _send_sse_event(
-        id, SSE.SYSTEM_STARTUP_INFO, jsonable_encoder(api_startup_status.dict())
+        id, SSE.SYSTEM_STARTUP_INFO, jsonable_encoder(api_startup_status.model_dump())
     )
 
     loop = asyncio.get_event_loop()
