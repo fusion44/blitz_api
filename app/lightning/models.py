@@ -1,4 +1,5 @@
 import logging
+import time
 from enum import Enum
 from typing import List, Optional, Union
 
@@ -491,7 +492,7 @@ class Channel(BaseModel):
 
 
 class Invoice(BaseModel):
-    memo: str = Query(
+    memo: str | None = Query(
         None,
         description=(
             "Optional memo to attach along with the invoice. "
@@ -501,7 +502,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    r_preimage: str = Query(
+    r_preimage: str | None = Query(
         None,
         description=(
             "The hex-encoded preimage(32 byte) which will allow settling "
@@ -509,7 +510,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    r_hash: str = Query(None, description="The hash of the preimage.")
+    r_hash: str | None = Query(None, description="The hash of the preimage.")
 
     value_msat: int = Query(
         ..., description="The value of this invoice in milli satoshis."
@@ -517,21 +518,23 @@ class Invoice(BaseModel):
 
     settled: bool = Query(False, description="Whether this invoice has been fulfilled")
 
-    creation_date: int = Query(
+    creation_date: int | None = Query(
         None,
         description="When this invoice was created. Not available with CLN.",
     )
 
-    settle_date: int = Query(
+    settle_date: int | None = Query(
         None,
         description=(
             "When this invoice was settled. " "Not available with pending invoices."
         ),
     )
 
-    expiry_date: int = Query(None, description="The time at which this invoice expires")
+    expiry_date: int | None = Query(
+        None, description="The time at which this invoice expires"
+    )
 
-    payment_request: str = Query(
+    payment_request: str | None = Query(
         None,
         description=(
             "A bare-bones invoice for a payment within the "
@@ -540,7 +543,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    description_hash: str = Query(
+    description_hash: str | None = Query(
         None,
         description=(
             "Hash(SHA-256) of a description of the payment. Used if the description of "
@@ -549,21 +552,21 @@ class Invoice(BaseModel):
         ),
     )
 
-    expiry: int = Query(
+    expiry: int | None = Query(
         None,
         description="Payment request expiry time in seconds. Default is 3600 (1 hour).",
     )
 
-    fallback_addr: str = Query(None, description="Fallback on-chain address.")
+    fallback_addr: str | None = Query(None, description="Fallback on-chain address.")
 
-    cltv_expiry: int = Query(
+    cltv_expiry: int | None = Query(
         None,
         description=(
             "Delta to use for the time-lock of the CLTV extended to the final hop."
         ),
     )
 
-    route_hints: List[RouteHint] = Query(
+    route_hints: List[RouteHint] | None = Query(
         None,
         description=(
             "Route hints that can each be individually used to assist "
@@ -571,7 +574,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    private: bool = Query(
+    private: bool | None = Query(
         None,
         description=(
             "Whether this invoice should include routing hints for private channels."
@@ -598,7 +601,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    settle_index: int = Query(
+    settle_index: int | None = Query(
         None,
         description=(
             "The `settle` index of this invoice. Each newly settled invoice will "
@@ -606,7 +609,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    amt_paid_sat: int = Query(
+    amt_paid_sat: int | None = Query(
         None,
         description=(
             "The amount that was accepted for this invoice, in satoshis. This "
@@ -618,7 +621,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    amt_paid_msat: int = Query(
+    amt_paid_msat: int | None = Query(
         None,
         description=(
             "The amount that was accepted for this invoice, in millisatoshis. "
@@ -632,15 +635,15 @@ class Invoice(BaseModel):
 
     state: InvoiceState = Query(..., description="The state the invoice is in.")
 
-    htlcs: List[InvoiceHTLC] = Query(
+    htlcs: List[InvoiceHTLC] | None = Query(
         None, description="List of HTLCs paying to this invoice[EXPERIMENTAL]."
     )
 
-    features: List[FeaturesEntry] = Query(
+    features: List[FeaturesEntry] | None = Query(
         None, description="List of features advertised on the invoice."
     )
 
-    is_keysend: bool = Query(
+    is_keysend: bool | None = Query(
         None,
         description=(
             "[LND only] Indicates if this invoice was a spontaneous payment "
@@ -648,7 +651,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    payment_addr: str = Query(
+    payment_addr: str | None = Query(
         None,
         description=(
             "The payment address of this invoice. This value will be used "
@@ -657,7 +660,7 @@ class Invoice(BaseModel):
         ),
     )
 
-    is_amp: bool = Query(
+    is_amp: bool | None = Query(
         None, description="Signals whether or not this is an AMP invoice."
     )
 
@@ -676,7 +679,6 @@ class Invoice(BaseModel):
             memo=i.memo,
             r_preimage=i.r_preimage.hex(),
             r_hash=i.r_hash.hex(),
-            value=i.value,
             value_msat=i.value_msat,
             settled=i.settled,
             creation_date=i.creation_date,
@@ -689,7 +691,7 @@ class Invoice(BaseModel):
             cltv_expiry=i.cltv_expiry,
             route_hints=_route_hints(i.route_hints),
             private=i.private,
-            add_index=i.add_index,
+            add_index=str(i.add_index),
             settle_index=i.settle_index,
             amt_paid_sat=i.amt_paid_sat,
             amt_paid_msat=i.amt_paid_msat,
@@ -705,11 +707,10 @@ class Invoice(BaseModel):
     def from_cln_json(cls, i) -> "Invoice":
         amt = parse_cln_msat(i["amount_msat"])
         return cls(
-            add_index=i["label"],
+            add_index=str(i["label"]),
             memo=i["description"],
             r_preimage=i["payment_preimage"] if "payment_preimage" in i else None,
             r_hash=i["payment_hash"],
-            value=amt / 1000,
             value_msat=amt,
             settled=True if i["status"] == "paid" else False,
             expiry_date=i["expires_at"],
@@ -717,7 +718,7 @@ class Invoice(BaseModel):
             payment_request=i["bolt11"],
             settle_index=i["pay_index"] if "pay_index" in i else None,
             amt_paid_sat=(
-                parse_cln_msat(i["amount_received_msat"]) / 1000
+                round(parse_cln_msat(i["amount_received_msat"]) / 1000)
                 if "amount_received_msat" in i
                 else None
             ),
@@ -737,7 +738,6 @@ class Invoice(BaseModel):
             memo=i.description,
             r_preimage=i.payment_preimage.hex(),
             r_hash=i.payment_hash.hex(),
-            value=i.amount_msat.msat / 1000,
             value_msat=i.amount_msat.msat,
             settled=True if state == InvoiceState.SETTLED else False,
             expiry_date=i.expires_at,
@@ -1208,6 +1208,7 @@ class Payment(BaseModel):
     def from_cln_jrpc(cls, p) -> "Payment":
         value = parse_cln_msat(p["amount_msat"])
         total_sent = parse_cln_msat(p["amount_sent_msat"])
+        ts = time.localtime(p["created_at"])
 
         return cls(
             payment_hash=p["payment_hash"],
@@ -1216,7 +1217,7 @@ class Payment(BaseModel):
             payment_request=p["bolt11"] if "bolt11" in p else "",
             status=PaymentStatus.from_cln_jrpc(p["status"]),
             fee_msat=total_sent - value,
-            creation_time_ns=p["created_at"],
+            creation_time_ns=ts.tm_sec,
             label=p["label"] if "label" in p else "",
             failure_reason=PaymentFailureReason.from_cln_jrpc(p),
         )
@@ -1623,10 +1624,10 @@ class LightningInfoLite(BaseModel):
     block_height: int = Query(
         ..., description="The node's current view of the height of the best block"
     )
-    synced_to_chain: bool = Query(
+    synced_to_chain: bool | None = Query(
         None, description="Whether the wallet's view is synced to the main chain"
     )
-    synced_to_graph: bool = Query(
+    synced_to_graph: bool | None = Query(
         None,
         description=(
             "Whether we consider ourselves synced with " "the public channel graph."
@@ -1906,7 +1907,8 @@ class GenericTx(BaseModel):
             "category **onchain**."
         ),
     )
-    num_confs: Union[int, None] = Query(
+    num_confs: int | None = Query(
+        None,
         ge=0,
         description=(
             "Number of confirmations. Only applicable for category **onchain**."
@@ -1931,7 +1933,7 @@ class GenericTx(BaseModel):
             amount = i.value_msat
 
         return cls(
-            id=i.payment_request,
+            id=i.payment_request or "",
             category=TxCategory.LIGHTNING,
             type=TxType.RECEIVE,
             amount=amount,

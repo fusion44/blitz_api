@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
     remove_local_cookie()
 
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.include_router(app_router)
 app.include_router(bitcoin_router)
 if node_type != "none":

@@ -479,7 +479,7 @@ This will show more debug information.
                 expiry=expiry,
                 r_hash=response.r_hash.hex(),
                 payment_request=response.payment_request,
-                add_index=response.add_index,
+                add_index=str(response.add_index),
                 payment_addr=response.payment_addr.hex(),
                 state=InvoiceState.OPEN,
                 is_keysend=is_keysend,

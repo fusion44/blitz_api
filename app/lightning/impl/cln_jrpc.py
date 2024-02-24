@@ -48,10 +48,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
     lastpay_index = 0
     _current_id: int = _WAIT_ANY_INVOICE_ID + 1
     _futures: dict[int, asyncio.Future] = {}
-    _socket_path: str = None
-    _reader: asyncio.StreamReader = None
-    _writer: asyncio.StreamWriter = None
-    _loop: asyncio.AbstractEventLoop = None
+    _socket_path: str | None = None
+    _reader: asyncio.StreamReader | None = None
+    _writer: asyncio.StreamWriter | None = None
+    _loop: asyncio.AbstractEventLoop | None = None
     _initialized: bool = False
     _invoice_queue = asyncio.Queue()
 
@@ -78,7 +78,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
         yield InitLnRepoUpdate(state=LnInitState.BOOTSTRAPPING)
 
         try:
-            self._socket_path = decouple.config("cln_jrpc_path")
+            self._socket_path = str(decouple.config("cln_jrpc_path"))
+            print(decouple.config("cln_jrpc_path"))
         except decouple.UndefinedValueError as e:
             logger.debug(e)
             logger.error(
@@ -102,6 +103,13 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         while True:
             try:
+                if not isinstance(self._socket_path, str):
+                    logger.trace(
+                        f"self._socket_path is None, retrying {type(self._socket_path)}"
+                    )
+                    await asyncio.sleep(10)
+                    continue
+
                 self._reader, self._writer = await asyncio.open_unix_connection(
                     path=self._socket_path,
                     limit=_SOCKET_BUFFER_SIZE_LIMIT,
@@ -145,7 +153,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         chan_local = chan_remote = chan_pending_local = chan_pending_remote = 0
 
         for o in res["outputs"]:
-            sat = parse_cln_msat(o["amount_msat"]) / 1000
+            sat = int(parse_cln_msat(o["amount_msat"]) / 1000)
 
             if o["status"] == "unconfirmed":
                 onchain_unconfirmed += sat
@@ -227,7 +235,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         tx = []
         for invoice in res[0]:
             i = GenericTx.from_invoice(invoice)
-            if successful_only and i["status"] == "succeeded":
+            if successful_only and i.status == "succeeded":
                 tx.append(i)
                 continue
             tx.append(i)
@@ -240,7 +248,11 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
             tx.append(t)
 
-        for pay in res[2]:  # type: Payment
+        for pay in res[2]:
+            if pay is not Payment:
+                logger.error("Payment is not a payment class.")
+                continue
+
             comment = ""
 
             if pay.payment_request is not None and len(pay.payment_request) > 0:
@@ -249,7 +261,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
             p = GenericTx.from_payment(pay, comment)
 
-            if successful_only and p["status"] == "succeeded":
+            if successful_only and p.status == "succeeded":
                 tx.append(p)
                 continue
 
@@ -524,7 +536,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if "error" not in res:
             res = res["result"]
             r = SendCoinsResponse.from_cln_json(res, input)
-            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
+            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
 
             return r
 
@@ -681,7 +693,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 await self._refresh_invoice_sub(True)
 
     @logger.catch(exclude=(HTTPException,))
-    async def listen_forward_events(self) -> ForwardSuccessEvent:
+    async def listen_forward_events(self) -> AsyncGenerator[ForwardSuccessEvent, None]:
         logger.trace("listen_forward_events()")
 
         # CLN has no subscription to forwarded events.
@@ -731,10 +743,18 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         if "error" in res:
             self._handle_open_channel_error(res["error"])
-        res = res["result"]
 
-        if "txid" in res and "channel_id" in res:
-            return res["txid"]
+        res = res["result"]
+        if "txid" not in res and "channel_id" not in res:
+            self._handle_open_channel_error(
+                {
+                    "message": (
+                        "Unable to find txid and channel_id in connect peer result"
+                    )
+                }
+            )
+
+        return res["txid"]
 
     def _handle_open_channel_error(self, error):
         logger.trace(f"_handle_open_channel_error({error})")
@@ -903,6 +923,10 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
     async def _read_loop(self):
         logger.trace("_read_loop()")
+        if self._writer is None or self._reader is None:
+            message = "Not initialized - _writer or _reader not yet available"
+            logger.error(message)
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
 
         while not self._writer.is_closing():
             try:
