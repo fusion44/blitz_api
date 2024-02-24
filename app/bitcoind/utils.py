@@ -142,6 +142,11 @@ async def _process_response(resp: aiohttp.ClientResponse):
                 "error": m,
                 "status": status.HTTP_400_BAD_REQUEST,
             }
+        if "Use -txindex" in m:
+            return {
+                "error": "-txindex option for Bitcoin Core not enabled",
+                "status": status.HTTP_400_BAD_REQUEST,
+            }
 
     return {
         "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
