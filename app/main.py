@@ -13,6 +13,7 @@ from fastapi_plugins import (
     registered_configuration,
 )
 from loguru import logger
+from pydantic import BaseModel
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
@@ -220,7 +221,6 @@ async def _initialize_lightning():
 
 @app.get("/")
 def index(req: Request):
-
     return RedirectResponse(
         "/api/docs",
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
@@ -281,6 +281,15 @@ async def warmup_new_connections():
     # when the startup state changes. Especially the hardware info
     # is rather data intensive. This is OK for now, to keep the code simple.
 
+    async def _handle(id, event, res):
+        if isinstance(res, BaseModel):
+            return await _send_sse_event(id, event, res.model_dump())
+        elif isinstance(res, dict) or isinstance(res, list):
+            return await _send_sse_event(id, event, res)
+
+        logger.error(f"Error while fetching warmup_data for {event}: {res}")
+        return await _send_sse_event(id, event, {"error": f"{res}"})
+
     global new_connections
     if len(new_connections) == 0:
         return
@@ -300,14 +309,14 @@ async def warmup_new_connections():
             for id in new_connections:
                 await asyncio.gather(
                     *[
-                        _send_sse_event(id, SSE.SYSTEM_INFO, res[0].dict()),
-                        _send_sse_event(id, SSE.BTC_INFO, res[1].dict()),
-                        _send_sse_event(id, SSE.LN_INFO, res[2].dict()),
-                        _send_sse_event(id, SSE.LN_INFO_LITE, res[3].dict()),
-                        _send_sse_event(id, SSE.LN_FEE_REVENUE, res[4]),
-                        _send_sse_event(id, SSE.WALLET_BALANCE, res[5].dict()),
-                        _send_sse_event(id, SSE.INSTALLED_APP_STATUS, res[6]),
-                        _send_sse_event(id, SSE.HARDWARE_INFO, res[7]),
+                        _handle(id, SSE.SYSTEM_INFO, res[0]),
+                        _handle(id, SSE.BTC_INFO, res[1]),
+                        _handle(id, SSE.LN_INFO, res[2]),
+                        _handle(id, SSE.LN_INFO_LITE, res[3]),
+                        _handle(id, SSE.LN_FEE_REVENUE, res[4]),
+                        _handle(id, SSE.WALLET_BALANCE, res[5]),
+                        _handle(id, SSE.INSTALLED_APP_STATUS, res[6]),
+                        _handle(id, SSE.HARDWARE_INFO, res[7]),
                     ]
                 )
 
@@ -317,9 +326,9 @@ async def warmup_new_connections():
             for id in new_connections:
                 await asyncio.gather(
                     *[
-                        _send_sse_event(id, SSE.SYSTEM_INFO, res[0].dict()),
-                        _send_sse_event(id, SSE.BTC_INFO, res[1].dict()),
-                        _send_sse_event(id, SSE.HARDWARE_INFO, res[2]),
+                        _handle(id, SSE.SYSTEM_INFO, res[0]),
+                        _handle(id, SSE.BTC_INFO, res[1]),
+                        _handle(id, SSE.HARDWARE_INFO, res[2]),
                     ]
                 )
 
@@ -333,8 +342,8 @@ async def warmup_new_connections():
         for id in new_connections:
             await asyncio.gather(
                 *[
-                    _send_sse_event(id, SSE.BTC_INFO, res[0].dict()),
-                    _send_sse_event(id, SSE.HARDWARE_INFO, res[1]),
+                    _handle(id, SSE.BTC_INFO, res[0]),
+                    _handle(id, SSE.HARDWARE_INFO, res[1]),
                 ]
             )
 
@@ -348,7 +357,7 @@ async def warmup_new_connections():
         # Bitcoin Core and Lightning running
         res = await get_hardware_info()
         for id in new_connections:
-            await _send_sse_event(id, SSE.HARDWARE_INFO, res),
+            await _send_sse_event(id, SSE.HARDWARE_INFO, res)
 
         # don't clear new_connections, we'll try again later when api is initialized
 
