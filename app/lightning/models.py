@@ -586,13 +586,14 @@ class Channel(BaseModel):
             peer_publickey=c["peer_id"],
             peer_alias=peer_alias,
             balance_local=parse_cln_msat(c["to_us_msat"]) if "to_us_msat" in c else 0,
-            balance_remote=parse_cln_msat(c["total_msat"])
-            - parse_cln_msat(c["to_us_msat"])
-            if "total_msat" in c
-            else 0,
-            balance_capacity=parse_cln_msat(c["total_msat"])
-            if "total_msat" in c
-            else 0,
+            balance_remote=(
+                parse_cln_msat(c["total_msat"]) - parse_cln_msat(c["to_us_msat"])
+                if "total_msat" in c
+                else 0
+            ),
+            balance_capacity=(
+                parse_cln_msat(c["total_msat"]) if "total_msat" in c else 0
+            ),
             initiator=ChannelInitiator.from_cln(c["opener"]),
             closer=ChannelInitiator.from_cln(c["closer"]) if "closer" in c else None,
         )

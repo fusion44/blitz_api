@@ -909,9 +909,11 @@ This will show more debug information.
                     self._lnd_stub.ListChannels(
                         ln.ListChannelsRequest(peer_alias_lookup=peer_alias_lookup)
                     ),
-                    self._lnd_stub.ClosedChannels(ln.ListChannelsRequest())
-                    if include_closed
-                    else None,
+                    (
+                        self._lnd_stub.ClosedChannels(ln.ListChannelsRequest())
+                        if include_closed
+                        else None
+                    ),
                 ]
             )
 
