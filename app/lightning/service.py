@@ -220,13 +220,13 @@ async def _handle_info_listener():
         info = await ln.get_ln_info()
 
         if last_info != info:
-            await broadcast_sse_msg(SSE.LN_INFO, info.dict())
+            await broadcast_sse_msg(SSE.LN_INFO, info.model_dump())
             last_info = info
 
         info_lite = LightningInfoLite.from_lninfo(info)
 
         if last_info_lite != info_lite:
-            await broadcast_sse_msg(SSE.LN_INFO_LITE, info_lite.dict())
+            await broadcast_sse_msg(SSE.LN_INFO_LITE, info_lite.model_dump())
             last_info_lite = info_lite
 
         await asyncio.sleep(GATHER_INFO_INTERVALL)
@@ -234,7 +234,7 @@ async def _handle_info_listener():
 
 async def _handle_invoice_listener():
     async for i in ln.listen_invoices():
-        await broadcast_sse_msg(SSE.LN_INVOICE_STATUS, i.dict())
+        await broadcast_sse_msg(SSE.LN_INVOICE_STATUS, i.model_dump())
         _schedule_wallet_balance_update()
 
 
@@ -258,13 +258,13 @@ async def _handle_forward_event_listener():
 
         _schedule_wallet_balance_update()
         rev = await get_fee_revenue()
-        await broadcast_sse_msg(SSE.LN_FEE_REVENUE, rev.dict())
+        await broadcast_sse_msg(SSE.LN_FEE_REVENUE, rev.model_dump())
 
         _fwd_update_scheduled = False
 
     async for i in ln.listen_forward_events():
         if ENABLE_FWD_NOTIFICATIONS:
-            _fwd_successes.append(i.dict())
+            _fwd_successes.append(i.model_dump())
 
         if not _fwd_update_scheduled:
             loop = asyncio.get_event_loop()
@@ -281,7 +281,7 @@ def _schedule_wallet_balance_update():
         await asyncio.sleep(1.1)
         wb = await ln.get_wallet_balance()
         if _CACHE["wallet_balance"] != wb:
-            await broadcast_sse_msg(SSE.WALLET_BALANCE, wb.dict())
+            await broadcast_sse_msg(SSE.WALLET_BALANCE, wb.model_dump())
             _CACHE["wallet_balance"] = wb
 
         _wallet_balance_update_scheduled = False

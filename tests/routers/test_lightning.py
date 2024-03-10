@@ -49,10 +49,10 @@ def test_get_ln_status(monkeypatch):
     response = test_client.get(f"{prefix_latest}/get-info-lite")
 
     r_js = response.json()
-    v_js = get_valid_lightning_info_lite().dict()
+    v_js = get_valid_lightning_info_lite().model_dump()
     assert r_js == v_js
 
     response = test_client.get(f"{prefix_v1}/get-info-lite")
     r_js = response.json()
-    v_js = get_valid_lightning_info_lite().dict()
+    v_js = get_valid_lightning_info_lite().model_dump()
     assert r_js == v_js

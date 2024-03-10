@@ -278,7 +278,7 @@ This will show more debug information.
             ):
                 pass  # do nothing here
             else:
-                logger.warning(f"Unhandled initialization event: {res.dict()}")
+                logger.warning(f"Unhandled initialization event: {res.model_dump()}")
 
             yield res
 
@@ -566,7 +566,7 @@ This will show more debug information.
                     break
 
             r = SendCoinsResponse.from_lnd_grpc(tx, input)
-            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
+            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
             return r
         except grpc.aio._call.AioRpcError as error:
             _check_if_locked(error)
@@ -613,7 +613,7 @@ This will show more debug information.
             p = None
             async for response in self._router_stub.SendPaymentV2(r):
                 p = Payment.from_lnd_grpc(response)
-                await broadcast_sse_msg(SSE.LN_PAYMENT_STATUS, p.dict())
+                await broadcast_sse_msg(SSE.LN_PAYMENT_STATUS, p.model_dump())
             return p
         except grpc.aio._call.AioRpcError as error:
             _check_if_locked(error)

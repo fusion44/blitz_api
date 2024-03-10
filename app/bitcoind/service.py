@@ -213,7 +213,7 @@ async def _handle_gather_bitcoin_status():
 
         if last_info != info:
             # only send data if anything has changed
-            await broadcast_sse_msg(SSE.BTC_INFO, info.dict())
+            await broadcast_sse_msg(SSE.BTC_INFO, info.model_dump())
             last_info = info
 
         await asyncio.sleep(2)
