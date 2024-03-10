@@ -1,12 +1,22 @@
 from abc import abstractmethod
 from typing import Dict
 
-from app.system.models import ConnectionInfo, LoginInput, RawDebugLogData, SystemInfo
+from app.system.models import (
+    ConnectionInfo,
+    LoginInput,
+    RawDebugLogData,
+    SystemHealthInfo,
+    SystemInfo,
+)
 
 
 class SystemBase:
     @abstractmethod
     async def get_system_info(self) -> SystemInfo:
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def get_system_health(self, verbose: bool) -> SystemHealthInfo:
         raise NotImplementedError()
 
     @abstractmethod

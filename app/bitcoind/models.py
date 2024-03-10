@@ -102,9 +102,9 @@ class RawTransaction(BaseModel):
     @classmethod
     def from_rpc(cls, tx):
         return cls(
-            in_active_chain=tx["in_active_chain"]
-            if "in_active_chain" in tx.keys()
-            else None,
+            in_active_chain=(
+                tx["in_active_chain"] if "in_active_chain" in tx.keys() else None
+            ),
             txid=tx["txid"] if "txid" in tx.keys() else "",
             hash=tx["hash"] if "hash" in tx.keys() else "",
             size=tx["size"] if "size" in tx.keys() else 0,
@@ -140,10 +140,10 @@ class NetworkInfo(BaseModel):
     connections_out: int = Query(..., description="The number of outbound connections")
     network_active: bool = Query(..., description="Whether p2p networking is enabled")
     networks: List[BtcNetwork] = Query(..., description="Information per network")
-    relay_fee: int = Query(
+    relay_fee: float = Query(
         ..., description="Minimum relay fee for transactions in BTC/kB"
     )
-    incremental_fee: int = Query(
+    incremental_fee: float = Query(
         ...,
         description=(
             "Minimum fee increment for mempool limiting or BIP 125 "
@@ -228,7 +228,7 @@ class Bip9Data(BaseModel):
         ...,
         description='One of "defined", "started", "locked_in", "active", "failed"',
     )
-    bit: int = Query(
+    bit: int | None = Query(
         None,
         description=(
             "the bit(0-28) in the block version field used to signal this "
@@ -255,21 +255,21 @@ class Bip9Data(BaseModel):
     min_activation_height: int = Query(
         ..., description="Minimum height of blocks for which the rules may be enforced"
     )
-    statistics: Bip9Statistics = Query(
+    statistics: Bip9Statistics | None = Query(
         None,
         description=(
             "numeric statistics about BIP9 signalling for a "
             "softfork(only for `started` status)"
         ),
     )
-    height: int = Query(
+    height: int | None = Query(
         None,
         description=(
             "Height of the first block which the rules are or will be "
             "enforced(only for `buried` type, or `bip9` type with `active` status)"
         ),
     )
-    active: bool = Query(
+    active: bool | None = Query(
         None,
         description="True if the rules are enforced for the mempool and the next block",
     )
@@ -283,9 +283,9 @@ class Bip9Data(BaseModel):
             timeout=r["timeout"],
             since=r["since"],
             min_activation_height=r["min_activation_height"],
-            statistics=Bip9Statistics.from_rpc(r["statistics"])
-            if "statistics" in r
-            else None,
+            statistics=(
+                Bip9Statistics.from_rpc(r["statistics"]) if "statistics" in r else None
+            ),
             height=r["height"] if "height" in r else None,
             active=r["active"] if "active" in r else None,
         )
@@ -300,10 +300,10 @@ class SoftFork(BaseModel):
             "True **if** the rules are enforced for the mempool and the next block"
         ),
     )
-    bip9: Bip9Data = Query(
+    bip9: Bip9Data | None = Query(
         None, description='Status of bip9 softforks(only for "bip9" type)'
     )
-    height: int = Query(
+    height: int | None = Query(
         None,
         description=(
             "Height of the first block which the rules are or will be enforced "
@@ -337,7 +337,7 @@ class BlockchainInfo(BaseModel):
     best_block_hash: str = Query(
         ..., description="The hash of the currently best block"
     )
-    difficulty: int = Query(..., description="The current difficulty")
+    difficulty: float = Query(..., description="The current difficulty")
     mediantime: int = Query(..., description="Median time for the current best block")
     verification_progress: float = Query(
         ..., description="Estimate of verification progress[0..1]"
@@ -353,19 +353,19 @@ class BlockchainInfo(BaseModel):
         ..., description="The estimated size of the block and undo files on disk"
     )
     pruned: bool = Query(..., description="If the blocks are subject to pruning")
-    prune_height: int = Query(
+    prune_height: int | None = Query(
         None,
         description=(
             "Lowest-height complete block stored(only present if pruning is enabled)"
         ),
     )
-    automatic_pruning: bool = Query(
+    automatic_pruning: bool | None = Query(
         None,
         description=(
             "Whether automatic pruning is enabled(only present if pruning is enabled)"
         ),
     )
-    prune_target_size: int = Query(
+    prune_target_size: int | None = Query(
         None,
         description=(
             "The target size used by pruning(only present if automatic pruning is "
@@ -395,13 +395,13 @@ class BlockchainInfo(BaseModel):
             chainwork=r["chainwork"],
             size_on_disk=r["size_on_disk"],
             pruned=r["pruned"],
-            pruned_height=None if "pruneheight" not in r else r["pruneheight"],
-            automatic_pruning=None
-            if "automatic_pruning" not in r
-            else r["automatic_pruning"],
-            prune_target_size=None
-            if "prune_target_size" not in r
-            else r["prune_target_size"],
+            prune_height=None if "pruneheight" not in r else r["pruneheight"],
+            automatic_pruning=(
+                None if "automatic_pruning" not in r else bool(r["automatic_pruning"])
+            ),
+            prune_target_size=(
+                None if "prune_target_size" not in r else int(r["prune_target_size"])
+            ),
             warnings=r["warnings"],
             softforks=softforks,
         )
@@ -422,7 +422,7 @@ class BtcInfo(BaseModel):
     verification_progress: float = Query(
         ..., description="Estimate of verification progress[0..1]"
     )
-    difficulty: int = Query(..., description="The current difficulty")
+    difficulty: float = Query(..., description="The current difficulty")
     size_on_disk: int = Query(
         ..., description="The estimated size of the block and undo files on disk"
     )

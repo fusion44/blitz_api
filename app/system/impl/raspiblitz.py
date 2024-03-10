@@ -25,6 +25,7 @@ from app.system.models import (
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
+    SystemHealthInfo,
     SystemInfo,
 )
 
@@ -73,6 +74,9 @@ class RaspiBlitzSystem(SystemBase):
             ssh_address=f"admin@{lan}",
             chain=data_chain,
         )
+
+    async def get_system_health(self, verbose: bool) -> SystemHealthInfo:
+        return SystemHealthInfo(healthy=True)
 
     async def shutdown(self, reboot: bool) -> bool:
         params = ""
@@ -350,9 +354,9 @@ class RaspiBlitzSystem(SystemBase):
                     "partition_total_bytes": total,
                     "partition_used_bytes": total - free,
                     "partition_free_bytes": free,
-                    "partition_percent": 0
-                    if total == 0
-                    else round((100 / total) * free, 2),
+                    "partition_percent": (
+                        0 if total == 0 else round((100 / total) * free, 2)
+                    ),
                 }
             ]
 

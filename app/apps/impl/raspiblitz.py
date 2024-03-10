@@ -25,6 +25,7 @@ available_app_ids = {
     "mempool",
     "thunderhub",
     "jam",
+    "electrs",
 }
 
 
@@ -65,52 +66,17 @@ class RaspiBlitzApps(AppsBase):
             }
 
         try:
-            error = ""
-            if "error" in data.keys():
-                error = data["error"]
+            keys = data.keys()
+            error = data["error"] if "error" in keys else ""
+            installed = False
+            version = data["version"] if "version" in keys else ""
 
-            version = ""
-            if "version" in data.keys():
-                version = data["version"]
-
-            if data["installed"] == "1":
-                # get basic data
+            status = "offline"
+            if "installed" in keys and data["installed"] == "1":
                 status = "online"
-                installed = data["installed"] == "1"
-                localIP = data["localIP"]
-                httpPort = data["httpPort"]
-                httpsPort = data["httpsPort"]
-                httpsForced = data["httpsForced"]
-                httpsSelfsigned = data["httpsSelfsigned"]
-                address = f"http://{localIP}:{httpPort}"
-                if httpsForced == "1":
-                    address = f"https://{localIP}:{httpsPort}"
-                hiddenService = data["toraddress"]
-                authMethod = "none"
-                if "authMethod" in data.keys():
-                    authMethod = data["authMethod"]
-                details = {}
+                installed = True
 
-                # set details for certain apps
-                if app_id == "mempool" or app_id == "btc-rpc-explorer":
-                    details = {
-                        "isIndexed": data["isIndexed"],
-                        "indexInfo": data["indexInfo"],
-                    }
-                return {
-                    "id": app_id,
-                    "version": version,
-                    "installed": installed,
-                    "status": status,
-                    "address": address,
-                    "httpsForced": httpsForced,
-                    "httpsSelfsigned": httpsSelfsigned,
-                    "hiddenService": hiddenService,
-                    "authMethod": authMethod,
-                    "details": details,
-                    "error": error,
-                }
-            else:
+            if not installed:
                 return {
                     "id": app_id,
                     "version": version,
@@ -118,12 +84,70 @@ class RaspiBlitzApps(AppsBase):
                     "status": "offline",
                     "error": error,
                 }
-        except:
-            logging.warning(f"error on repackage data: {result}")
+
+            configured = False
+            if "configured" in keys and data["configured"] == "1":
+                configured = True
+
+            httpsSelfsigned = False
+            if "httpsSelfsigned" in keys and data["httpsSelfsigned"] == "1":
+                httpsSelfsigned = True
+
+            localIP = data["localIP"] if "localIP" in keys else ""
+            httpPort = data["httpPort"] if "httpPort" in keys else ""
+            httpsPort = data["httpsPort"] if "httpsPort" in keys else ""
+            httpsForced = data["httpsForced"] == "1" if "httpsForced" in keys else False
+            address = f"http://{localIP}:{httpPort}"
+            if httpsForced:
+                address = f"https://{localIP}:{httpsPort}"
+            hiddenService = data["toraddress"] if "toraddress" in keys else ""
+            authMethod = "none"
+            if "authMethod" in data.keys():
+                authMethod = data["authMethod"]
+
+            details = {}
+            # set details for certain apps
+            if app_id == "mempool" or app_id == "btc-rpc-explorer":
+                details = {
+                    "isIndexed": data["isIndexed"],
+                    "indexInfo": data["indexInfo"],
+                }
+
+            return {
+                "id": app_id,
+                "installed": installed,
+                "configured": configured,
+                "status": status,
+                "localIP": localIP,
+                "httpPort": httpPort,
+                "httpsPort": httpsPort,
+                "httpsForced": httpsForced,
+                "httpsSelfsigned": httpsSelfsigned,
+                "hiddenService": hiddenService,
+                "address": address,
+                "authMethod": authMethod,
+                "details": details,
+            }
+
+        except Exception as e:
+            logging.error(e)
+            logging.info(f"error on repackage data: {result}")
             return {
                 "id": f"{app_id}",
                 "error": f"script result processing error: {script_call}",
             }
+
+    async def get_app_status_advanced(self, app_id):
+        if app_id not in available_app_ids:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"App id invalid. Available app ids: {available_app_ids}",
+            )
+
+        if app_id == "electrs":
+            return await _do_electrs_status_advanced()
+
+        return {}
 
     async def get_app_status(self):
         appStatusList: List = []
@@ -346,3 +370,84 @@ class RaspiBlitzApps(AppsBase):
                     logging.debug(f"updatedAppData: {updatedAppData}")
                     logging.debug(f"params: {params}")
                     return
+
+
+async def _do_electrs_status_advanced():
+    app_id = "electrs"
+    script_call_status = (
+        os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
+        + " status showAddress"
+    )
+
+    script_call_sync = (
+        os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
+        + " status-sync"
+    )
+
+    try:
+        result_status = await call_sudo_script(script_call_status)
+        result_sync = await call_sudo_script(script_call_sync)
+        result = result_status + result_sync
+    except Exception as e:
+        # script had error or was not able to deliver all requested data fields
+        logging.error(e)
+        logging.debug(f"error on calling: {script_call_status} and {script_call_sync}")
+        return {
+            "id": f"{app_id}",
+            "error": "Unable to get Electrs data from script.",
+        }
+
+    try:
+        data = parse_key_value_text(result)
+    except Exception as e:
+        logging.error(e)
+        logging.debug(f"error on parsing: {result}")
+        return {
+            "id": f"{app_id}",
+            "error": "Unable to get Electrs data from script.",
+        }
+
+    try:
+        if data["installed"] == "0":
+            return {
+                "id": app_id,
+                "error": "Service not installed.",
+            }
+
+        if data["configured"] == "0":
+            return {
+                "id": app_id,
+                "error": "Service not configured.",
+            }
+
+        if data["serviceRunning"] == "0":
+            return {
+                "id": app_id,
+                "error": "Service installed, but not running.",
+            }
+
+        if "initialSynced" not in data:
+            logging.error(
+                (
+                    f"The Raspiblitz {script_call_sync} doesn't "
+                    "return the required data (initialSynced)."
+                )
+            )
+            logging.debug(data)
+            return {
+                "id": app_id,
+                "error": f"script not working for api: {script_call_status}",
+            }
+
+        return {
+            "version": data["version"],
+            "localIP": data["localIP"],
+            "publicIP": data["publicIP"],
+            "portTCP": data["portTCP"],
+            "portSSL": data["portSSL"],
+            "TORaddress": data["TORaddress"],
+            "initialSyncDone": data["initialSynced"] == "1",
+        }
+    except Exception as e:
+        logging.error(e)
+        logging.debug(data)

@@ -12,7 +12,7 @@ from app.system.docs import get_debug_data_sample_str
 class LoginInput(BaseModel):
     password: constr(min_length=8)
     one_time_password: Optional[
-        constr(min_length=6, max_length=6, regex="^[0-9]+$")
+        constr(min_length=6, max_length=6, pattern="^[0-9]+$")
     ] = None
 
 
@@ -45,7 +45,7 @@ class SystemInfo(BaseModel):
         "",
         description="The version of this platform",
     )
-    code_version = Query(
+    code_version: str = Query(
         "",
         description="[RaspiBlitz only] The code version.",
     )
@@ -106,3 +106,19 @@ class ConnectionInfo(BaseModel):
     )
     cl_rest_macaroon: str = Query("", description="core lightning rest macaroon")
     cl_rest_onion: str = Query("", description="core lightning rest onion address")
+
+
+class SubSystemHealthInfo(BaseModel):
+    name: str = Query(..., description="Name of the subsystem")
+    health: bool = Query(..., description="Whether this system is healthy or not")
+    message: str = Query(
+        "", description="Optional message describing the systems health"
+    )
+
+
+class SystemHealthInfo(BaseModel):
+    healthy: bool = Query(..., description="")
+    message: str = Query("", description="")
+    subsystems: list[SubSystemHealthInfo] = Query(
+        [], description="Health information of running subsystems"
+    )

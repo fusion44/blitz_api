@@ -115,6 +115,12 @@ async def get_raw_transaction(txid: str) -> RawTransaction:
     if "No such mempool or blockchain transaction." in result["error"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=result["error"])
 
+    if "-txindex option" in result["error"]:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="-txindex option for Bitcoin Core not enabled",
+        )
+
     if "must be of length 64" in result["error"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=result["error"])
 
@@ -125,6 +131,16 @@ async def get_raw_transaction(txid: str) -> RawTransaction:
 async def get_btc_info() -> BtcInfo:
     binfo = await get_blockchain_info()
     ninfo = await get_network_info()
+
+    if binfo is None or ninfo is None:
+        logger.error(f"Blockchain Info or Network Info not available: {binfo} {ninfo}")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Unable to get blockchain or network data. "
+                "See the log files for more information"
+            ),
+        )
 
     return BtcInfo.from_rpc(binfo, ninfo)
 
@@ -197,7 +213,7 @@ async def _handle_gather_bitcoin_status():
 
         if last_info != info:
             # only send data if anything has changed
-            await broadcast_sse_msg(SSE.BTC_INFO, info.dict())
+            await broadcast_sse_msg(SSE.BTC_INFO, info.model_dump())
             last_info = info
 
         await asyncio.sleep(2)

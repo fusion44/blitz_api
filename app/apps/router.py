@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 from fastapi.params import Depends
 from loguru import logger
 from pydantic import BaseModel
@@ -34,6 +34,23 @@ async def get_status():
 @logger.catch(exclude=(HTTPException,))
 async def get_single_status(id):
     return await repo.get_app_status_single(id)
+
+
+@router.get(
+    "/status_advanced/{id}",
+    name=f"{_PREFIX}/status_advanced",
+    summary="Get the advanced status of a single app by id.",
+    description="""Some apps might give status information that is computationally
+    to expensive to include in the normal status endpoint.
+
+> ℹ️ _This endpoint is not implemented on all platforms_
+    """,
+    dependencies=[Depends(JWTBearer())],
+    responses={400: {"description": ("If no or invalid app id is given.")}},
+)
+@logger.catch(exclude=(HTTPException,))
+async def get_single_status_advanced(id: str = Path(..., required=True)):
+    return await repo.get_app_status_advanced(id)
 
 
 @router.get(

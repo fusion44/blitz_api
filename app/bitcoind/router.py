@@ -125,7 +125,7 @@ async def getnetworkinfo():
     dependencies=[Depends(JWTBearer())],
     response_model=RawTransaction,
     responses={
-        400: {"description": "Invalid transaction id"},
+        400: {"description": "Invalid transaction id or -txindex not enabled"},
         404: {"description": "No such mempool or blockchain transaction."},
     },
 )

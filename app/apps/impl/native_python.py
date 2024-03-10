@@ -18,6 +18,9 @@ class NativePythonApps(AppsBase):
     async def get_app_status(self):
         raise _NotImplemented()
 
+    async def get_app_status_advanced(self, app_id: str):
+        raise _NotImplemented()
+
     async def get_app_status_sub(self):
         raise _NotImplemented()
 

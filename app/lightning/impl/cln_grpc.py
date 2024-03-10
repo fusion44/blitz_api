@@ -647,7 +647,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
             response = await self._cln_stub.Withdraw(req)
             r = SendCoinsResponse.from_cln_grpc(response, input)
-            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.dict())
+            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
             return r
         except grpc.aio._call.AioRpcError as error:
             details = error.details()

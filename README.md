@@ -19,6 +19,7 @@ This software is still considered BETA and may contain bugs. Don't expose it to 
     - [Linux / macOS](#linux--macos-1)
     - [Windows](#windows-1)
   - [Development](#development)
+      - [Using the nix package manager](#using-the-nix-package-manager)
     - [Installation](#installation-1)
     - [Sync changes to a RaspiBlitz](#sync-changes-to-a-raspiblitz)
     - [Debugging code running on a remote machine via VSCode](#debugging-code-running-on-a-remote-machine-via-vscode)
@@ -98,6 +99,18 @@ poetry shell
 ```
 
 (To exit the poetry shell use: `exit`)
+
+#### Using the nix package manager
+Blitz API provides a [Nix](https://github.com/NixOS/nix) Flake file to create a development environment. Execute `nix develop` (make sure you have flakes enabled) to enter the environment.
+
+In this environment a hidden folder `.venv` is created to install the python dependencies locally. If pyright can't find these dependencies create the following file in the root
+folder of the project:
+```json
+{
+  "venvPath": ".",
+  "venv": ".venv"
+}
+```
 
 ### Installation
 
