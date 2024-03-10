@@ -351,6 +351,12 @@ This will show more debug information.
                 else:
                     if p.payment_request is not None and p.payment_request != "":
                         pr = await self.decode_pay_request(p.payment_request)
+                        if pr is None:
+                            logger.error(
+                                f"Unable to decode payment request {p.payment_request}"
+                            )
+                            continue
+
                         comment = pr.description
                         self._memo_cache[p.payment_request] = pr.description
                 tx.append(GenericTx.from_lnd_grpc_payment(p, comment))
