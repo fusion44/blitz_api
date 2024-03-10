@@ -116,7 +116,11 @@ class LightningNodeBase:
 
     @abstractmethod
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         raise NotImplementedError()
 
@@ -125,7 +129,11 @@ class LightningNodeBase:
         raise NotImplementedError()
 
     @abstractmethod
-    async def channel_list(self) -> List[Channel]:
+    async def channel_list(
+        self,
+        include_closed: bool,
+        peer_alias_lookup: bool,
+    ) -> List[Channel]:
         raise NotImplementedError()
 
     @abstractmethod

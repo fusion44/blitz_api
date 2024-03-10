@@ -422,52 +422,152 @@ class RouteHint(BaseModel):
         return cls(hop_hints=hop_hints)
 
 
+class ChannelInitiator(str, Enum):
+    UNKNOWN = "unknown"
+    LOCAL = "local"
+    REMOTE = "remote"
+    BOTH = "both"
+
+    @classmethod
+    def from_cln(cls, i: str) -> "ChannelInitiator":
+        if i == "local":
+            return cls.LOCAL
+        if i == "remote":
+            return cls.REMOTE
+
+        raise NotImplementedError(f"Unknown CLN channel initiator id: {i}")
+
+    @classmethod
+    def from_lnd_grpc(cls, i: Union[int, bool]) -> "ChannelInitiator":
+        # LND only returns whether we are initiator
+        # or not for NORMAL state channels
+        if i is True:
+            return cls.LOCAL
+        if i is False:
+            return cls.REMOTE
+
+        # LND differentiates further with pending channels
+        if i == 1:
+            return cls.LOCAL
+        if i == 2:
+            return cls.REMOTE
+        if i == 3:
+            return cls.BOTH
+
+        if i > 3:
+            # leave a notice in the logs
+            # that we don't know this case yet
+            logger.warning(f"Unknown channel initiator id: {i}")
+
+        return cls.UNKNOWN
+
+
+class ChannelState(str, Enum):
+    OPENING = "opening"
+    NORMAL = "normal"
+    CLOSING = "closing"
+    FORCE_CLOSING = "force_closing"
+    CLOSED = "closed"
+    ABANDONED = "abandoned"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def from_cln_json(cls, s) -> "ChannelState":
+        openings = [
+            "OPENINGD",
+            "CHANNELD_AWAITING_LOCKIN",
+            "DUALOPEND_OPEN_INIT",
+            "DUALOPEND_AWAITING_LOCKIN",
+        ]
+        closings = [
+            "CHANNELD_SHUTTING_DOWN",
+            "CLOSINGD_SIGEXCHANGE",
+            "CLOSINGD_COMPLETE",
+            "FUNDING_SPEND_SEEN",
+        ]
+
+        if s in openings:
+            return cls.OPENING
+        if s == "CHANNELD_NORMAL":
+            return cls.NORMAL
+        if s in closings:
+            return cls.CLOSING
+        if s == "AWAITING_UNILATERAL":
+            return cls.FORCE_CLOSING
+        if s == "ONCHAIN":
+            return cls.CLOSED
+
+        return cls.UNKNOWN
+
+
 class Channel(BaseModel):
-    channel_id: Optional[str]
-    active: Optional[bool]
+    channel_id: str = Query(
+        "",
+        description="The unique identifier of the channel",
+    )
 
-    peer_publickey: Optional[str]
-    peer_alias: Optional[str]
+    state: ChannelState = Query(..., description="The state of the channel")
 
-    balance_local: Optional[int]
-    balance_remote: Optional[int]
-    balance_capacity: Optional[int]
+    active: bool = Query(
+        ...,
+        description=(
+            "Whether the channel is active or not. "
+            "True if the channel is not closing and the peer is online."
+        ),
+    )
 
-    @classmethod
-    def from_lnd_grpc(cls, c) -> "Channel":
-        return cls(
-            active=c.active,
-            # use channel point as id because thats needed
-            # for closing the channel with lnd
-            channel_id=c.channel_point,
-            peer_publickey=c.remote_pubkey,
-            peer_alias="n/a",
-            balance_local=c.local_balance,
-            balance_remote=c.remote_balance,
-            balance_capacity=c.capacity,
-        )
+    peer_publickey: str = Query(
+        ...,
+        description="The public key of the peer",
+    )
 
-    @classmethod
-    def from_lnd_grpc_pending(cls, c) -> "Channel":
-        return cls(
-            active=False,
-            # use channel point as id because thats needed
-            # for closing the channel with lnd
-            channel_id=c.channel_point,
-            peer_publickey=c.remote_node_pub,
-            peer_alias="n/a",
-            balance_local=-1,
-            balance_remote=-1,
-            balance_capacity=c.capacity,
-        )
+    peer_alias: str = Query(
+        "",
+        description="The alias of the peer if available",
+    )
+
+    balance_local: int = Query(
+        0,
+        description="This node's current balance in this channel",
+    )
+
+    balance_remote: int = Query(
+        0,
+        description="The counterparty's current balance in this channel",
+    )
+
+    balance_capacity: int = Query(
+        0,
+        description="The total capacity of the channel",
+    )
+
+    dual_funded: Optional[bool] = Query(
+        None,
+        description="Whether the channel was dual funded or not",
+    )
+
+    initiator: ChannelInitiator = Query(
+        ChannelInitiator.UNKNOWN,
+        description="Whether the channel was initiated by us, our peer or both",
+    )
+
+    closer: Union[ChannelInitiator, None] = Query(
+        None,
+        description=(
+            "If state is closing, this shows who initiated the close. "
+            "None, if not in a closing state."
+        ),
+    )
 
     @classmethod
     def from_cln_grpc(cls, c, peer_alias="n/a") -> "Channel":
         # TODO: get alias and balance of the channel
         return cls(
             active=c.connected,
+            state=ChannelState.UNKNOWN,
+            # state=ChannelState.from_cln_jrpc(c.state),
             # use channel point as id because thats needed
-            #  for closing the channel with lnd
+            # for closing the channel with lnd
             channel_id=c.short_channel_id,
             peer_publickey=c.peer_id.hex(),
             peer_alias=peer_alias,
@@ -477,17 +577,25 @@ class Channel(BaseModel):
         )
 
     @classmethod
-    def from_cln_jrpc(cls, c, peer_alias="n/a") -> "Channel":
-        # TODO: get alias and balance of the channel
+    def from_cln_jrpc(cls, c, peer_alias="") -> "Channel":
+        state = ChannelState.from_cln_json(c["state"])
         return cls(
-            active=c["connected"],
-            channel_id=c["short_channel_id"] if "short_channel_id" in c else None,
+            active=c["peer_connected"],
+            state=state,
+            channel_id=c["short_channel_id"] if "short_channel_id" in c else "",
             peer_publickey=c["peer_id"],
             peer_alias=peer_alias,
-            balance_local=parse_cln_msat(c["our_amount_msat"]),
-            balance_remote=parse_cln_msat(c["amount_msat"])
-            - parse_cln_msat(c["our_amount_msat"]),
-            balance_capacity=parse_cln_msat(c["amount_msat"]),
+            balance_local=parse_cln_msat(c["to_us_msat"]) if "to_us_msat" in c else 0,
+            balance_remote=(
+                parse_cln_msat(c["total_msat"]) - parse_cln_msat(c["to_us_msat"])
+                if "total_msat" in c
+                else 0
+            ),
+            balance_capacity=(
+                parse_cln_msat(c["total_msat"]) if "total_msat" in c else 0
+            ),
+            initiator=ChannelInitiator.from_cln(c["opener"]),
+            closer=ChannelInitiator.from_cln(c["closer"]) if "closer" in c else None,
         )
 
 
