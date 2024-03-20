@@ -17,8 +17,8 @@ from app.system.models import (
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
-    SystemInfo,
     SystemHealthInfo,
+    SystemInfo,
 )
 from app.system.service import (
     HW_INFO_YIELD_TIME,
