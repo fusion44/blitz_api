@@ -200,7 +200,7 @@ class RaspiBlitzSystem(SystemBase):
             cl_rest_onion=data_cl_rest_onion,
         )
 
-    async def login(self, i: LoginInput) -> Dict[str, str]:
+    async def login(self, i: LoginInput) -> str:
         matches = await self._match_password(i)
         if matches:
             return sign_jwt()
