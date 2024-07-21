@@ -1,7 +1,7 @@
 from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from .auth_handler import decodeJWT
+from .auth_handler import decode_jwt
 
 # https://testdriven.io/blog/fastapi-jwt-auth/
 
@@ -36,7 +36,7 @@ class JWTBearer(HTTPBearer):
         isTokenValid: bool = False
 
         try:
-            payload = decodeJWT(jwtoken)
+            payload = decode_jwt(jwtoken)
         except:  # noqa: E722
             payload = None
 
