@@ -60,7 +60,7 @@ def remove_local_cookie():
 
 def register_cookie_updater():
     # We need to update the cookie file once the cookie is expired
-    expiry_time = config("jwt_expiry_time")
+    expiry_time = config("jwt_expiry_time", default=300, cast=int)
 
     async def _cookie_updater():
         while True:
