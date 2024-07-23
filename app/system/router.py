@@ -63,8 +63,10 @@ async def login_path(i: LoginInput, response: Response):
     response_description="Returns a fresh JWT token.",
     dependencies=[Depends(JWTBearer())],
 )
-def refresh_token():
-    return sign_jwt()
+def refresh_token(response: Response):
+    token = sign_jwt()
+    response.set_cookie("access_token", token)
+    return token
 
 
 @router.post(

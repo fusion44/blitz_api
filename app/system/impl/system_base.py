@@ -28,7 +28,7 @@ class SystemBase:
         raise NotImplementedError()
 
     @abstractmethod
-    async def login(self, i: LoginInput) -> Dict[str, str]:
+    async def login(self, i: LoginInput) -> str:
         raise NotImplementedError()
 
     @abstractmethod

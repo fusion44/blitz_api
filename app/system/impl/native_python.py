@@ -63,7 +63,7 @@ class NativePythonSystem(SystemBase):
         # return an empty connection info object for now
         return ConnectionInfo()
 
-    async def login(self, i: LoginInput) -> Dict[str, str]:
+    async def login(self, i: LoginInput) -> str:
         matches = secrets.compare_digest(i.password, config("login_password", cast=str))
         if matches:
             return sign_jwt()

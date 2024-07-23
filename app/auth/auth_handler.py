@@ -1,30 +1,33 @@
 import asyncio
 import os
 import time
-from typing import Dict
 
 import jwt
 from decouple import config
 from loguru import logger
 
-JWT_SECRET = config("secret")
-JWT_ALGORITHM = config("algorithm")
-JWT_EXPIRY_TIME = config("jwt_expiry_time", default=300, cast=int)
 
-
-def sign_jwt() -> Dict[str, str]:
+def sign_jwt() -> str:
     payload = {
         "user_id": "admin",
-        "expires": int(round(time.time() * 1000) + JWT_EXPIRY_TIME),
+        "expires": int(
+            time.time() + config("jwt_expiry_time", default=300, cast=int),
+        ),
     }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    token = jwt.encode(
+        payload,
+        config("secret"),
+        algorithm=str(config("algorithm")),
+    )
     return token
 
 
-def decodeJWT(token: str) -> dict:
+def decode_jwt(token: str):
     try:
-        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return decoded_token if decoded_token["expires"] >= time.time() * 1000 else None
+        decoded_token = jwt.decode(
+            token, config("secret"), algorithms=[str(config("algorithm"))]
+        )
+        return decoded_token if decoded_token["expires"] >= time.time() else None
     except Exception as e:
         logger.warning(f"Unable to decode jwt_token {e}")
         return {}
@@ -57,9 +60,11 @@ def remove_local_cookie():
 
 def register_cookie_updater():
     # We need to update the cookie file once the cookie is expired
+    expiry_time = config("jwt_expiry_time", default=300, cast=int)
+
     async def _cookie_updater():
         while True:
-            await asyncio.sleep(JWT_EXPIRY_TIME - 10)
+            await asyncio.sleep(expiry_time - 10)
             handle_local_cookie()
 
     loop = asyncio.get_event_loop()

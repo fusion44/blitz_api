@@ -122,7 +122,7 @@ async def register_hardware_info_gatherer():
     loop.create_task(_handle_gather_hardware_info())
 
 
-async def login(i: LoginInput) -> Dict[str, str]:
+async def login(i: LoginInput) -> str:
     try:
         return await system.login(i)
     except HTTPException:
