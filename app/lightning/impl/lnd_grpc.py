@@ -15,7 +15,7 @@ import app.lightning.impl.protos.lnd.router_pb2 as router
 import app.lightning.impl.protos.lnd.router_pb2_grpc as routerrpc
 import app.lightning.impl.protos.lnd.walletunlocker_pb2 as unlocker
 import app.lightning.impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
-from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str
+from app.api.utils import SSE, broadcast_json_ws, config_get_hex_str
 from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.ln_base import LightningNodeBase
 from app.lightning.models import (
@@ -572,7 +572,7 @@ This will show more debug information.
                     break
 
             r = SendCoinsResponse.from_lnd_grpc(tx, input)
-            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
+            await broadcast_json_ws(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
             return r
         except grpc.aio._call.AioRpcError as error:
             _check_if_locked(error)
@@ -619,7 +619,7 @@ This will show more debug information.
             p = None
             async for response in self._router_stub.SendPaymentV2(r):
                 p = Payment.from_lnd_grpc(response)
-                await broadcast_sse_msg(SSE.LN_PAYMENT_STATUS, p.model_dump())
+                await broadcast_json_ws(SSE.LN_PAYMENT_STATUS, p.model_dump())
             return p
         except grpc.aio._call.AioRpcError as error:
             _check_if_locked(error)

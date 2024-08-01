@@ -1,4 +1,5 @@
 from decouple import config
+from fastapi import HTTPException, status
 
 from app.system.models import APIPlatform
 
@@ -21,7 +22,10 @@ async def get_app_status_single(app_id: str):
 
 
 async def get_app_status():
-    return await apps.get_app_status()
+    try:
+        return await apps.get_app_status()
+    except NotImplementedError:
+        return HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED)
 
 
 async def get_app_status_advanced(app_id: str):

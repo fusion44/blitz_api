@@ -48,9 +48,6 @@ echo "# local cache delete .."
 rm -r ./app/__pycache__ 2>/dev/null
 rm -r ./app/repositories/ln_impl/protos/__pycache__ 2>/dev/null
 rm -r ./app/repositories/ln_impl/__pycache__ 2>/dev/null
-rm -r ./app/external/fastapi_versioning/__pycache__ 2>/dev/null
-rm -r ./app/external/sse_starlette/__pycache__ 2>/dev/null
-rm -r ./app/external/__pycache__ 2>/dev/null
 rm -r ./app/models/__pycache__ 2>/dev/null
 rm -r ./app/repositories/__pycache__ 2>/dev/null
 rm -r ./app/routers/__pycache__ 2>/dev/null

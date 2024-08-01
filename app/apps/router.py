@@ -6,7 +6,6 @@ from pydantic import BaseModel
 import app.apps.docs as docs
 import app.apps.service as repo
 from app.auth.auth_bearer import JWTBearer
-from app.external.sse_starlette import EventSourceResponse
 
 _PREFIX = "apps"
 
@@ -51,18 +50,6 @@ async def get_single_status(id):
 @logger.catch(exclude=(HTTPException,))
 async def get_single_status_advanced(id: str = Path(..., required=True)):
     return await repo.get_app_status_advanced(id)
-
-
-@router.get(
-    "/status-sub",
-    name=f"{_PREFIX}/status-sub",
-    summary="Subscribe to status changes of currently installed apps.",
-    response_description=docs.get_app_status_sub_response_docs,
-    dependencies=[Depends(JWTBearer())],
-)
-@logger.catch(exclude=(HTTPException,))
-async def get_status_sub():
-    return EventSourceResponse(repo.get_app_status_sub())
 
 
 @router.post(

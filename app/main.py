@@ -3,8 +3,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from decouple import config as dconfig
-from fastapi import FastAPI, Request
-from fastapi.encoders import jsonable_encoder
+from fastapi import Depends, FastAPI, Request, WebSocket
 from fastapi.exceptions import HTTPException
 from fastapi_plugins import (
     RedisSettings,
@@ -19,7 +18,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
 from app.api.models import ApiStartupStatus, StartupState
-from app.api.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
+from app.api.utils import SSE, broadcast_json_ws, ws_mgr
 from app.api.warmup import (
     get_bitcoin_client_warmup_data,
     get_full_client_warmup_data,
@@ -86,7 +85,7 @@ async def lifespan(app: FastAPI):
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
     register_cookie_updater()
-    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
+    await broadcast_json_ws(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
     loop = asyncio.get_event_loop()
     loop.create_task(_initialize_bitcoin())
     loop.create_task(_initialize_lightning())
@@ -145,7 +144,7 @@ async def _set_startup_status(
 
     loop = asyncio.get_event_loop()
     loop.create_task(warmup_new_connections())
-    await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
+    await broadcast_json_ws(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
 
 
 @logger.catch
@@ -230,46 +229,31 @@ def index(req: Request):
 new_connections = []
 
 
-def _send_sse_event(id, event, data):
-    return sse_mgr.send_to_single(id, build_sse_event(event, data))
-
-
-@app.get(
-    "/sse/subscribe",
-    status_code=status.HTTP_200_OK,
+@logger.catch(exclude=(HTTPException,))
+@app.websocket(
+    "/ws",
+    dependencies=[Depends(JWTBearer())],
 )
-async def stream(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        # No token in cookies found, try to get it from the Authorization header
-        token = request.headers.get("authorization")
+async def ws(websocket: WebSocket):
+    try:
+        id = await ws_mgr.connect(websocket)
 
-    if not token:
-        # Raise an exception as there is not token found
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No authorization code.",
+        new_connections.append(id)
+        loop = asyncio.get_event_loop()
+        loop.create_task(warmup_new_connections())
+        await ws_mgr.send_json(
+            id=id,
+            data={
+                "event": SSE.SYSTEM_STARTUP_INFO,
+                "data": api_startup_status.model_dump(),
+            },
         )
 
-    token = token.replace("Bearer ", "")
-    if not JWTBearer().verify_jwt(jwtoken=token):
-        # token is invalid
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization code.",
-        )
-
-    event_source, id = sse_mgr.add_connection(request)
-    new_connections.append(id)
-
-    await _send_sse_event(
-        id, SSE.SYSTEM_STARTUP_INFO, jsonable_encoder(api_startup_status.model_dump())
-    )
-
-    loop = asyncio.get_event_loop()
-    loop.create_task(warmup_new_connections())
-
-    return event_source
+        while True:
+            await websocket.receive_text()
+            await websocket.send_text("Read only WebSocket")
+    except Exception as e:
+        logger.error(e)
 
 
 warmup_running = False
@@ -281,14 +265,22 @@ async def warmup_new_connections():
     # when the startup state changes. Especially the hardware info
     # is rather data intensive. This is OK for now, to keep the code simple.
 
-    async def _handle(id, event, res):
+    async def _send(id, event, res):
         if isinstance(res, BaseModel):
-            return await _send_sse_event(id, event, res.model_dump())
+            e = {"event": event, "data": res.model_dump()}
+            return await ws_mgr.send_json(id, e)
         elif isinstance(res, dict) or isinstance(res, list):
-            return await _send_sse_event(id, event, res)
+            e = {"event": event, "data": res}
+            return await ws_mgr.send_json(id, e)
+        elif isinstance(res, HTTPException):
+            e = {
+                "event": event,
+                "data": {"error_code": res.status_code, "detail": res.detail},
+            }
+            return await ws_mgr.send_json(id, e)
 
         logger.error(f"Error while fetching warmup_data for {event}: {res}")
-        return await _send_sse_event(id, event, {"error": f"{res}"})
+        return await ws_mgr.send_json(id, {"event": SSE.SERVER_ERROR, "data": res})
 
     global new_connections
     if len(new_connections) == 0:
@@ -309,14 +301,14 @@ async def warmup_new_connections():
             for id in new_connections:
                 await asyncio.gather(
                     *[
-                        _handle(id, SSE.SYSTEM_INFO, res[0]),
-                        _handle(id, SSE.BTC_INFO, res[1]),
-                        _handle(id, SSE.LN_INFO, res[2]),
-                        _handle(id, SSE.LN_INFO_LITE, res[3]),
-                        _handle(id, SSE.LN_FEE_REVENUE, res[4]),
-                        _handle(id, SSE.WALLET_BALANCE, res[5]),
-                        _handle(id, SSE.INSTALLED_APP_STATUS, res[6]),
-                        _handle(id, SSE.HARDWARE_INFO, res[7]),
+                        _send(id, SSE.SYSTEM_INFO, res[0]),
+                        _send(id, SSE.BTC_INFO, res[1]),
+                        _send(id, SSE.LN_INFO, res[2]),
+                        _send(id, SSE.LN_INFO_LITE, res[3]),
+                        _send(id, SSE.LN_FEE_REVENUE, res[4]),
+                        _send(id, SSE.WALLET_BALANCE, res[5]),
+                        _send(id, SSE.INSTALLED_APP_STATUS, res[6]),
+                        _send(id, SSE.HARDWARE_INFO, res[7]),
                     ]
                 )
 
@@ -326,9 +318,9 @@ async def warmup_new_connections():
             for id in new_connections:
                 await asyncio.gather(
                     *[
-                        _handle(id, SSE.SYSTEM_INFO, res[0]),
-                        _handle(id, SSE.BTC_INFO, res[1]),
-                        _handle(id, SSE.HARDWARE_INFO, res[2]),
+                        _send(id, SSE.SYSTEM_INFO, res[0]),
+                        _send(id, SSE.BTC_INFO, res[1]),
+                        _send(id, SSE.HARDWARE_INFO, res[2]),
                     ]
                 )
 
@@ -342,8 +334,8 @@ async def warmup_new_connections():
         for id in new_connections:
             await asyncio.gather(
                 *[
-                    _handle(id, SSE.BTC_INFO, res[0]),
-                    _handle(id, SSE.HARDWARE_INFO, res[1]),
+                    _send(id, SSE.BTC_INFO, res[0]),
+                    _send(id, SSE.HARDWARE_INFO, res[1]),
                 ]
             )
 
@@ -357,7 +349,7 @@ async def warmup_new_connections():
         # Bitcoin Core and Lightning running
         res = await get_hardware_info()
         for id in new_connections:
-            await _send_sse_event(id, SSE.HARDWARE_INFO, res)
+            await _send(id, SSE.HARDWARE_INFO, res)
 
         # don't clear new_connections, we'll try again later when api is initialized
 

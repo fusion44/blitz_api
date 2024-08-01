@@ -6,7 +6,6 @@ from fastapi.params import Depends, Query
 from app.api.utils import SSE
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
-from app.external.sse_starlette import EventSourceResponse
 from app.system.docs import (
     get_debug_logs_raw_desc,
     get_debug_logs_raw_resp_desc,

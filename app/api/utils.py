@@ -6,17 +6,15 @@ import random
 import re
 import time
 import warnings
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 from loguru import logger
 
-from app.api.sse_manager import SSEManager
-from app.external.sse_starlette import ServerSentEvent
+from app.api.ws_manager import WebSocketManager
 
-sse_mgr = SSEManager()
-sse_mgr.setup()
+ws_mgr = WebSocketManager()
 
 
 class ProcessResult:
@@ -37,15 +35,8 @@ class ProcessResult:
         )
 
 
-def build_sse_event(event: str, json_data: Optional[Dict]):
-    return ServerSentEvent(
-        event=event,
-        data=json.dumps(jsonable_encoder(json_data)),
-    )
-
-
-async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
-    """Broadcasts a message to all connected clients
+async def broadcast_json_ws(event: str, json_data: dict[str, Any]):
+    """Broadcasts a json message to all connected clients
 
     Parameters
     ----------
@@ -54,8 +45,7 @@ async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
     data : dictionary, optional
         The data to include
     """
-
-    await sse_mgr.broadcast_to_all(build_sse_event(event, json_data))
+    await ws_mgr.broadcast_json(json_data={"event": event, "data": json_data})
 
 
 async def redis_get(key: str) -> str:
@@ -107,6 +97,8 @@ class SSE:
     LN_FEE_REVENUE = "ln_fee_revenue"
     LN_FORWARD_SUCCESSES = "ln_forward_successes"
     WALLET_BALANCE = "wallet_balance"
+
+    SERVER_ERROR = "server_error"
 
 
 # https://gist.github.com/risent/4cab3878d995bec7d1c2

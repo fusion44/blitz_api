@@ -19,7 +19,6 @@ from app.bitcoind.service import (
     handle_block_sub,
 )
 from app.bitcoind.utils import bitcoin_rpc
-from app.external.sse_starlette import EventSourceResponse
 
 _PREFIX = "bitcoin"
 
@@ -132,18 +131,6 @@ async def getnetworkinfo():
 async def get_raw_transaction_path(
     txid: str = Query(
         ..., min_length=64, max_length=64, description="The transaction id"
-    )
+    ),
 ):
     return await get_raw_transaction(txid)
-
-
-@router.get(
-    "/block-sub",
-    name=f"{_PREFIX}.block-sub",
-    summary="Subscribe to incoming blocks.",
-    description=blocks_sub_doc,
-    response_description="A JSON object with information about the new block.",
-    dependencies=[Depends(JWTBearer())],
-)
-async def zmq_sub(request: Request, verbosity: int = 1):
-    return EventSourceResponse(handle_block_sub(request, verbosity))

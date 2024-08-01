@@ -11,7 +11,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from loguru import logger as logging
 
-from app.api.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
+from app.api.utils import SSE, broadcast_json_ws, call_sudo_script, parse_key_value_text
 from app.apps.impl.apps_base import AppsBase
 
 available_app_ids = {
@@ -196,7 +196,7 @@ class RaspiBlitzApps(AppsBase):
                 detail=app_id + "install script does not exist / is not supported",
             )
 
-        await broadcast_sse_msg(
+        await broadcast_json_ws(
             SSE.INSTALL_APP,
             {"id": app_id, "mode": "on", "result": "running", "details": ""},
         )
@@ -212,7 +212,7 @@ class RaspiBlitzApps(AppsBase):
                 status.HTTP_400_BAD_REQUEST, detail="script not exist/supported"
             )
 
-        await broadcast_sse_msg(
+        await broadcast_json_ws(
             SSE.INSTALL_APP,
             {"id": app_id, "mode": "off", "result": "running", "details": ""},
         )
@@ -279,7 +279,7 @@ class RaspiBlitzApps(AppsBase):
                 logging.error(
                     f"FOUND `error=` returned by script: {stdoutData['error']}"
                 )
-                await broadcast_sse_msg(
+                await broadcast_json_ws(
                     SSE.INSTALL_APP,
                     {
                         "id": app_id,
@@ -292,7 +292,7 @@ class RaspiBlitzApps(AppsBase):
             # stdout - consider also script had error
             elif "result" not in stdoutData:
                 logging.error("NO `result=` returned by script:")
-                await broadcast_sse_msg(
+                await broadcast_json_ws(
                     SSE.INSTALL_APP,
                     {
                         "id": app_id,
@@ -310,7 +310,7 @@ class RaspiBlitzApps(AppsBase):
                 if updatedAppData["error"] != "":
                     logging.warning("Error Detected ...")
                     logging.warning(f"updatedAppData: {updatedAppData}")
-                    await broadcast_sse_msg(
+                    await broadcast_json_ws(
                         SSE.INSTALL_APP,
                         {
                             "id": app_id,
@@ -324,7 +324,7 @@ class RaspiBlitzApps(AppsBase):
                 elif mode == "on":
                     if updatedAppData["installed"]:
                         logging.info(f"WIN - install of {app_id} was effective")
-                        await broadcast_sse_msg(
+                        await broadcast_json_ws(
                             SSE.INSTALL_APP,
                             {
                                 "id": app_id,
@@ -335,14 +335,14 @@ class RaspiBlitzApps(AppsBase):
                                 "details": stdoutData["result"],
                             },
                         )
-                        await broadcast_sse_msg(
+                        await broadcast_json_ws(
                             SSE.INSTALLED_APP_STATUS, [updatedAppData]
                         )
                     else:
                         logging.error(f"FAIL - {app_id} was not installed")
                         logging.debug(f"updatedAppData: {updatedAppData}")
                         logging.debug(f"params: {params}")
-                        await broadcast_sse_msg(
+                        await broadcast_json_ws(
                             SSE.INSTALL_APP,
                             {
                                 "id": app_id,
@@ -351,16 +351,16 @@ class RaspiBlitzApps(AppsBase):
                                 "details": "install was not effective",
                             },
                         )
-                        await broadcast_sse_msg(
+                        await broadcast_json_ws(
                             SSE.INSTALLED_APP_STATUS, [updatedAppData]
                         )
 
                 elif mode == "off":
-                    await broadcast_sse_msg(
+                    await broadcast_json_ws(
                         SSE.INSTALL_APP,
                         {"id": app_id, "mode": mode, "result": "win"},
                     )
-                    await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
+                    await broadcast_json_ws(SSE.INSTALLED_APP_STATUS, [updatedAppData])
 
                     if not updatedAppData["installed"]:
                         logging.info(f"WIN - uninstall of {app_id} was effective")

@@ -10,26 +10,35 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, poetry2nix }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        # see https://github.com/nix-community/poetry2nix/tree/master#api for more functions and examples.
-        pkgs = nixpkgs.legacyPackages.${system};
-        inherit (poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
-      in
-      {
-        packages = {
-          myapp = mkPoetryApplication { projectDir = self; };
-          default = self.packages.${system}.myapp;
-        };
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    poetry2nix,
+  }:
+    flake-utils.lib.eachDefaultSystem (system: let
+      # see https://github.com/nix-community/poetry2nix/tree/master#api for more functions and examples.
+      pkgs = nixpkgs.legacyPackages.${system};
+      inherit (poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryApplication;
+    in {
+      packages = {
+        myapp = mkPoetryApplication {projectDir = self;};
+        default = self.packages.${system}.myapp;
+      };
 
-        devShells.default = pkgs.mkShell {
-          inputsFrom = [ self.packages.${system}.myapp ];
-          packages = with pkgs; [
-            poetry
-            pyright
-            sshpass
-          ];
-        };
-      });
+      devShells.default = pkgs.mkShell {
+        inputsFrom = [self.packages.${system}.myapp];
+        packages = with pkgs; [
+          alejandra
+          claws # testing websockets: https://github.com/thehowl/claws
+          redis
+          poetry
+          pyright
+          sshpass
+        ];
+        shellHook = ''
+          LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib";
+        '';
+      };
+    });
 }

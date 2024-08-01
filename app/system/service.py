@@ -1,10 +1,10 @@
 import asyncio
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from decouple import config
 from fastapi import HTTPException, Request, status
 
-from app.api.utils import SSE, broadcast_sse_msg
+from app.api.utils import SSE, broadcast_json_ws
 from app.system.models import (
     APIPlatform,
     ConnectionInfo,
@@ -76,9 +76,9 @@ async def get_connection_info() -> ConnectionInfo:
 
 async def shutdown(reboot: bool) -> bool:
     if reboot:
-        await broadcast_sse_msg(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
+        await broadcast_json_ws(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
     else:
-        await broadcast_sse_msg(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
+        await broadcast_json_ws(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
 
     try:
         return await system.shutdown(reboot=reboot)
@@ -111,7 +111,7 @@ async def _handle_gather_hardware_info():
     while True:
         info = await get_hardware_info()
         if last_info != info:
-            await broadcast_sse_msg(SSE.HARDWARE_INFO, info)
+            await broadcast_json_ws(SSE.HARDWARE_INFO, info)
             last_info = info
 
         await asyncio.sleep(HW_INFO_YIELD_TIME)

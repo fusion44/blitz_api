@@ -10,7 +10,7 @@ from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
 
-from app.api.utils import SSE, broadcast_sse_msg
+from app.api.utils import SSE, broadcast_json_ws
 from app.bitcoind.models import (
     BlockchainInfo,
     BlockRpcFunc,
@@ -187,7 +187,7 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
             )
 
         r = await bitcoin_rpc_async("getblock", [hash, verbosity])
-        await broadcast_sse_msg(SSE.BTC_NEW_BLOC, r["result"])
+        await broadcast_json_ws(SSE.BTC_NEW_BLOC, r["result"])
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -213,7 +213,7 @@ async def _handle_gather_bitcoin_status():
 
         if last_info != info:
             # only send data if anything has changed
-            await broadcast_sse_msg(SSE.BTC_INFO, info.model_dump())
+            await broadcast_json_ws(SSE.BTC_INFO, info.model_dump())
             last_info = info
 
         await asyncio.sleep(2)
