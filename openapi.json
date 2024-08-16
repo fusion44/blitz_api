@@ -1327,35 +1327,6 @@
         ]
       }
     },
-    "/lightning/get-info-lite": {
-      "get": {
-        "tags": [
-          "Lightning"
-        ],
-        "summary": "Get lightweight current lightning info. Less verbose version of /lightning/get-info",
-        "operationId": "lightning_get_info_lite_lightning_get_info_lite_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LightningInfoLite"
-                }
-              }
-            }
-          },
-          "423": {
-            "description": "LND only: Wallet is locked. Unlock via /lightning/unlock-wallet."
-          }
-        },
-        "security": [
-          {
-            "JWTBearer": []
-          }
-        ]
-      }
-    },
     "/lightning/decode-pay-req": {
       "get": {
         "tags": [

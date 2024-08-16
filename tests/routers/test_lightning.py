@@ -1,9 +1,6 @@
 from starlette.testclient import TestClient
 
 from app.main import app
-from app.models.lightning import LightningInfoLite
-from app.routers import lightning
-from tests.routers.test_lightning_utils import get_valid_lightning_info_lite
 from tests.routers.utils import call_route
 from tests.utils import monkeypatch_auth
 
@@ -28,31 +25,7 @@ def test_route_authentications_latest():
         call_route(test_client, f"{prefix}/send-coins", params=p, method="p")
         p = {"pay_req": "1337"}
         call_route(test_client, f"{prefix}/send-payment", params=p, method="p")
-        call_route(test_client, f"{prefix}/get-info-lite")
         call_route(test_client, f"{prefix}/get-info")
         call_route(test_client, f"{prefix}/decode-pay-req", params={"pay_req": ""})
         p = {"password": "1"}
         call_route(test_client, f"{prefix}/unlock-wallet", params=p, method="p")
-
-
-def test_get_ln_status(monkeypatch):
-    prefix_latest = "/latest/lightning"
-    prefix_v1 = "/v1/lightning"
-
-    monkeypatch_auth(monkeypatch)
-
-    async def mock_get_ln_info_lite() -> LightningInfoLite:
-        return get_valid_lightning_info_lite()
-
-    monkeypatch.setattr(lightning, "get_ln_info_lite", mock_get_ln_info_lite)
-
-    response = test_client.get(f"{prefix_latest}/get-info-lite")
-
-    r_js = response.json()
-    v_js = get_valid_lightning_info_lite().model_dump()
-    assert r_js == v_js
-
-    response = test_client.get(f"{prefix_v1}/get-info-lite")
-    r_js = response.json()
-    v_js = get_valid_lightning_info_lite().model_dump()
-    assert r_js == v_js

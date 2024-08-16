@@ -1608,50 +1608,6 @@ class LnInfo(BaseModel):
         )
 
 
-class LightningInfoLite(BaseModel):
-    implementation: str = Query(
-        ..., description="Lightning software implementation (LND, c-lightning)"
-    )
-    version: str = Query(..., description="Version of the implementation")
-    identity_pubkey: str = Query(
-        ..., description="The identity pubkey of the current node"
-    )
-    identity_uri: str = Query(..., description="The complete URI of the current node")
-    num_pending_channels: int = Query(..., description="Number of pending channels")
-    num_active_channels: int = Query(..., description="Number of active channels")
-    num_inactive_channels: int = Query(..., description="Number of inactive channels")
-    num_peers: int = Query(..., description="Number of peers")
-    block_height: int = Query(
-        ..., description="The node's current view of the height of the best block"
-    )
-    synced_to_chain: bool | None = Query(
-        None, description="Whether the wallet's view is synced to the main chain"
-    )
-    synced_to_graph: bool | None = Query(
-        None,
-        description=(
-            "Whether we consider ourselves synced with " "the public channel graph."
-        ),
-    )
-
-    @classmethod
-    @logger.catch(exclude=(HTTPException,))
-    def from_lninfo(cls, info: LnInfo):
-        return cls(
-            implementation=info.implementation,
-            version=info.version,
-            identity_pubkey=info.identity_pubkey,
-            identity_uri=info.identity_uri,
-            num_pending_channels=info.num_pending_channels,
-            num_active_channels=info.num_active_channels,
-            num_inactive_channels=info.num_inactive_channels,
-            num_peers=info.num_peers,
-            block_height=info.block_height,
-            synced_to_chain=info.synced_to_chain,
-            synced_to_graph=info.synced_to_graph,
-        )
-
-
 class WalletBalance(BaseModel):
     onchain_confirmed_balance: int = Query(
         ...,
