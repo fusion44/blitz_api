@@ -100,7 +100,6 @@ class SSE:
     BTC_INFO = "btc_info"
 
     LN_INFO = "ln_info"
-    LN_INFO_LITE = "ln_info_lite"
     LN_INVOICE_STATUS = "ln_invoice_status"
     LN_PAYMENT_STATUS = "ln_payment_status"
     LN_ONCHAIN_PAYMENT_STATUS = "ln_onchain_payment_status"

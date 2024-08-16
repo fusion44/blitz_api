@@ -13,7 +13,6 @@ from app.lightning.models import (
     GenericTx,
     InitLnRepoUpdate,
     Invoice,
-    LightningInfoLite,
     LnInfo,
     NewAddressInput,
     OnChainTransaction,
@@ -71,11 +70,6 @@ if ln_node != "none":
 async def initialize_ln_repo() -> AsyncGenerator[InitLnRepoUpdate, None]:
     async for u in ln.initialize():
         yield u
-
-
-async def get_ln_info_lite() -> LightningInfoLite:
-    ln_info = await ln.get_ln_info()
-    return LightningInfoLite.from_lninfo(ln_info)
 
 
 async def get_wallet_balance():
@@ -222,12 +216,6 @@ async def _handle_info_listener():
         if last_info != info:
             await broadcast_sse_msg(SSE.LN_INFO, info.model_dump())
             last_info = info
-
-        info_lite = LightningInfoLite.from_lninfo(info)
-
-        if last_info_lite != info_lite:
-            await broadcast_sse_msg(SSE.LN_INFO_LITE, info_lite.model_dump())
-            last_info_lite = info_lite
 
         await asyncio.sleep(GATHER_INFO_INTERVALL)
 

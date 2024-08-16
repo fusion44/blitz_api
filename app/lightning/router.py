@@ -17,7 +17,6 @@ from app.lightning.models import (
     FeeRevenue,
     GenericTx,
     Invoice,
-    LightningInfoLite,
     LnInfo,
     NewAddressInput,
     OnChainTransaction,
@@ -36,7 +35,6 @@ from app.lightning.service import (
     decode_pay_request,
     get_fee_revenue,
     get_ln_info,
-    get_ln_info_lite,
     get_wallet_balance,
     list_all_tx,
     list_invoices,
@@ -465,27 +463,6 @@ async def sendpayment(
 async def get_info():
     try:
         return await get_ln_info()
-    except HTTPException:
-        raise
-    except NotImplementedError as r:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
-
-
-@router.get(
-    "/get-info-lite",
-    name=f"{_PREFIX}.get-info-lite",
-    summary=(
-        "Get lightweight current lightning info. "
-        "Less verbose version of /lightning/get-info"
-    ),
-    dependencies=[Depends(JWTBearer())],
-    status_code=status.HTTP_200_OK,
-    response_model=LightningInfoLite,
-    responses=responses,
-)
-async def get_ln_info_lite_path():
-    try:
-        return await get_ln_info_lite()
     except HTTPException:
         raise
     except NotImplementedError as r:

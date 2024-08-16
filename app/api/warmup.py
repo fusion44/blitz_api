@@ -9,7 +9,6 @@ from app.bitcoind.service import get_btc_info
 from app.lightning.service import (
     get_fee_revenue,
     get_ln_info,
-    get_ln_info_lite,
     get_wallet_balance,
 )
 from app.system.service import get_hardware_info, get_system_info
@@ -36,7 +35,6 @@ async def get_full_client_warmup_data() -> List:
             get_system_info(),
             get_btc_info(),
             get_ln_info(),
-            get_ln_info_lite(),
             get_fee_revenue(),
             get_wallet_balance(),
             get_app_status(),
