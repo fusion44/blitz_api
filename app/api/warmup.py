@@ -6,11 +6,7 @@ from loguru import logger
 
 from app.apps.service import get_app_status
 from app.bitcoind.service import get_btc_info
-from app.lightning.service import (
-    get_fee_revenue,
-    get_ln_info,
-    get_wallet_balance,
-)
+from app.lightning.service import get_fee_revenue, get_ln_info, get_wallet_balance
 from app.system.service import get_hardware_info, get_system_info
 
 
