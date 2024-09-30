@@ -328,7 +328,8 @@ async def warmup_new_connections():
                     *[
                         _handle(id, SSE.SYSTEM_INFO, res[0]),
                         _handle(id, SSE.BTC_INFO, res[1]),
-                        _handle(id, SSE.HARDWARE_INFO, res[2]),
+                        _handle(id, SSE.INSTALLED_APP_STATUS, res[2]),
+                        _handle(id, SSE.HARDWARE_INFO, res[3]),
                     ]
                 )
 
