@@ -22,7 +22,7 @@ install:
 	poetry run python -m pip install -r requirements.txt
 
 install-dev:
-	poetry install && poetry run pre-commit install
+	poetry install
 
 run:
 	poetry run python -m uvicorn app.main:app --reload
@@ -39,9 +39,6 @@ update-requirements-file:
 
 sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
-
-pre-commit:
-	poetry run pre-commit run --all-files
 
 generate-client-libs:
 	poetry run python gen_client_libs.py

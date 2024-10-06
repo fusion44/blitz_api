@@ -1,7 +1,6 @@
 # Blitz API
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 
 A management backend for bitcoin and lightning node operators written in Python with FastAPI.
 
@@ -116,7 +115,6 @@ folder of the project:
 
 ```
 poetry install
-pre-commit install
 ```
 
 or
@@ -222,10 +220,6 @@ Clone https://github.com/fusion44/blitz_api_client_libraries next to the blitz_a
 make generate-client-libs
 ```
 > ⚠️ The first run requires `sudo` as it must download a Java .jar file to the system npm package folder.
-
-### Before you commit
-
-This project uses [pre-commit](https://pre-commit.com) to keep the source code structured. Please make sure to run either `make pre_commit` or `pre-commit run --all-files`. The CI pipeline will reject pull requests that fail this step. This step helps to ensures that the source code is formatted consistently and pull requests are as tidy as possible.
 
 ### [Swagger / OpenAPI](https://swagger.io)
 
