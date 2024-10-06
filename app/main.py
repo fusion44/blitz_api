@@ -312,13 +312,12 @@ async def warmup_new_connections():
                         _handle(id, SSE.SYSTEM_INFO, res[0]),
                         _handle(id, SSE.BTC_INFO, res[1]),
                         _handle(id, SSE.LN_INFO, res[2]),
-                        _handle(id, SSE.LN_FEE_REVENUE, res[4]),
-                        _handle(id, SSE.WALLET_BALANCE, res[5]),
-                        _handle(id, SSE.INSTALLED_APP_STATUS, res[6]),
-                        _handle(id, SSE.HARDWARE_INFO, res[7]),
+                        _handle(id, SSE.LN_FEE_REVENUE, res[3]),
+                        _handle(id, SSE.WALLET_BALANCE, res[4]),
+                        _handle(id, SSE.INSTALLED_APP_STATUS, res[5]),
+                        _handle(id, SSE.HARDWARE_INFO, res[6]),
                     ]
                 )
-
         # when its bitcoin only
         else:
             res = await get_full_client_warmup_data_bitcoinonly()
