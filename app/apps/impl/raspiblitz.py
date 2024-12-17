@@ -26,6 +26,7 @@ available_app_ids = {
     "thunderhub",
     "jam",
     "electrs",
+    "albyhub",
 }
 
 
