@@ -26,6 +26,7 @@ available_app_ids = {
     "thunderhub",
     "jam",
     "electrs",
+    "albyhub",
 }
 
 
@@ -160,8 +161,12 @@ class RaspiBlitzApps(AppsBase):
                     continue
                 if appID == "thunderhub":
                     continue
+                if appID == "albyhub":
+                    continue
             elif node_type == "cln_grpc":
                 if appID == "thunderhub":
+                    continue
+                if appID == "albyhub":
                     continue
             # elif node_type="lnd_grpc":
 
@@ -193,7 +198,13 @@ class RaspiBlitzApps(AppsBase):
         if app_id not in available_app_ids:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail=app_id + "install script does not exist / is not supported",
+                detail=app_id + " install script does not exist / is not supported",
+            )
+
+        if node_type == "cln_grpc" and (app_id == "thunderhub" or app_id == "albyhub"):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=app_id + " not available for Core Lightning nodes",
             )
 
         await broadcast_sse_msg(
@@ -307,7 +318,7 @@ class RaspiBlitzApps(AppsBase):
                 updatedAppData = await self.get_app_status_single(app_id)
 
                 # in case of script error
-                if updatedAppData["error"] != "":
+                if "error" in updatedAppData and updatedAppData["error"] != "":
                     logging.warning("Error Detected ...")
                     logging.warning(f"updatedAppData: {updatedAppData}")
                     await broadcast_sse_msg(
