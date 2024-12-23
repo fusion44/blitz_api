@@ -250,7 +250,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         for pay in res[2]:
             if pay is not Payment:
-                logger.error("Payment is not a payment class.")
+                logger.error(f"Payment is not a payment class: {pay}")
                 continue
 
             comment = ""

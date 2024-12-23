@@ -183,10 +183,10 @@ class ForwardSuccessEvent(BaseModel):
     def from_lnd_grpc(cls, evt) -> "ForwardSuccessEvent":
         return cls(
             timestamp_ns=int(evt.timestamp),
-            chan_id_in=int(evt.chan_id_in),
-            chan_id_out=int(evt.chan_id_out),
+            chan_id_in=str(evt.chan_id_in),
+            chan_id_out=str(evt.chan_id_out),
             amt_in_msat=int(evt.amt_in_msat),
-            amt_out_msat=int(evt.amt_out_msat),
+            amt_out_msat=str(evt.amt_out_msat),
             fee_msat=int(evt.fee_msat),
         )
 
@@ -384,11 +384,11 @@ class HopHint(BaseModel):
     @classmethod
     def from_lnd_grpc(cls, h) -> "HopHint":
         return cls(
-            node_id=h.node_id,
-            chan_id=h.chan_id,
-            fee_base_msat=h.fee_base_msat,
-            fee_proportional_millionths=h.fee_proportional_millionths,
-            cltv_expiry_delta=h.cltv_expiry_delta,
+            node_id=str(h.node_id),
+            chan_id=str(h.chan_id),
+            fee_base_msat=int(h.fee_base_msat),
+            fee_proportional_millionths=int(h.fee_proportional_millionths),
+            cltv_expiry_delta=int(h.cltv_expiry_delta),
         )
 
     @classmethod
@@ -1059,13 +1059,8 @@ class HTLCAttemptFailure(BaseModel):
 
     @classmethod
     def from_lnd_grpc(cls, f) -> "HTLCAttemptFailure":
-        code = None
-        if hasattr(f, "code"):
-            code = f.code
-
-        htlc_msat = None
-        if hasattr(f, "htlc_msat"):
-            htlc_msat = f.htlc_msat
+        code = f.code if hasattr(f, "code") else -1
+        htlc_msat = f.htlc_msat if hasattr(f, "htlc_msat") else 0
 
         return cls(
             code=code,
@@ -1077,7 +1072,6 @@ class HTLCAttemptFailure(BaseModel):
             failure_source_index=f.failure_source_index,
             height=f.height,
         )
-
 
 class HTLCStatus(str, Enum):
     IN_FLIGHT = "in_flight"
