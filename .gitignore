@@ -8,5 +8,16 @@ docker/.env
 .venv
 pyrightconfig.json
 
+test_env_data
+
 # Nix
 result
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
