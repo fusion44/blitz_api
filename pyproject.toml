@@ -9,37 +9,38 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-fastapi = {extras = ["standard"], version = "^0.115.6"}
-fastapi-plugins = "^0.13.0"
-anyio = "^4.3.0"
-redis = "^5.0.1"
+python = "^3.12 | ^3.11"
+fastapi = {extras = ["standard"], version = "^0.115.8"}
+fastapi-plugins = "^0.13.1"
+anyio = "^4.8.0"
+redis = "^4.6.0"
 aioredis = "^2.0.1"
-pydantic = "^2.6.1"
+pydantic = "^2.10.6"
 uvicorn = {extras = ["standard"], version = "^0.34.0"}
-pyjwt = "^2.8.0"
+pyjwt = "^2.10.1"
 python-decouple = "^3.8"
-psutil = "^5.9.8"
-requests = "^2.31.0"
-pyzmq = "^25.1.2"
-aiohttp = "^3.11.10"
-grpcio = "^1.60.1"
-grpcio-tools = "^1.60.1"
-googleapis-common-protos = "^1.62.0"
-protobuf = "^4.25.3"
-deepdiff = "^6.7.1"
+psutil = "^6.1.1"
+requests = "^2.32.3"
+pyzmq = "^26.2.1"
+aiohttp = "^3.11.12"
+grpcio = "^1.70.0"
+grpcio-tools = "^1.70.0"
+googleapis-common-protos = "^1.66.0"
+protobuf = "^5.29.3"
+deepdiff = "^8.2.0"
 loguru = "^0.7.2"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.3.0"
-pytest = "^8.0.1"
-pytest-asyncio = "^0.23.5"
-coverage = "^7.4.2"
-isort = "^5.13.2"
-ruff = "^0.8.3"
-ruff-lsp = "^0.0.59"
-debugpy = "^1.8.1"
-click = "^8.1.7"
+black = "^25.1.0"
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.3"
+coverage = "^7.6.10"
+isort = "^6.0.0"
+ruff = "^0.9.5"
+ruff-lsp = "^0.0.61"
+debugpy = "^1.8.12"
+click = "^8.1.8"
+watchfiles = "^0.24.0"
 
 [build-system]
 requires = ["poetry-core"]
