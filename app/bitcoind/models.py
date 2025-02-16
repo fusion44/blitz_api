@@ -5,6 +5,8 @@ from typing import List, Optional, Union
 from fastapi import Query
 from pydantic.main import BaseModel
 
+from loguru import logger
+
 
 class FeeEstimationMode(str, Enum):
     CONSERVATIVE = "conservative"
@@ -23,7 +25,9 @@ class BlockRpcFunc(str, Enum):
             return cls.RAWBLOCK
         else:
             raise ArgumentError(
-                "Function name must either be 'hashblock' or 'rawblock'"
+                None,
+                "Function name must either be 'hashblock' or 'rawblock'."
+                f" Actual: ${func}",
             )
 
 
@@ -153,14 +157,10 @@ class NetworkInfo(BaseModel):
     local_addresses: List[BtcLocalAddress] = Query(
         [], description="List of local addresses"
     )
-    warnings: str = Query(None, description="Any network and blockchain warnings")
+    warnings: List[str] = Query(None, description="Any network and blockchain warnings")
 
     @classmethod
     def from_rpc(cls, r):
-        networks = []
-        for n in r["networks"]:
-            networks.append(BtcNetwork.from_rpc(n))
-
         return cls(
             version=r["version"],
             subversion=r["subversion"],
@@ -372,7 +372,7 @@ class BlockchainInfo(BaseModel):
             "enabled)"
         ),
     )
-    warnings: str = Query(..., description="Any network and blockchain warnings")
+    warnings: List[str] = Query(..., description="Any network and blockchain warnings")
     softforks: List[SoftFork] = Query(..., description="Status of softforks")
 
     @classmethod

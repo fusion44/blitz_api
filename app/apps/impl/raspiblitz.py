@@ -6,11 +6,11 @@ import os
 import random
 from typing import List
 
-from decouple import config
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from loguru import logger as logging
 
+from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
 from app.apps.impl.apps_base import AppsBase
 
@@ -26,13 +26,12 @@ available_app_ids = {
     "thunderhub",
     "jam",
     "electrs",
-    "albyhub",
 }
 
 
-SHELL_SCRIPT_PATH = config("shell_script_path")
+SHELL_SCRIPT_PATH = config("BAPI_RB_SHELL_SCRIPT_PATH")
 
-node_type = config("ln_node")
+node_type = config("BAPI_LN_NODE", default="none").to_lower()
 
 
 class RaspiBlitzApps(AppsBase):

@@ -1,9 +1,9 @@
 import asyncio
 from typing import Dict, Optional
 
-from decouple import config
 from fastapi import HTTPException, Request, status
 
+from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg
 from app.system.models import (
     APIPlatform,
@@ -14,11 +14,15 @@ from app.system.models import (
     SystemInfo,
 )
 
-PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
+PLATFORM = config("BAPI_PLATFORM", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
     from app.system.impl.raspiblitz import RaspiBlitzSystem as System
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.system.impl.native_python import NativePythonSystem as System
+else:
+    raise RuntimeError(
+        f"Unsupported platform '{PLATFORM}'. Options: {APIPlatform.values_as_list()}"
+    )
 
 
 system = System()

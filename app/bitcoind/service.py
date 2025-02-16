@@ -64,7 +64,7 @@ async def initialize_bitcoin_repo() -> bool:
 async def get_blockchain_info() -> BlockchainInfo:
     result = await bitcoin_rpc_async("getblockchaininfo")
 
-    if result["error"] is not None:
+    if "error" in result and result["error"] is not None:
         raise HTTPException(result["status"], detail=result["error"])
 
     return BlockchainInfo.from_rpc(result["result"])
@@ -77,7 +77,7 @@ async def estimate_fee(
 ) -> int:
     result = await bitcoin_rpc_async("estimatesmartfee", [target_conf, mode])
 
-    if result["error"] is not None:
+    if "error" in result and result["error"] is not None:
         raise HTTPException(result["status"], detail=result["error"])
 
     if "errors" in result["result"]:
@@ -99,7 +99,7 @@ async def estimate_fee(
 async def get_network_info() -> NetworkInfo:
     result = await bitcoin_rpc_async("getnetworkinfo")
 
-    if result["error"] is not None:
+    if "error" in result and result["error"] is not None:
         raise HTTPException(result["status"], detail=result["error"])
 
     return NetworkInfo.from_rpc(result["result"])
@@ -109,7 +109,7 @@ async def get_network_info() -> NetworkInfo:
 async def get_raw_transaction(txid: str) -> RawTransaction:
     result = await bitcoin_rpc_async("getrawtransaction", [txid, 1])
 
-    if result["error"] is None:
+    if "error" not in result or result["error"] is None:
         return RawTransaction.from_rpc(result["result"])
 
     if "No such mempool or blockchain transaction." in result["error"]:

@@ -4,12 +4,13 @@ import time
 from typing import Dict
 
 import jwt
-from decouple import config
 from loguru import logger
 
-JWT_SECRET = config("secret")
-JWT_ALGORITHM = config("algorithm")
-JWT_EXPIRY_TIME = config("jwt_expiry_time", default=300, cast=int)
+from app.api.config import config
+
+JWT_SECRET = config("BAPI_JWT_SECRET")
+JWT_ALGORITHM = config("BAPI_JWT_ALGORITHM")
+JWT_EXPIRY_TIME = config("BAPI_JWT_EXPIRY_TIME", default=300, cast=int)
 
 
 def sign_jwt() -> Dict[str, str]:
@@ -35,15 +36,23 @@ def handle_local_cookie():
 
     blitz_path = os.path.join(os.path.expanduser("~"), ".blitz_api")
     full_cookie_file_path = os.path.join(blitz_path, ".cookie")
-    enabled = config("enable_local_cookie_auth", default=False, cast=bool)
+    enabled = config("BAPI_ENABLE_LOCAL_COOKIE_AUTH", default=False, cast=bool)
+
+    if not enabled:
+        return
 
     if not os.path.exists(blitz_path):
-        os.makedirs(blitz_path)
-
-    if enabled:
-        f = open(full_cookie_file_path, "w")
-        f.write(sign_jwt())
-        f.close()
+        try:
+            os.makedirs(blitz_path)
+        except OSError as e:
+            logger.error(
+                f"""Unable to create the .blit_api folder: {e}
+                Please make sure that the target folder is readable.
+            """
+            )
+    f = open(full_cookie_file_path, "w")
+    f.write(sign_jwt())
+    f.close()
 
 
 def remove_local_cookie():

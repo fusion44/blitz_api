@@ -16,7 +16,73 @@ class NativePythonApps(AppsBase):
         raise _NotImplemented()
 
     async def get_app_status(self):
-        raise _NotImplemented()
+        # TODO: revert me before merge to main
+        return [
+            {
+                "id": "btcpayserver",
+                "version": "v1.12.5",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+            {
+                "id": "lnbits",
+                "version": "0.11.3",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+            {
+                "id": "rtl",
+                "version": "v0.14.1",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+            {
+                "id": "electrs",
+                "installed": True,
+                "configured": False,
+                "status": "online",
+                "localIP": "",
+                "httpPort": "",
+                "httpsPort": "",
+                "httpsForced": False,
+                "httpsSelfsigned": False,
+                "hiddenService": "",
+                "address": "http://:",
+                "authMethod": "none",
+                "details": {},
+            },
+            {
+                "id": "btc-rpc-explorer",
+                "version": "v3.4.0",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+            {
+                "id": "mempool",
+                "version": "v2.5.0",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+            {
+                "id": "jam",
+                "version": "0.2.0",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+            {
+                "id": "thunderhub",
+                "version": "v0.13.30",
+                "installed": False,
+                "status": "offline",
+                "error": "",
+            },
+        ]
 
     async def get_app_status_advanced(self, app_id: str):
         raise _NotImplemented()

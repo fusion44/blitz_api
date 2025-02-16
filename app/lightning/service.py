@@ -1,11 +1,11 @@
 import asyncio
 from typing import AsyncGenerator, List, Optional
 
-from decouple import config
 from fastapi import status
 from fastapi.exceptions import HTTPException
 from loguru import logger
 
+from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg, redis_get
 from app.lightning.models import (
     Channel,
@@ -23,9 +23,9 @@ from app.lightning.models import (
 )
 from app.system.models import APIPlatform
 
-PLATFORM = config("platform", cast=str)
+PLATFORM = config("BAPI_PLATFORM", cast=str)
 
-ln_node = config("ln_node").lower()
+ln_node = config("BAPI_LN_NODE", default="none").lower()
 if ln_node == "lnd_grpc":
     from app.lightning.impl.lnd_grpc import LnNodeLNDgRPC as LnNode
 elif ln_node == "cln_jrpc" and PLATFORM == APIPlatform.RASPIBLITZ:
@@ -49,19 +49,22 @@ else:
     logger.error(f"config: unknown lightning node: {ln_node}")
     raise RuntimeError(f"unknown lightning node type: {ln_node}")
 
-GATHER_INFO_INTERVALL = config("gather_ln_info_interval", default=2, cast=float)
+GATHER_INFO_INTERVALL = config("BAPI_GATHER_LN_INFO_INTERVAL", default=2, cast=float)
 
 _CACHE = {"wallet_balance": None}
 
 ENABLE_FWD_NOTIFICATIONS = config(
-    "sse_notify_forward_successes", default=False, cast=bool
+    "BAPI_SSE_NOTIFY_FORWARD_SUCCESSES", default=False, cast=bool
 )
 
-FWD_GATHER_INTERVAL = config("forwards_gather_interval", default=2.0, cast=float)
+FWD_GATHER_INTERVAL = config("BAPI_FORWARDS_GATHER_INTERVAL", default=2.0, cast=float)
 
 
 if FWD_GATHER_INTERVAL < 0.3:
-    raise RuntimeError("forwards_gather_interval cannot be less than 0.3 seconds")
+    raise RuntimeError("BAPI_FORWARDS_GATHER_INTERVAL cannot be less than 0.3 seconds")
+
+if ln_node != "none":
+    ln = LnNode()
 
 if ln_node != "none":
     ln = LnNode()
