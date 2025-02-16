@@ -1,14 +1,16 @@
-from decouple import config
-
+from app.api.config import config
 from app.system.models import APIPlatform
 
-PLATFORM = config("platform", default=APIPlatform.RASPIBLITZ)
-apps = None
-
+PLATFORM = config("BAPI_PLATFORM", default=APIPlatform.UNKNOWN)
 if PLATFORM == APIPlatform.RASPIBLITZ:
     from app.apps.impl.raspiblitz import RaspiBlitzApps as Apps
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
     from app.apps.impl.native_python import NativePythonApps as Apps
+else:
+    raise RuntimeError(
+        f"Unsupported platform '{PLATFORM}'. Options: {APIPlatform.values_as_list()}."
+    )
+
 
 apps = Apps()
 

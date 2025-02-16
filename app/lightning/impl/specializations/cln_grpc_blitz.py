@@ -1,11 +1,11 @@
 import asyncio
 from typing import AsyncGenerator, List, Optional
 
-from decouple import config
 from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
 
+from app.api.config import config
 from app.api.utils import redis_get
 from app.lightning.impl.cln_grpc import LnNodeCLNgRPC
 from app.lightning.impl.specializations.blitz_common import blitz_cln_unlock
@@ -34,7 +34,7 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
 
     _unlocked = False
 
-    _NETWORK = config("network", default="mainnet")
+    _NETWORK = config("BAPI_NETWORK", default="mainnet")
 
     def get_implementation_name(self) -> str:
         return "CLN_GRPC_BLITZ"

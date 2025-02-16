@@ -1,11 +1,11 @@
 from enum import Enum
 from typing import Optional
 
-from decouple import config
 from fastapi import Query
 from pydantic import BaseModel
 from pydantic.types import constr
 
+from app.api.config import config
 from app.system.docs import get_debug_data_sample_str
 
 
@@ -23,13 +23,24 @@ class APIPlatform(str, Enum):
 
     @staticmethod
     def get_current():
-        p = config("platform", default="raspiblitz")
+        p = config("BAPI_PLATFORM", default="raspiblitz")
         if p == "raspiblitz":
             return APIPlatform.RASPIBLITZ
         elif p == "native_python":
             return APIPlatform.NATIVE_PYTHON
         else:
             return APIPlatform.UNKNOWN
+
+    @staticmethod
+    def values_as_list():
+        """
+        Returns a list of all supported platform values.
+
+        Returns:
+            list: A list of supported platform values.
+        """
+
+        return [e.value for e in APIPlatform if e.value != "unknown"]
 
 
 class SystemInfo(BaseModel):

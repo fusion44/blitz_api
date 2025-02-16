@@ -1,8 +1,9 @@
 import logging
 import sys
 
-from decouple import config as dconfig
 from loguru import logger
+
+from app.api.config import config as dconfig
 
 # Sourced from LNbits project:
 # https://github.com/lnbits/lnbits/blob/841e8e7bbd61fb942a776d82ca0b6d03668eb524/lnbits/app.py#L285
@@ -11,8 +12,8 @@ from loguru import logger
 
 
 def configure_logger() -> None:
-    level = dconfig("log_level", default="INFO", cast=str)
-    log_file = dconfig("log_file", default="", cast=str)
+    level = dconfig("BAPI_LOG_LEVEL", default="INFO", cast=str)
+    log_file = dconfig("BAPI_LOG_FILE", default="", cast=str)
 
     logger.remove()
     formatter = Formatter(level)
@@ -84,4 +85,17 @@ class InterceptHandler(logging.Handler):
             level = logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
-        logger.log(level, record.getMessage())
+
+        try:
+            logger.log(level, record.getMessage())
+        except TypeError as e:
+            logger.error(
+                f"""Unable to process log message: {e}
+                Name of the record:
+                    {record.name}
+                Message of the record:
+                    {record.msg}
+                Args of the record:
+                    {record.args}
+            """
+            )

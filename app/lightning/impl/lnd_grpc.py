@@ -3,7 +3,6 @@ import os
 from typing import AsyncGenerator, List, Optional
 
 import grpc
-from decouple import config as dconfig
 from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
@@ -15,6 +14,7 @@ import app.lightning.impl.protos.lnd.router_pb2 as router
 import app.lightning.impl.protos.lnd.router_pb2_grpc as routerrpc
 import app.lightning.impl.protos.lnd.walletunlocker_pb2 as unlocker
 import app.lightning.impl.protos.lnd.walletunlocker_pb2_grpc as unlockerrpc
+from app.api.config import config as dconfig
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str
 from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.ln_base import LightningNodeBase
@@ -223,17 +223,19 @@ This will show more debug information.
             )
             yield InitLnRepoUpdate(state=LnInitState.DONE)
 
-        lnd_macaroon = config_get_hex_str(dconfig("lnd_macaroon"), name="lnd_macaroon")
+        lnd_macaroon = config_get_hex_str(
+            str(dconfig("BAPI_LND_MACAROON")), name="lnd_macaroon"
+        )
         lnd_cert = bytes.fromhex(
-            config_get_hex_str(dconfig("lnd_cert"), name="lnd_cert")
+            config_get_hex_str(str(dconfig("BAPI_LND_CERT")), name="lnd_cert")
         )
 
         def metadata_callback(context, callback):
             # for more info see grpc docs
             callback([("macaroon", lnd_macaroon)], None)
 
-        lnd_grpc_ip = dconfig("lnd_grpc_ip")
-        lnd_grpc_port = dconfig("lnd_grpc_port")
+        lnd_grpc_ip = str(dconfig("BAPI_LND_GRPC_IP"))
+        lnd_grpc_port = str(dconfig("BAPI_LND_GRPC_PORT"))
         self._lnd_grpc_url = lnd_grpc_ip + ":" + lnd_grpc_port
 
         auth_creds = grpc.metadata_call_credentials(metadata_callback)

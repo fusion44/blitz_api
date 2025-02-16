@@ -5,11 +5,11 @@ import sys
 from typing import AsyncGenerator, Dict, List, Optional, Union
 
 import decouple
-from decouple import config
 from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
 
+from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
 from app.lightning.exceptions import NodeNotFoundError
@@ -78,14 +78,13 @@ class LnNodeCLNjRPC(LightningNodeBase):
         yield InitLnRepoUpdate(state=LnInitState.BOOTSTRAPPING)
 
         try:
-            self._socket_path = str(decouple.config("cln_jrpc_path"))
-            print(decouple.config("cln_jrpc_path"))
+            self._socket_path = str(config("BAPI_CLN_JRPC_PATH"))
         except decouple.UndefinedValueError as e:
             logger.debug(e)
             logger.error(
                 (
-                    "CLN JSON-RPC implementation set, but cln_jrpc_path is missing "
-                    "from the config file."
+                    "CLN JSON-RPC implementation set, but BAPI_CLN_JRPC_PATH is "
+                    "missing from the config file."
                 )
             )
             sys.exit(1)
@@ -699,7 +698,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         # CLN has no subscription to forwarded events.
         # We must poll instead.
 
-        interval = config("gather_ln_info_interval", default=2, cast=float)
+        interval = config("BAPI_GATHER_LN_INFO_INTERVAL", default=2, cast=float)
 
         # make sure we know how many forwards we have
         # we need to calculate the difference between each iteration

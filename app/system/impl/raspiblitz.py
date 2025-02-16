@@ -4,9 +4,9 @@ import os
 import time
 from typing import Dict
 
-from decouple import config
 from fastapi import HTTPException, status
 
+from app.api.config import config
 from app.api.constants import API_VERSION
 from app.api.utils import (
     SSE,
@@ -31,7 +31,7 @@ from app.system.models import (
 
 _HW_INFO_YIELD_TIME = 2
 
-SHELL_SCRIPT_PATH = config("shell_script_path")
+SHELL_SCRIPT_PATH = config("BAPI_RB_SHELL_SCRIPT_PATH")
 GET_DEBUG_LOG_SCRIPT = os.path.join(
     SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh"
 )

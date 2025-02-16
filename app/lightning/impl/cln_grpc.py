@@ -4,7 +4,6 @@ import sys
 from typing import AsyncGenerator, List, Optional
 
 import grpc
-from decouple import config
 from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
@@ -12,6 +11,7 @@ from starlette import status
 import app.lightning.impl.protos.cln.node_pb2 as ln
 import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
+from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
 from app.lightning.exceptions import NodeNotFoundError
@@ -44,7 +44,7 @@ async def _make_local_call(cmd: str):
     # FIXME: this is a hack because some of the commands are not exposed
     # in the CLN grpc interface yet.
 
-    testnet = config("network") == "testnet"
+    testnet = config("BAPI_NETWORK") == "testnet"
     cmd = f"lightning-cli -k {'--testnet ' if testnet else ''}{cmd}"
     proc = await asyncio.create_subprocess_shell(
         cmd,
@@ -127,17 +127,25 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         try:
             cln_grpc_key = bytes.fromhex(
-                config_get_hex_str(config("cln_grpc_key"), name="cln_grpc_key")
+                config_get_hex_str(
+                    str(config("BAPI_CLN_GRPC_KEY")), name="cln_grpc_key"
+                )
             )
             cln_grpc_cert = bytes.fromhex(
-                config_get_hex_str(config("cln_grpc_cert"), name="cln_grpc_cert")
+                config_get_hex_str(
+                    str(config("BAPI_CLN_GRPC_CERT")), name="cln_grpc_cert"
+                )
             )
             cln_grpc_ca = bytes.fromhex(
-                config_get_hex_str(config("cln_grpc_ca"), name="cln_grpc_ca")
+                config_get_hex_str(str(config("BAPI_CLN_GRPC_CA")), name="cln_grpc_ca")
             )
-            cln_grpc_url = config("cln_grpc_ip") + ":" + config("cln_grpc_port")
+            cln_grpc_url = (
+                str(config("BAPI_CLN_GRPC_IP"))
+                + ":"
+                + str(config("BAPI_CLN_GRPC_PORT"))
+            )
         except ValueError as e:
-            logger.critical(f"Unable to decode cln_grpc_cert: {e.args}.")
+            logger.critical(f"Unable to decode BAPI_CLN_GRPC_CERT: {e.args}.")
             sys.exit(0)
 
         self.creds = grpc.ssl_channel_credentials(
@@ -816,7 +824,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
         # CLN has no subscription to forwarded events.
         # We must poll instead.
 
-        interval = config("gather_ln_info_interval", default=2, cast=float)
+        interval = config("BAPI_GATHER_LN_INFO_INTERVAL", default=2, cast=float)
 
         # make sure we know how many forwards we have
         # we need to calculate the difference between each iteration

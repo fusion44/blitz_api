@@ -4,35 +4,31 @@ from types import coroutine
 
 import aiohttp
 import requests
-from decouple import config
+from loguru import logger
 from starlette import status
 
+from app.api.config import config
 from app.bitcoind.models import BlockRpcFunc
 
 
 class _BitcoinConfig:
     def __init__(self) -> None:
-        self.network = config("network")
-        self.zmq_block_rpc = BlockRpcFunc.from_string(config("bitcoind_zmq_block_rpc"))
+        self.network = config("BAPI_NETWORK")
+        self.zmq_block_rpc = BlockRpcFunc.from_string(
+            str(config("BAPI_BITCOIND_ZMQ_BLOCK_RPC", default="hashblock"))
+        )
 
-        if self.network == "testnet":
-            self.ip = config("bitcoind_ip_testnet")
-            self.rpc_port = config("bitcoind_port_rpc_testnet")
-            self.zmq_port = config("bitcoind_zmq_block_port_testnet")
-        elif self.network == "regtest":
-            self.ip = config("bitcoind_ip_regtest")
-            self.rpc_port = config("bitcoind_port_rpc_regtest")
-            self.zmq_port = config("bitcoind_zmq_block_port_regtest")
-        else:
-            self.ip = config("bitcoind_ip_mainnet")
-            self.rpc_port = config("bitcoind_port_rpc_mainnet")
-            self.zmq_port = config("bitcoind_zmq_block_port_mainnet")
+        self.ip = config("BAPI_BITCOIND_ADDRESS")
+        self.rpc_port = config("BAPI_BITCOIND_PORT_RPC")
+        self.zmq_port = config("BAPI_BITCOIND_ZMQ_BLOCK_PORT")
 
         self.rpc_url = f"http://{self.ip}:{self.rpc_port}"
         self.zmq_url = f"tcp://{self.ip}:{self.zmq_port}"
 
-        self.username = config("bitcoind_user")
-        self.pw = config("bitcoind_pw")
+        self.username = config("BAPI_BITCOIND_USER")
+        self.pw = config("BAPI_BITCOIND_RPC_PW")
+
+        logger.trace(f"Built Bitcoin config: {self.rpc_url} {self.zmq_url}")
 
 
 bitcoin_config = _BitcoinConfig()

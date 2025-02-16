@@ -38,6 +38,9 @@ This software is still considered BETA and may contain bugs. Don't expose it to 
 
 Create a `.env` file with your `bitcoind` and `lnd` configuration. See the `.env_sample` file for all configuration options.
 
+The `.env` file is expected to be at the project root folder by default.
+To use a custom path, set the `BAPI_ENV_PATH` env variable to the `.env` file path. 
+
 ### Dependencies
 
 - [Python in version 3.7](https://www.python.org/downloads/)

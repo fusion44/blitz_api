@@ -2,22 +2,19 @@ import asyncio
 import sys
 from contextlib import asynccontextmanager
 
-from decouple import config as dconfig
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
-from fastapi_plugins import (
-    RedisSettings,
-    get_config,
-    redis_plugin,
-    registered_configuration,
-)
+from fastapi_plugins import RedisSettings
+from fastapi_plugins import get_config as get_redis_config
+from fastapi_plugins import redis_plugin, registered_configuration
 from loguru import logger
 from pydantic import BaseModel
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 
+from app.api.config import config as dconfig
 from app.api.models import ApiStartupStatus, StartupState
 from app.api.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
 from app.api.warmup import (
@@ -49,7 +46,7 @@ from app.system.service import get_hardware_info, register_hardware_info_gathere
 configure_logger()
 
 
-remote_debugging = dconfig("remote_debugging", cast=bool, default=False)
+remote_debugging = dconfig("BAPI_REMOTE_DEBUGGING", cast=bool, default=False)
 if remote_debugging:
     logger.warning(
         (
@@ -57,7 +54,9 @@ if remote_debugging:
             "Only enable on development machines."
         )
     )
-    remote_debugging_port = dconfig("remote_debugging_port", cast=int, default=5678)
+    remote_debugging_port = dconfig(
+        "BAPI_REMOTE_DEBUGGING_PORT", cast=int, default=5678
+    )
 
     try:
         import debugpy
@@ -67,7 +66,7 @@ if remote_debugging:
 
     debugpy.listen(("0.0.0.0", remote_debugging_port))
 
-node_type = dconfig("ln_node").lower()
+node_type = dconfig("BAPI_LN_NODE", default="none").lower()
 if node_type == "":
     node_type = "none"
 
@@ -77,7 +76,7 @@ class AppSettings(RedisSettings):
     api_name: str = str(__name__)
 
 
-config = get_config()
+config = get_redis_config()
 
 
 @asynccontextmanager
@@ -221,8 +220,10 @@ async def _initialize_lightning():
 
 @app.get("/")
 def index(req: Request):
+    logger.info(req.url)
+    p = req.scope.get("root_path")
     return RedirectResponse(
-        "/api/docs",
+        f"{p}/docs",
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
@@ -318,6 +319,7 @@ async def warmup_new_connections():
                         _handle(id, SSE.HARDWARE_INFO, res[6]),
                     ]
                 )
+
         # when its bitcoin only
         else:
             res = await get_full_client_warmup_data_bitcoinonly()
