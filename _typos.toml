@@ -1,0 +1,7 @@
+[files]
+extend-exclude = ["app/lightning/impl/protos/*", "openapi.json"]
+
+
+[default.extend-words]
+# Don't correct the surname "Teh"
+TBE = "TBE"
