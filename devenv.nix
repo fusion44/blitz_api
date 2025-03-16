@@ -76,19 +76,22 @@ in {
   packages = with pkgs-unstable; [
     stdenv.cc.cc
     pyright
+    isort
     alejandra
     statix
     ruff
     ruff-lsp
     redis
     nushell
+    typos
+    typos-lsp
 
     bitcoind
     lnd
     clightning
   ];
 
-  # blitz api uses its own .env file and is not applicaple for
+  # blitz api uses its own .env file and is not applicable for
   # the devenv
   dotenv.disableHint = true;
 
