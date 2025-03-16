@@ -11,7 +11,7 @@ pyrightconfig.json
 test_env_data
 
 # Nix
-result
+./result/
 # Devenv
 .devenv*
 devenv.local.nix
