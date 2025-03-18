@@ -1,21 +1,22 @@
 import asyncio
 import sys
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import HTTPException
-from fastapi_plugins import RedisSettings
+from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi_plugins import RedisSettings, redis_plugin, registered_configuration
 from fastapi_plugins import get_config as get_redis_config
-from fastapi_plugins import redis_plugin, registered_configuration
 from loguru import logger
 from pydantic import BaseModel
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import RedirectResponse
+from starlette.responses import JSONResponse, RedirectResponse
 
 from app.api.config import config as dconfig
-from app.api.models import ApiStartupStatus, StartupState
+from app.api.error_report.report import Report
+from app.api.models import ApiErrors, ApiStartupStatus, ErrorMessage, StartupState
 from app.api.utils import SSE, broadcast_sse_msg, build_sse_event, sse_mgr
 from app.api.warmup import (
     get_bitcoin_client_warmup_data,
@@ -120,6 +121,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_e_handler(_: Request, e: HTTPException):
+    # Take the HTTPException and return it as a plain JSONResponse
+    # We do this because the default HTTPException won't have any other
+    # fields than detail
+    return JSONResponse(status_code=e.status_code, content=e.detail)
+
+
+@app.exception_handler(RequestValidationError)
+async def valid_e_handler(_: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    try:
+        return JSONResponse(
+            status_code=422,
+            content=ErrorMessage(
+                detail=errors[0]["msg"],
+                error_code=ApiErrors.INVALID_REQUEST_INPUT,
+                report=errors,
+            ).model_dump(),
+        )
+    except Exception as e:
+        tb = traceback.format_exception(e)
+        logger.error(f"error processing RequestValidationError: {e}\n{tb}")
+        report = Report("error while processing RequestValidationError", e).attach(exc)
+        return JSONResponse(
+            status_code=500,
+            content=ErrorMessage(
+                detail="error processing RequestValidationError",
+                error_code=ApiErrors.UNABLE_TO_PROCESS_ERROR,
+                report=report.format_verbose(),
+                trace=tb,
+            ).model_dump(),
+        )
 
 
 api_startup_status = ApiStartupStatus()
