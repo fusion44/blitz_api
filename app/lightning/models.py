@@ -13,6 +13,32 @@ from pydantic.types import conint
 import app.lightning.docs as docs
 from app.lightning.impl.cln_utils import parse_cln_msat
 
+from app.external.result_type.src.result import Err, Ok, Result
+
+from app.api.error_report.report import Report
+
+
+class LnNodeType(str, Enum):
+    LND_GRPC = "lnd_grpc"
+    CLN_JRPC = "cln_jrpc"
+    CLN_GRPC = "cln_grpc"
+    NONE = "none"
+
+    @staticmethod
+    def values_as_list() -> List[str]:
+        return ["lnd_grpc", "cln_jrpc", "cln_grpc", "none"]
+
+    @classmethod
+    def from_string(cls, value: str) -> Result["LnNodeType", Report]:
+        try:
+            return Ok(cls(value))
+        except ValueError:
+            return Err(
+                Report(f"Invalid node type {value}").attach(
+                    LnNodeType.values_as_list(), "available_types"
+                )
+            )
+
 
 class LnInitState(str, Enum):
     OFFLINE = "offline"

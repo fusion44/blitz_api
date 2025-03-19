@@ -1,17 +1,21 @@
 from abc import abstractmethod
 
+from app.api.error_report.report import Report
+from app.apps.models import AppStatus, AppStatusQueryResult
+from app.external.result_type.src.result import Result
+
 
 class AppsBase:
     @abstractmethod
-    async def get_app_status_single(self, app_id: str):
+    async def get_app_status_single(self, app_id: str) -> Result[AppStatus, Report]:
         raise NotImplementedError()
 
     @abstractmethod
-    async def get_app_status(self):
+    async def get_app_status(self) -> Result[AppStatusQueryResult, Report]:
         raise NotImplementedError()
 
     @abstractmethod
-    async def get_app_status_advanced(self, app_id: str):
+    async def get_app_status_advanced(self, app_id: str) -> Result[AppStatus, Report]:
         raise NotImplementedError()
 
     @abstractmethod
