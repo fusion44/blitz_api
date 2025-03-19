@@ -11,168 +11,228 @@ from fastapi.encoders import jsonable_encoder
 from loguru import logger as logging
 
 from app.api.config import config
+from app.api.error_report.report import Report
 from app.api.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
 from app.apps.impl.apps_base import AppsBase
+from app.apps.models import (
+    AppId,
+    AppOnlineStatus,
+    AppStatus,
+    AppStatusQueryError,
+    AppStatusQueryResult,
+)
+from app.apps.utils import check_app_id
+from app.external.result_type.src.result import Err, Ok, Result
+from app.lightning.models import LnNodeType
 
-available_app_ids = {
-    "btc-rpc-explorer",
-    "rtl",
-    # Specter is deactivated for now because it uses its own self signed HTTPS cert that
-    # makes trouble in Chrome on last test
-    # "specter",
-    "btcpayserver",
-    "lnbits",
-    "mempool",
-    "thunderhub",
-    "jam",
-    "electrs",
-}
+temp_path = config("BAPI_RB_SHELL_SCRIPT_PATH")
+temp_node_type = config("BAPI_LN_NODE")
+fail_setup = False
+if not isinstance(temp_path, str):
+    logging.critical(f"Provided script path '{temp_path}' is not a string")
+    fail_setup = True
+elif not os.path.exists(temp_path):
+    logging.critical(f"Provided script path '{temp_path}' is does not exist")
+    fail_setup = True
 
+if not isinstance(temp_node_type, str):
+    logging.critical(f"Provided node type '{temp_node_type}' is not a string")
+    fail_setup = True
+elif LnNodeType.from_string(str(temp_node_type)).is_err():
+    logging.critical(
+        f"Unsupported node type '{temp_node_type}'. "
+        f"Options: {LnNodeType.values_as_list()}."
+    )
 
-SHELL_SCRIPT_PATH = config("BAPI_RB_SHELL_SCRIPT_PATH")
+SHELL_SCRIPT_PATH: str = str(temp_path)
+NODE_TYPE: LnNodeType
+match LnNodeType.from_string(str(temp_node_type)):
+    case Ok(value):
+        NODE_TYPE = value
+    case Err(error):
+        logging.critical(error.format_verbose())
+        fail_setup = True
 
-node_type = config("BAPI_LN_NODE", default="none").to_lower()
+if fail_setup:
+    raise RuntimeError("Error during apps system setup. Consult the logs.")
 
 
 class RaspiBlitzApps(AppsBase):
-    async def get_app_status_single(self, app_id):
-        if app_id not in available_app_ids:
-            return {
-                "id": f"{app_id}",
-                "error": "appID not in list",
-            }
-        script_call = (
-            os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
-            + " status"
-        )
+    async def get_app_status_single(self, app_id: str) -> Result[AppStatus, Report]:
+        match check_app_id(app_id):
+            case Ok(value):
+                app_id = value
+            case Err(report):
+                return Err(report)
+
+        try:
+            script_call = (
+                os.path.join(
+                    SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id.value}.sh"
+                )
+                + " status"
+            )
+        except Exception as e:
+            exception_str = str(e)
+            report = Report(
+                "unable to join the scripts",
+                error=HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+                ),
+            )
+
+            return Err(report)
 
         try:
             result = await call_sudo_script(script_call)
-        except:
+        except Exception as e:
             # script had error or was not able to deliver all requested data fields
-            logging.warning(f"error on calling: {script_call}")
-            return {
-                "id": f"{app_id}",
-                "error": f"script not working for api: {script_call}",
-            }
+            exception_str = str(e)
+            report = Report(
+                "App status script execution failed.",
+                error=HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+                ),
+            )
+            report.attach(script_call, "script_name")
+
+            return Err(report)
 
         try:
             data = parse_key_value_text(result)
-        except:
-            logging.warning(f"error on parsing: {result}")
-            return {
-                "id": f"{app_id}",
-                "error": f"script result parsing error: {script_call}",
-            }
+        except Exception as e:
+            exception_str = str(e)
+            report = Report(
+                "Unable to parse the output of the executed script.",
+                error=HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+                ),
+            )
+            report.attach(script_call, "script_name")
+            report.attach(result, "script_output", sensitive=True)
+
+            return Err(report)
 
         try:
             keys = data.keys()
-            error = data["error"] if "error" in keys else ""
-            installed = False
-            version = data["version"] if "version" in keys else ""
+            error = str(data["error"]) if "error" in keys else None
+            if error is not None and error != "":
+                # script ran without any execution error, but returned an error
+                # treat is as an error
+                return Err(
+                    Report(
+                        "Script execution resulted in an error.",
+                        error=HTTPException(
+                            status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error
+                        ),
+                    )
+                    .attach(script_call, "script_name")
+                    .attach(result, "script_output", sensitive=True)
+                )
 
-            status = "offline"
+            s = AppStatus(id=app_id)
+            s.installed = False
+            s.version = str(data["version"]) if "version" in keys else None
+            s.status = AppOnlineStatus.OFFLINE
             if "installed" in keys and data["installed"] == "1":
-                status = "online"
-                installed = True
+                s.status = AppOnlineStatus.ONLINE
+                s.installed = True
 
-            if not installed:
-                return {
-                    "id": app_id,
-                    "version": version,
-                    "installed": False,
-                    "status": "offline",
-                    "error": error,
-                }
+            if not s.installed:
+                return Ok(s)
 
-            configured = False
+            s.configured = False
             if "configured" in keys and data["configured"] == "1":
-                configured = True
+                s.configured = True
 
-            httpsSelfsigned = False
+            s.https_self_signed = False
             if "httpsSelfsigned" in keys and data["httpsSelfsigned"] == "1":
-                httpsSelfsigned = True
+                s.https_self_signed = True
 
-            localIP = data["localIP"] if "localIP" in keys else ""
-            httpPort = data["httpPort"] if "httpPort" in keys else ""
-            httpsPort = data["httpsPort"] if "httpsPort" in keys else ""
-            httpsForced = data["httpsForced"] == "1" if "httpsForced" in keys else False
-            address = f"http://{localIP}:{httpPort}"
-            if httpsForced:
-                address = f"https://{localIP}:{httpsPort}"
-            hiddenService = data["toraddress"] if "toraddress" in keys else ""
-            authMethod = "none"
+            s.local_ip = str(data["localIP"]) if "localIP" in keys else None
+            s.http_port = str(data["httpPort"]) if "httpPort" in keys else None
+            s.https_port = str(data["httpsPort"]) if "httpsPort" in keys else None
+            s.https_forced = (
+                data["httpsForced"] == "1" if "httpsForced" in keys else False
+            )
+            s.address = f"http://{s.local_ip}:{s.http_port}"
+            if s.https_forced:
+                s.address = f"https://{s.local_ip}:{s.https_port}"
+            s.hidden_service = str(data["toraddress"]) if "toraddress" in keys else None
+            s.auth_method = "none"
             if "authMethod" in data.keys():
-                authMethod = data["authMethod"]
+                s.auth_method = str(data["authMethod"])
 
-            details = {}
             # set details for certain apps
-            if app_id == "mempool" or app_id == "btc-rpc-explorer":
-                details = {
+            if app_id == AppId.MEMPOOL or app_id == AppId.BTC_RPC_EXPLORER:
+                s.details = {
                     "isIndexed": data["isIndexed"],
                     "indexInfo": data["indexInfo"],
                 }
 
-            return {
-                "id": app_id,
-                "installed": installed,
-                "configured": configured,
-                "status": status,
-                "localIP": localIP,
-                "httpPort": httpPort,
-                "httpsPort": httpsPort,
-                "httpsForced": httpsForced,
-                "httpsSelfsigned": httpsSelfsigned,
-                "hiddenService": hiddenService,
-                "address": address,
-                "authMethod": authMethod,
-                "details": details,
-            }
+            return Ok(s)
 
         except Exception as e:
-            logging.error(e)
-            logging.info(f"error on repackage data: {result}")
-            return {
-                "id": f"{app_id}",
-                "error": f"script result processing error: {script_call}",
-            }
+            exception_str = str(e)
+            report = Report(
+                "Unable to parse the output of the app script.",
+                error=HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+                ),
+            )
+            report.attach(script_call, "script_name")
+            report.attach(result, "script_output", sensitive=True)
 
-    async def get_app_status_advanced(self, app_id):
-        if app_id not in available_app_ids:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail=f"App id invalid. Available app ids: {available_app_ids}",
+            return Err(report)
+
+    async def get_app_status_advanced(self, app_id) -> Result[AppStatus, Report]:
+        if app_id not in [AppId.ELECTRS]:
+            report = Report(
+                "Unable to parse the output of the app script.",
+                error=HTTPException(
+                    status.HTTP_404_NOT_FOUND,
+                    detail="App id invalid. Available app ids for the advanced "
+                    f"endpoint: {AppId.ELECTRS.value}",
+                ),
             )
 
-        if app_id == "electrs":
-            return await _do_electrs_status_advanced()
+            return Err(report)
 
-        return {}
+        return await _do_electrs_status_advanced()
 
-    async def get_app_status(self):
-        appStatusList: List = []
-        for appID in available_app_ids:
-            # skip app based on node running
-            if node_type == "" or node_type == "none":
-                if appID == "rtl":
+    async def get_app_status(self) -> Result[AppStatusQueryResult, Report]:
+        app_status_list: List[AppStatus] = []
+        report_list: List[AppStatusQueryError] = []
+        for app_id in AppId:
+            # skip app based on the node type running
+            if NODE_TYPE == LnNodeType.NONE:
+                # These apps require lightning to work, skip them
+                if app_id in {
+                    AppId.RTL,
+                    AppId.LNBITS,
+                    AppId.THUNDERHUB,
+                    AppId.ALBYHUB,
+                }:
                     continue
-                if appID == "lnbits":
+            elif NODE_TYPE == LnNodeType.CLN_JRPC or NODE_TYPE == LnNodeType.CLN_GRPC:
+                # These apps require LND to work, skip them
+                if app_id in {
+                    AppId.THUNDERHUB,
+                    AppId.ALBYHUB,
+                }:
                     continue
-                if appID == "thunderhub":
-                    continue
-                if appID == "albyhub":
-                    continue
-            elif node_type == "cln_grpc":
-                if appID == "thunderhub":
-                    continue
-                if appID == "albyhub":
-                    continue
-            # elif node_type="lnd_grpc":
 
             # get status (installed, etc) and append
-            appStatusList.append(await self.get_app_status_single(appID))
+            match await self.get_app_status_single(app_id):
+                case Ok(value):
+                    app_status_list.append(value)
+                case Err(report):
+                    logging.error(report.format_verbose())
+                    report_list.append(
+                        AppStatusQueryError(id=app_id, error=report.format())
+                    )
 
-        return appStatusList
+        return Ok(AppStatusQueryResult(data=app_status_list, errors=report_list))
 
     async def get_app_status_sub(self):
         switch = True
@@ -200,7 +260,7 @@ class RaspiBlitzApps(AppsBase):
                 detail=app_id + " install script does not exist / is not supported",
             )
 
-        if node_type == "cln_grpc" and (app_id == "thunderhub" or app_id == "albyhub"):
+        if NODE_TYPE == "cln_grpc" and (app_id == "thunderhub" or app_id == "albyhub"):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail=app_id + " not available for Core Lightning nodes",
@@ -239,7 +299,7 @@ class RaspiBlitzApps(AppsBase):
         # to satisfy CodeQL: test again against predefined array and
         # don't use 'user value'
         tested_app_id = ""
-        for id in available_app_ids:
+        for id in AppId.as_str_list():
             if id == app_id:
                 tested_app_id = id
 
@@ -382,82 +442,114 @@ class RaspiBlitzApps(AppsBase):
                     return
 
 
-async def _do_electrs_status_advanced():
-    app_id = "electrs"
-    script_call_status = (
-        os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
-        + " status showAddress"
-    )
+async def _do_electrs_status_advanced() -> Result[AppStatus, Report]:
+    app_id = AppId.ELECTRS.value
+    try:
+        script_call_status = (
+            os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
+            + " status showAddress"
+        )
 
-    script_call_sync = (
-        os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
-        + " status-sync"
-    )
+        script_call_sync = (
+            os.path.join(SHELL_SCRIPT_PATH, "config.scripts", f"bonus.{app_id}.sh")
+            + " status-sync"
+        )
+    except Exception as e:
+        exception_str = str(e)
+        report = Report(
+            "unable to join the electrs scripts",
+            error=HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+            ),
+        )
+
+        return Err(report)
 
     try:
         result_status = await call_sudo_script(script_call_status)
         result_sync = await call_sudo_script(script_call_sync)
         result = result_status + result_sync
     except Exception as e:
-        # script had error or was not able to deliver all requested data fields
-        logging.error(e)
-        logging.debug(f"error on calling: {script_call_status} and {script_call_sync}")
-        return {
-            "id": f"{app_id}",
-            "error": "Unable to get Electrs data from script.",
-        }
+        exception_str = str(e)
+        report = Report(
+            "electrs status script execution failed",
+            error=HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+            ),
+        )
+        report.attach(script_call_status, "script_name")
+        report.attach(script_call_sync, "script_name")
+
+        return Err(report)
 
     try:
         data = parse_key_value_text(result)
     except Exception as e:
-        logging.error(e)
-        logging.debug(f"error on parsing: {result}")
-        return {
-            "id": f"{app_id}",
-            "error": "Unable to get Electrs data from script.",
-        }
+        exception_str = str(e)
+        report = Report(
+            "unable to parse the output of the executed scripts",
+            error=HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+            ),
+        )
+        report.attach(script_call_status, "script_name")
+        report.attach(script_call_sync, "script_name")
+        report.attach(result, "script_output", sensitive=True)
+
+        return Err(report)
 
     try:
-        if data["installed"] == "0":
-            return {
-                "id": app_id,
-                "error": "Service not installed.",
-            }
+        s = AppStatus(id=AppId.ELECTRS)
+        s.version = data.get("version", "")
+        if data.get("installed", "0") == "0":
+            s.installed = False
+            return Ok(s)
 
-        if data["configured"] == "0":
-            return {
-                "id": app_id,
-                "error": "Service not configured.",
-            }
+        if data.get("configured", "0") == "0":
+            s.configured = False
+            return Ok(s)
 
-        if data["serviceRunning"] == "0":
-            return {
-                "id": app_id,
-                "error": "Service installed, but not running.",
-            }
+        if data.get("serviceRunning", "0") == "0":
+            s.status = AppOnlineStatus.OFFLINE
+            return Ok(s)
 
         if "initialSynced" not in data:
-            logging.error(
-                (
-                    f"The Raspiblitz {script_call_sync} doesn't "
-                    "return the required data (initialSynced)."
+            return Err(
+                Report(
+                    f"The RaspiBlitz {script_call_sync} doesn't "
+                    "return the required data (initialSynced).",
+                    error=HTTPException(
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"The Raspiblitz {script_call_sync} doesn't "
+                        "return the required data (initialSynced).",
+                    ),
                 )
             )
-            logging.debug(data)
-            return {
-                "id": app_id,
-                "error": f"script not working for api: {script_call_status}",
-            }
 
-        return {
-            "version": data["version"],
-            "localIP": data["localIP"],
-            "publicIP": data["publicIP"],
-            "portTCP": data["portTCP"],
-            "portSSL": data["portSSL"],
-            "TORaddress": data["TORaddress"],
-            "initialSyncDone": data["initialSynced"] == "1",
+        s.local_ip = data.get("localIP", "")
+        s.address = data.get("publicIP", "")
+        s.http_port = data.get("portTCP", "")
+        s.https_port = data.get("portSSL", "")
+        s.hidden_service = data.get("TORaddress", "")
+        s.details = {
+            "initial_sync_done": data.get("initialSynced", "0") == "1",
+            "block_height": data.get("blockheight", ""),
+            "blockheightPercent": data.get("blockheightPercent", ""),
+            "info_sync": data.get("infoSync", ""),
+            "electrum_responding": data.get("electrumResponding", ""),
         }
+
+        return Ok(s)
+
     except Exception as e:
-        logging.error(e)
-        logging.debug(data)
+        exception_str = str(e)
+        report = Report(
+            "unable to process the output of the executed Electrs scripts",
+            error=HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
+            ),
+        )
+        report.attach(script_call_status, "script_name")
+        report.attach(script_call_sync, "script_name")
+
+        return Err(report)
