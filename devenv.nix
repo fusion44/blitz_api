@@ -115,6 +115,10 @@ in {
         --lightning-dir=${clnDataDir} \
         --bitcoin-datadir=${bitcoinDataDir}
     '';
+    redis_updater.exec = ''
+      sleep 3
+      nu ./scripts/fake_blitz_scripts/update_redis_values.nu
+    '';
   };
 
   # https://devenv.sh/services/
