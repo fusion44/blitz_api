@@ -15,11 +15,11 @@ BAPI_JWT_EXPIRY_TIME=3600000
 BAPI_ROOT_PATH = "/"
 BAPI_LOG_LEVEL=INFO
 BAPI_ENABLE_LOCAL_COOKIE_AUTH = true
-BAPI_PLATFORM=native_python
+BAPI_PLATFORM={{platform}}
+BAPI_RB_SHELL_SCRIPT_PATH={{schell_script_path}}
 BAPI_GATHER_HW_INFO_INTERVAL = 2
 BAPI_CPU_USAGE_AVERAGING_PERIOD = 0.5
 BAPI_GATHER_LN_INFO_INTERVAL = 5.0
-
 BAPI_NETWORK=regtest
 BAPI_BITCOIND_ADDRESS=127.0.0.1
 BAPI_BITCOIND_PORT_RPC=18443
@@ -56,17 +56,20 @@ def init_env [] {
 #  Generates a '.env' file for use with
 #  Blitz Api using the local node.
 #
-#  Options are "lnd" and "cln".
-#  If no node is specified, "lnd" is used.
+#  Required: node options are "lnd" and "cln".
+#
+#  Platform options are "native_python", "raspiblitz" and "fake_blitz".
+#  If no platform is specified, "native_python" is used.
 #
 #  NOTE: Run this in the directory where the
 #        data folder is located (test_env_data)
 #        as it'll be relative to that path
 #
 #  Example:
-#  reg-mk-api-env lnd | save .env
+#  reg-mk-api-env lnd raspiblitz | save .env
 def "reg-mk-api-env" [
-    node: string = "lnd"  # The node to use
+    node: string = "lnd",  # The node to use
+    platform: string = "native_python"  # The platform to use
 ] {
   let folders = (ls | where type == "dir" | get name)
   if not ($folders | any {|f| $f == $BASE_DIR}) {
@@ -74,12 +77,23 @@ def "reg-mk-api-env" [
     return
   }
 
-  if $node != "cln" and $node != "lnd" {
-    print "node must either be \"lnd\" or \"cln\"."
+  if ($node != "cln" and $node != "lnd") {
+    print $"node must either be \"lnd\" or \"cln\". Got: ($node)"
     return
   }
 
+  if ($platform != "native_python"
+      and $platform != "raspiblitz"
+      and $platform != "fake_blitz")  {
+    print "node must either be \"native_python\", \"raspiblitz\" or \"fake_blitz\". Got: ($platform)"
+    return
+  }
+
+  let platform_value = (if $platform == "raspiblitz" or $platform == "fake_blitz" { "raspiblitz" } else { "native_python" })
+  let shell_script_path = (if $platform == "raspiblitz"  { "/home/admin" } else if $platform == "fake_blitz" { "./scripts/fake_blitz_scripts" } else { "/dev/null" })
   let replacements = {
+    "{{platform}}": $platform_value,
+    "{{schell_script_path}}": $shell_script_path,
     "{{node_type}}": (if $node == "lnd" { "lnd_grpc" } else { "cln_jrpc" }),
     "{{lnd_cert}}": $"(pwd)/($LND_DIR)/tls.cert",
     "{{lnd_macaroon}}": $"(pwd)/($LND_DIR)/data/chain/bitcoin/regtest/admin.macaroon",
