@@ -238,8 +238,7 @@ class Bip9Data(BaseModel):
     start_time: int = Query(
         ...,
         description=(
-            "The minimum median time past of a block at which the bit gains "
-            "its meaning"
+            "The minimum median time past of a block at which the bit gains its meaning"
         ),
     )
     timeout: int = Query(

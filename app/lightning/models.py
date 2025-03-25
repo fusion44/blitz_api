@@ -11,11 +11,9 @@ from pydantic import BaseModel, validator
 from pydantic.types import conint
 
 import app.lightning.docs as docs
-from app.lightning.impl.cln_utils import parse_cln_msat
-
-from app.external.result_type.src.result import Err, Ok, Result
-
 from app.api.error_report.report import Report
+from app.external.result_type.src.result import Err, Ok, Result
+from app.lightning.impl.cln_utils import parse_cln_msat
 
 
 class LnNodeType(str, Enum):
@@ -552,7 +550,7 @@ class Invoice(BaseModel):
     settle_date: int | None = Query(
         None,
         description=(
-            "When this invoice was settled. " "Not available with pending invoices."
+            "When this invoice was settled. Not available with pending invoices."
         ),
     )
 
@@ -1473,8 +1471,7 @@ class LnInfo(BaseModel):
     best_header_timestamp: int = Query(
         None,
         description=(
-            "Timestamp of the block best known to the wallet. "
-            "Only available with LND."
+            "Timestamp of the block best known to the wallet. Only available with LND."
         ),
     )
 

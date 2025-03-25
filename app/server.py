@@ -1,8 +1,9 @@
 import uvicorn
 
+from app.api.config import config
+
 import click  # isort:skip
 
-from app.api.config import config
 
 
 @click.command()

@@ -486,7 +486,7 @@ async def get_info():
     responses=responses,
 )
 async def get_decode_pay_request(
-    pay_req: str = Query(..., description="The payment request string to be decoded")
+    pay_req: str = Query(..., description="The payment request string to be decoded"),
 ):
     try:
         return await decode_pay_request(pay_req)

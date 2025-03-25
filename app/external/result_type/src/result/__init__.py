@@ -6,10 +6,10 @@ from .result import (
     UnwrapError,
     as_async_result,
     as_result,
-    is_ok,
-    is_err,
     do,
     do_async,
+    is_err,
+    is_ok,
 )
 
 __all__ = [

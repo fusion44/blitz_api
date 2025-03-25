@@ -1,6 +1,6 @@
 from enum import Enum
+from typing import Any, Dict, List, Optional, Sequence, Union
 
-from typing import Optional, Union, Dict, List, Sequence, Any
 
 from pydantic import BaseModel
 from fastapi import Query

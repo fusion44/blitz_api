@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Callable
 
 import pytest
-
 from result import Err, Ok, OkErr, Result, UnwrapError, as_async_result, as_result
 
 

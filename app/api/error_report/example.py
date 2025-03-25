@@ -1,5 +1,5 @@
-from app.external.result_type.src.result import Err, Result, Ok
 from app.api.error_report.report import Report
+from app.external.result_type.src.result import Err, Ok, Result
 
 
 def nested_err_4() -> Result[str, Report]:
