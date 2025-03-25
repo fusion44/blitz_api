@@ -1,4 +1,6 @@
 import os
+from typing import Any
+
 from decouple import (
     Config,
     RepositoryEmpty,
@@ -7,7 +9,6 @@ from decouple import (
     UndefinedValueError,
 )
 from loguru import logger
-from typing import Any
 
 _config: Config | None = None
 

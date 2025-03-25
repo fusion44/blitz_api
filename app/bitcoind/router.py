@@ -132,7 +132,7 @@ async def getnetworkinfo():
 async def get_raw_transaction_path(
     txid: str = Query(
         ..., min_length=64, max_length=64, description="The transaction id"
-    )
+    ),
 ):
     return await get_raw_transaction(txid)
 

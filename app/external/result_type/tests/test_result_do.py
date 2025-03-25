@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-
 import pytest
-
 from result import Err, Ok, Result, do, do_async
 
 

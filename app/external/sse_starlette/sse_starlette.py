@@ -151,9 +151,7 @@ class EventSourceResponse(Response):
         self.sep = sep
         self.ping_message_factory = ping_message_factory
         if inspect.isasyncgen(content):
-            self.body_iterator = (
-                content
-            )  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
+            self.body_iterator = content  # type: AsyncIterable[Union[Any,dict,ServerSentEvent]]
         else:
             self.body_iterator = iterate_in_threadpool(content)  # type: ignore
         self.status_code = status_code

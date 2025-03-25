@@ -635,10 +635,8 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 raise HTTPException(
                     status.HTTP_412_PRECONDITION_FAILED,
                     detail=(
-                        (
-                            f"Could not afford {input.amount}sat. "
-                            "Not enough funds available"
-                        )
+                        f"Could not afford {input.amount}sat. "
+                        "Not enough funds available"
                     ),
                 )
 
@@ -740,10 +738,8 @@ class LnNodeCLNgRPC(LightningNodeBase):
                 raise HTTPException(
                     status.HTTP_400_BAD_REQUEST,
                     detail=(
-                        (
-                            "amount must not be specified when paying "
-                            "a non-zero amount invoice"
-                        )
+                        "amount must not be specified when paying "
+                        "a non-zero amount invoice"
                     ),
                 )
 
