@@ -5,36 +5,20 @@ import os
 import random
 import re
 import time
-import warnings
 from typing import Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 from loguru import logger
 
+from app.api.error_report.report import Report
+from app.api.models import ProcessResult
 from app.api.sse_manager import SSEManager
+from app.external.result_type.src.result import Err, Ok, Result
 from app.external.sse_starlette import ServerSentEvent
 
 sse_mgr = SSEManager()
 sse_mgr.setup()
-
-
-class ProcessResult:
-    return_code: int
-    stdout: str
-    stderr: str
-
-    def __init__(self, return_code, stdout, stderr) -> None:
-        self.return_code = return_code
-        self.stdout = stdout
-        self.stderr = stderr
-
-    def __str__(self) -> str:
-        return (
-            f"ProcessResult: \nreturn_code: {self.return_code}\n"
-            f"stdout: {self.stdout}\n"
-            f"stderr: {self.stderr}"
-        )
 
 
 def build_sse_event(event: str, json_data: Optional[Dict]):
@@ -113,9 +97,7 @@ class SSE:
 # https://gist.github.com/mikelehen/3596a30bd69384624c11
 class _PushID(object):
     # Modeled after base64 web-safe chars, but ordered by ASCII.
-    PUSH_CHARS = (
-        "-0123456789" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "_abcdefghijklmnopqrstuvwxyz"
-    )
+    PUSH_CHARS = "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
     def __init__(self):
         # Timestamp of last push, used to prevent local collisions if you
@@ -208,60 +190,97 @@ def _is_hex(s):
         return False
 
 
-async def call_script(scriptPath) -> str:
-    warnings.warn("call_script is deprecated. Use call_script2 instead.")
-
-    cmd = f"bash {scriptPath}"
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return stdout.decode()
-    if stderr:
-        logger.error(stderr.decode())
-    return ""
-
-
-async def call_script2(script_path) -> ProcessResult:
+async def _terminate_process(proc, timeout=5) -> Result[bool, Report]:
     """
-    Call a local bash script and return the results
+    Terminates a process and waits for it to finish.
 
-    :param str script_path: full path with arguments
-    :return: The process result
-    :rtype: ProcessResult
+    :param proc: The process to terminate.
+    :param timeout: The maximum time in seconds to wait for the process to terminate.
     """
-
-    cmd = f"bash {script_path}"
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-
-    return ProcessResult(
-        proc.returncode,
-        stdout.decode() if stdout else "",
-        stderr.decode() if stderr else "",
-    )
+    try:
+        proc.kill()
+        await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.error(f"failed to terminate process {proc.pid} within {timeout} seconds")
+        return Err(
+            Report(
+                f"failed to terminate process within {timeout} seconds",
+                error=TimeoutError(),
+            )
+        )
+    return Ok(True)
 
 
-async def call_sudo_script(scriptPath) -> str:
-    cmd = f"sudo bash {scriptPath}"
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return stdout.decode()
-    if stderr:
-        logger.error(stderr.decode())
-    return ""
+async def exec_bash_command(
+    command: str,
+    use_sudo: bool = False,
+    timeout: float | None = 10.0,
+    sensitive: bool = False,
+) -> Result[ProcessResult, Report]:
+    """
+    Executes a bash command asynchronously.
+
+    :param command: The bash command to execute.
+    :param use_sudo: Whether to prepend 'sudo' to the command.
+                     Defaults to False.
+    :param timeout: The maximum time in seconds to wait for the command to
+                    complete. Defaults to 10.0 seconds.
+    :param sensitive: Whether to hide the command in the log.
+    :return: A Result object containing either a ProcessResult on success or a
+             Report on failure.
+    """  # noqa: E501
+    if sensitive:
+        logger.debug(
+            f"executing sensitive command with sudo: {use_sudo} and timeout: {timeout}"
+        )
+    else:
+        logger.debug(
+            f"executing command: {command} with sudo: {use_sudo} and timeout: {timeout}"
+        )
+
+    try:
+        if command.startswith("sudo"):
+            return Err(
+                Report(
+                    f"command '{command}' must not start with sudo", error=ValueError()
+                )
+            )
+
+        cmd = f"{'sudo ' if use_sudo else ''}bash {command}"
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            return Ok(
+                ProcessResult(
+                    proc.returncode,
+                    stdout.decode() if stdout else "",
+                    stderr.decode() if stderr else "",
+                )
+            )
+        except asyncio.TimeoutError:
+            logger.debug(f"{cmd} timed out after {timeout} seconds")
+            res = await _terminate_process(proc)
+            match res:
+                case Ok(_):
+                    return Err(
+                        Report(
+                            f"command '{command}' timed out after {timeout} seconds",
+                            error=TimeoutError(),
+                        ).attach(command, "command")
+                    )
+                case Err(report):
+                    return Err(report)
+
+    except Exception as e:
+        report = Report(f"unable to execute the bash script {command}", error=e)
+        report.attach(command, "command")
+
+        return Err(report)
 
 
 def parse_key_value_lines(lines: list) -> dict:

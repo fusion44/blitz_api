@@ -68,8 +68,8 @@ async def uninstall_app_sub(app_id: str, delete_data: bool):
 
 def _handle_error(report: Report):
     code = 0
-    if isinstance(report.root_error, HTTPException):
-        code = report.root_error.status_code
+    if isinstance(report.last_error, HTTPException):
+        code = report.last_error.status_code
         if code >= 500:
             # internal error, log fully
             logger.error(report.format_verbose(include_sensitive=True))
@@ -78,7 +78,7 @@ def _handle_error(report: Report):
             logger.info(report.format_verbose())
 
         raise HTTPException(
-            status_code=report.root_error.status_code,
+            status_code=code,
             detail=ErrorMessage(
                 detail=report.frames[0].message,
                 error_code=ApiErrors.INVALID_REQUEST_INPUT,

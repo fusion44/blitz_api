@@ -4,7 +4,8 @@ from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
 
-from app.api.utils import call_script2, redis_get
+from app.api.utils import exec_bash_command, redis_get
+from app.external.result_type.src.result.result import Err, Ok
 
 
 async def blitz_cln_unlock(network: str, password: str) -> bool:
@@ -18,9 +19,19 @@ async def blitz_cln_unlock(network: str, password: str) -> bool:
             status.HTTP_412_PRECONDITION_FAILED, detail="wallet already unlocked"
         )
 
-    res = await call_script2(
+    res = await exec_bash_command(
         f"/home/admin/config.scripts/cl.hsmtool.sh unlock {network} {password}"
     )
+
+    match res:
+        case Ok(data):
+            res = data
+        case Err(report):
+            logger.error(report.format_verbose())
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=report.format_verbose(),
+            )
 
     if res.return_code == 0:
         logger.debug(

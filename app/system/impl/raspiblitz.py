@@ -5,18 +5,20 @@ import time
 from typing import Dict
 
 from fastapi import HTTPException, status
+from loguru import logger
 
 from app.api.config import config
 from app.api.constants import API_VERSION
+from app.api.error_report.report import Report
 from app.api.utils import (
     SSE,
     broadcast_sse_msg,
-    call_script,
-    call_sudo_script,
+    exec_bash_command,
     parse_key_value_text,
     redis_get,
 )
 from app.auth.auth_handler import sign_jwt
+from app.external.result_type.src.result.result import Err, Ok, Result
 from app.lightning.service import get_ln_info
 from app.system.impl.raspiblitz_utils import password_valid
 from app.system.impl.system_base import SystemBase
@@ -32,9 +34,23 @@ from app.system.models import (
 _HW_INFO_YIELD_TIME = 2
 
 SHELL_SCRIPT_PATH = config("BAPI_RB_SHELL_SCRIPT_PATH")
+
+if not SHELL_SCRIPT_PATH:
+    logger.critical("BAPI_RB_SHELL_SCRIPT_PATH is not set or is empty.")
+    exit(1)
+
+if type(SHELL_SCRIPT_PATH) is not str:
+    logger.critical("BAPI_RB_SHELL_SCRIPT_PATH is not a string.")
+    exit(1)
+
 GET_DEBUG_LOG_SCRIPT = os.path.join(
     SHELL_SCRIPT_PATH, "config.scripts", "blitz.debug.sh"
 )
+
+GET_PASSWORD_CHECK_SCRIPT = os.path.join(
+    SHELL_SCRIPT_PATH, "config.scripts", "blitz.passwords.sh"
+)
+
 
 os.environ["TERM"] = "xterm"
 
@@ -113,7 +129,7 @@ class RaspiBlitzSystem(SystemBase):
 
         return True
 
-    async def get_connection_info(self) -> ConnectionInfo:
+    async def get_connection_info(self) -> Result[ConnectionInfo, Report]:
         lightning = await redis_get("lightning")
 
         # Bitcoin RPC
@@ -128,10 +144,16 @@ class RaspiBlitzSystem(SystemBase):
         data_lnd_tls_cert = ""
 
         if lightning == "lnd":
-            key_value_text = await call_script(
+            result = await exec_bash_command(
                 "/home/admin/config.scripts/lnd.export.sh hexstring key-value"
             )
-            key_value = parse_key_value_text(key_value_text)
+            key_value = {}
+            match result:
+                case Ok(data):
+                    key_value = parse_key_value_text(data.stdout)
+                case Err(_):
+                    return result
+
             if "adminMacaroon" in key_value.keys():
                 data_lnd_admin_macaroon = key_value["adminMacaroon"]
             if "invoiceMacaroon" in key_value.keys():
@@ -148,10 +170,16 @@ class RaspiBlitzSystem(SystemBase):
         # ZEUS-Wallet (LND)
         data_lnd_zeus_connection_string = ""
         if lightning == "lnd":
-            key_value_text = await call_script(
+            result = await exec_bash_command(
                 "/home/admin/config.scripts/bonus.lndconnect.sh zeus-android tor key-value"  # noqa: E501
             )
-            key_value = parse_key_value_text(key_value_text)
+            key_value = {}
+            match result:
+                case Ok(data):
+                    key_value = parse_key_value_text(data.stdout)
+                case Err(_):
+                    return result
+
             if "lndconnect" in key_value.keys():
                 data_lnd_zeus_connection_string = key_value["lndconnect"]
             if "error" in key_value.keys():
@@ -162,10 +190,16 @@ class RaspiBlitzSystem(SystemBase):
         data_cl_rest_macaroon = ""
         data_cl_rest_onion = ""
         if lightning == "cl":
-            key_value_text = await call_sudo_script(
+            result = await exec_bash_command(
                 "/home/admin/config.scripts/cl.rest.sh connect mainnet key-value"
             )
-            key_value = parse_key_value_text(key_value_text)
+            key_value = {}
+            match result:
+                case Ok(data):
+                    key_value = parse_key_value_text(data.stdout)
+                case Err(_):
+                    return result
+
             if "connectstring" in key_value.keys():
                 data_cl_rest_zeus_connection_string = key_value["connectstring"]
             if "macaroon" in key_value.keys():
@@ -178,36 +212,52 @@ class RaspiBlitzSystem(SystemBase):
         # BTC PAY CONNECTION STRING
         data_lnd_btcpay_connection_string = ""
         if lightning == "lnd":
-            key_value_text = await call_script(
+            result = await exec_bash_command(
                 "/home/admin/config.scripts/lnd.export.sh btcpay key-value"
             )
-            key_value = parse_key_value_text(key_value_text)
+            key_value = {}
+            match result:
+                case Ok(data):
+                    key_value = parse_key_value_text(data.stdout)
+                case Err(_):
+                    return result
+
             if "connectionString" in key_value.keys():
                 data_lnd_btcpay_connection_string = key_value["connectionString"]
             if "error" in key_value.keys():
                 logging.warning(f"Error from script call: {key_value['error']}")
 
-        return ConnectionInfo(
-            lnd_admin_macaroon=data_lnd_admin_macaroon,
-            lnd_invoice_macaroon=data_lnd_invoice_macaroon,
-            lnd_readonly_macaroon=data_lnd_readonly_macaroon,
-            lnd_rest_onion=data_lnd_rest_onion,
-            lnd_tls_cert=data_lnd_tls_cert,
-            lnd_zeus_connection_string=data_lnd_zeus_connection_string,
-            lnd_btcpay_connection_string=data_lnd_btcpay_connection_string,
-            cl_rest_zeus_connection_string=data_cl_rest_zeus_connection_string,
-            cl_rest_macaroon=data_cl_rest_macaroon,
-            cl_rest_onion=data_cl_rest_onion,
+        return Ok(
+            ConnectionInfo(
+                lnd_admin_macaroon=data_lnd_admin_macaroon,
+                lnd_invoice_macaroon=data_lnd_invoice_macaroon,
+                lnd_readonly_macaroon=data_lnd_readonly_macaroon,
+                lnd_rest_onion=data_lnd_rest_onion,
+                lnd_tls_cert=data_lnd_tls_cert,
+                lnd_zeus_connection_string=data_lnd_zeus_connection_string,
+                lnd_btcpay_connection_string=data_lnd_btcpay_connection_string,
+                cl_rest_zeus_connection_string=data_cl_rest_zeus_connection_string,
+                cl_rest_macaroon=data_cl_rest_macaroon,
+                cl_rest_onion=data_cl_rest_onion,
+            )
         )
 
-    async def login(self, i: LoginInput) -> Dict[str, str]:
-        matches = await self._match_password(i)
-        if matches:
-            return sign_jwt()
+    async def login(self, i: LoginInput) -> Result[Dict[str, str], Report]:
+        result = await self._match_password(i)
+        match result:
+            case Ok(matches):
+                if matches:
+                    return Ok(sign_jwt())
+                else:
+                    raise HTTPException(
+                        status.HTTP_401_UNAUTHORIZED, detail="Password is incorrect"
+                    )
 
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, detail="Password is incorrect"
-        )
+            case Err(report):
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=report.format_verbose(),
+                )
 
     async def change_password(self, type: str, old_password: str, new_password: str):
         # check just allowed type values
@@ -228,10 +278,16 @@ class RaspiBlitzSystem(SystemBase):
             )
 
         # first check if old password is correct
-        result = await call_script(
+        result = await exec_bash_command(
             f'/home/admin/config.scripts/blitz.passwords.sh check {type} "{old_password}"'  # noqa: E501
         )
-        data = parse_key_value_text(result)
+        data = {}
+        match result:
+            case Ok(in_data):
+                data = parse_key_value_text(in_data.stdout)
+            case Err(_):
+                return result
+
         if not data["correct"] == "1":
             raise HTTPException(
                 status.HTTP_406_NOT_ACCEPTABLE, detail="old password not correct"
@@ -244,30 +300,49 @@ class RaspiBlitzSystem(SystemBase):
         if type == "c":
             # will set password c of both lnd & core lightning if installed/activated
             script_call = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'  # noqa: E501
-        result = await call_sudo_script(script_call)
-        data = parse_key_value_text(result)
+        result = await exec_bash_command(script_call)
+        data = {}
+        match result:
+            case Ok(in_data):
+                data = parse_key_value_text(in_data.stdout)
+            case Err(_):
+                return result
 
         if "error" in data.keys() and len(data["error"]) > 0:
             raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=data["error"])
+
         return
 
-    async def _match_password(self, i: LoginInput) -> bool:
+    async def _match_password(self, i: LoginInput) -> Result[bool, Report]:
         if password_valid(i.password):
-            result = await call_script(
-                f'/home/admin/config.scripts/blitz.passwords.sh check a "{i.password}"'
+            result = await exec_bash_command(
+                f'{GET_PASSWORD_CHECK_SCRIPT} check a "{i.password}"', sensitive=True
             )
-            data = parse_key_value_text(result)
-            if data["correct"] == "1":
-                return True
 
-        return False
+            match result:
+                case Ok(data):
+                    data = parse_key_value_text(data.stdout)
+                    if data["correct"] == "1":
+                        return Ok(True)
+                case Err(_):
+                    return result
+
+        return Ok(False)
 
     def _check_shell_scripts_status(self):
         if not os.path.exists(SHELL_SCRIPT_PATH):
-            raise Exception(f"invalid shell script path: {SHELL_SCRIPT_PATH}")
+            logger.critical(f"invalid shell script path: {SHELL_SCRIPT_PATH}")
+            exit(1)
 
         if not os.path.isfile(GET_DEBUG_LOG_SCRIPT):
-            raise Exception(f"Required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
+            logger.critical(f"required file does not exist: {GET_DEBUG_LOG_SCRIPT}")
+            exit(1)
+
+        if not os.path.isfile(GET_PASSWORD_CHECK_SCRIPT):
+            logger.critical(
+                f"required file does not exist: {GET_PASSWORD_CHECK_SCRIPT}"
+            )
+            exit(1)
 
     async def get_debug_logs_raw(self) -> RawDebugLogData:
         cmd = f"bash {GET_DEBUG_LOG_SCRIPT}"

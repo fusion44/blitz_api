@@ -7,7 +7,9 @@ from loguru import logger
 
 from app.api.config import config
 from app.api.constants import API_VERSION
+from app.api.error_report.report import Report
 from app.auth.auth_handler import sign_jwt
+from app.external.result_type.src.result.result import Err, Ok, Result
 from app.lightning.service import get_ln_info
 from app.system.impl.system_base import SystemBase
 from app.system.models import (
@@ -63,21 +65,47 @@ class NativePythonSystem(SystemBase):
         return False
 
     @logger.catch(exclude=(HTTPException,))
-    async def get_connection_info(self) -> ConnectionInfo:
+    async def get_connection_info(self) -> Result[ConnectionInfo, Report]:
         # return an empty connection info object for now
-        return ConnectionInfo()
+        return Ok(ConnectionInfo())
 
     @logger.catch(exclude=(HTTPException,))
-    async def login(self, i: LoginInput) -> Dict[str, str]:
+    async def login(self, i: LoginInput) -> Result[Dict[str, str], Report]:
         # https://github.com/fusion44/blitz_api/issues/255
-        matches = secrets.compare_digest(
-            i.password, config("BAPI_NATIVE_LOGIN_PASSWORD", cast=str)
-        )
-        if matches:
-            return sign_jwt()
+        pw = config("BAPI_NATIVE_LOGIN_PASSWORD", cast=str)
+        if not isinstance(pw, str):
+            return Err(
+                Report(
+                    "unable to convert the .env password to a string",
+                    error=HTTPException(
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Password is incorrect",
+                    ),
+                )
+            )
 
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, detail="Password is incorrect"
+        if len(pw) < 8:
+            return Err(
+                Report(
+                    "given password is less than 8 characters",
+                    error=HTTPException(
+                        status.HTTP_401_UNAUTHORIZED,
+                        detail="given password is less than 8 characters",
+                    ),
+                )
+            )
+
+        matches = secrets.compare_digest(i.password, pw)
+        if matches:
+            return Ok(sign_jwt())
+
+        return Err(
+            Report(
+                "password is incorrect",
+                error=HTTPException(
+                    status.HTTP_401_UNAUTHORIZED, detail="password is incorrect"
+                ),
+            )
         )
 
     @logger.catch(exclude=(HTTPException,))
