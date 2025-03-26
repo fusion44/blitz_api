@@ -12,7 +12,12 @@ from loguru import logger as logging
 
 from app.api.config import config
 from app.api.error_report.report import Report
-from app.api.utils import SSE, broadcast_sse_msg, call_sudo_script, parse_key_value_text
+from app.api.utils import (
+    SSE,
+    broadcast_sse_msg,
+    exec_bash_command,
+    parse_key_value_text,
+)
 from app.apps.impl.apps_base import AppsBase
 from app.apps.models import (
     AppId,
@@ -83,20 +88,26 @@ class RaspiBlitzApps(AppsBase):
 
             return Err(report)
 
-        try:
-            result = await call_sudo_script(script_call)
-        except Exception as e:
-            # script had error or was not able to deliver all requested data fields
-            exception_str = str(e)
-            report = Report(
-                "App status script execution failed.",
-                error=HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{exception_str}"
-                ),
-            )
-            report.attach(script_call, "script_name")
-
-            return Err(report)
+        result = await exec_bash_command(script_call, use_sudo=True)
+        match result:
+            case Ok(value):
+                if value.stderr is not None and value.stderr != "":
+                    return Err(
+                        Report(
+                            "App status script execution failed.",
+                            error=HTTPException(
+                                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"stderr: {value.stderr}\n"
+                                "----------------------------\n"
+                                f"stdout: {value.stdout}",
+                            ),
+                        )
+                        .attach(script_call, "script_name")
+                        .attach(value.stdout, "script_output", sensitive=True)
+                    )
+                result = value.stdout
+            case Err(report):
+                return Err(report)
 
         try:
             data = parse_key_value_text(result)
@@ -465,9 +476,21 @@ async def _do_electrs_status_advanced() -> Result[AppStatus, Report]:
 
         return Err(report)
 
+    result_status = await exec_bash_command(script_call_status)
+    match result_status:
+        case Ok(data):
+            result_status = data.stdout
+        case Err(report):
+            return Err(report)
+
+    result_sync = await exec_bash_command(script_call_sync)
+    match result_sync:
+        case Ok(data):
+            result_sync = data.stdout
+        case Err(report):
+            return Err(report)
+
     try:
-        result_status = await call_sudo_script(script_call_status)
-        result_sync = await call_sudo_script(script_call_sync)
         result = result_status + result_sync
     except Exception as e:
         exception_str = str(e)

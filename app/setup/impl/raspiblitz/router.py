@@ -1,10 +1,12 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
+from loguru import logger
 from pydantic import BaseModel
 
-from app.api.utils import call_script, parse_key_value_lines, redis_get
+from app.api.utils import parse_key_value_lines, redis_get
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.system.impl.raspiblitz import RaspiBlitzSystem
@@ -14,6 +16,21 @@ router = APIRouter(prefix="/setup", tags=["RaspiBlitz Setup"])
 
 setupFilePath = "/var/cache/raspiblitz/temp/raspiblitz.setup"
 configFilePath = "/mnt/hdd/raspiblitz.conf"
+
+
+async def _call_script(scriptPath) -> str:
+    cmd = f"bash {scriptPath}"
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if stdout:
+        return stdout.decode()
+    if stderr:
+        logger.error(stderr.decode())
+    return ""
 
 
 # can always be called without credentials to check if
@@ -206,7 +223,7 @@ async def setup_start_done(data: StartDoneData):
         logging.warning(f"not handled setupPhase state ({setupPhase})")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    await call_script("/home/admin/_cache.sh set state waitprovision")
+    await _call_script("/home/admin/_cache.sh set state waitprovision")
 
     # TODO: Following input parameters:
     # lightning='lnd', 'cl' or 'none'
@@ -269,7 +286,7 @@ async def setup_final_done():
         logging.warning("/setup-final-done can only be called when nodes awaits final")
         return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    await call_script("/home/admin/_cache.sh set state donefinal")
+    await _call_script("/home/admin/_cache.sh set state donefinal")
     return {"state": "donefinal"}
 
 

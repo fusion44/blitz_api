@@ -3,6 +3,8 @@ import traceback
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
+from fastapi import HTTPException
+
 
 @dataclass
 class Attachment:
@@ -95,7 +97,7 @@ class Report:
         self._root_error = error
 
         # Create and add the root frame - this is the higher level context/message
-        self.attach_frame(Frame(message=message))
+        self.attach_frame(Frame(message=message, error=error))
 
         # If an exception was provided, capture its traceback
         self._traceback = None
@@ -286,10 +288,15 @@ class Report:
 
     @property
     def frames(self) -> List[Frame]:
-        """Access the frames list (useful for testing and debugging)."""
+        """Access the frames list"""
         return self._frames.copy()
 
     @property
     def root_error(self) -> Optional[Exception]:
-        """Access the root error (useful for testing and debugging)."""
+        """Access the root error"""
         return self._root_error
+
+    @property
+    def last_error(self) -> Optional[Exception]:
+        """Access the last error"""
+        return self._frames[-1].error

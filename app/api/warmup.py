@@ -22,6 +22,12 @@ async def get_bitcoin_client_warmup_data() -> List:
     return [*res]
 
 
+async def _get_app_status_data():
+    """Transform the result of get_app_status."""
+    status = await get_app_status()
+    return status.data + status.errors
+
+
 @logger.catch(exclude=(HTTPException,))
 async def get_full_client_warmup_data() -> List:
     """Get the full data set needed when the lightning client is not yet ready."""
@@ -33,7 +39,7 @@ async def get_full_client_warmup_data() -> List:
             get_ln_info(),
             get_fee_revenue(),
             get_wallet_balance(),
-            get_app_status(),
+            _get_app_status_data(),
             get_hardware_info(),
         ],
         return_exceptions=True,
@@ -67,7 +73,7 @@ async def get_full_client_warmup_data_bitcoinonly() -> List:
         *[
             get_system_info(),
             get_btc_info(),
-            get_app_status(),
+            _get_app_status_data(),
             get_hardware_info(),
         ]
     )

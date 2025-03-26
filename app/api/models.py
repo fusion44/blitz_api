@@ -1,9 +1,26 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Union
 
-
-from pydantic import BaseModel
 from fastapi import Query
+from pydantic import BaseModel
+
+
+class ProcessResult:
+    return_code: int | None
+    stdout: str
+    stderr: str
+
+    def __init__(self, return_code: int | None, stdout: str, stderr: str) -> None:
+        self.return_code = return_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __str__(self) -> str:
+        return (
+            f"ProcessResult: \nreturn_code: {self.return_code}\n"
+            f"stdout: {self.stdout}\n"
+            f"stderr: {self.stderr}"
+        )
 
 
 class ApiErrors(str, Enum):

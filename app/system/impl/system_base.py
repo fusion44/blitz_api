@@ -1,6 +1,9 @@
 from abc import abstractmethod
+from logging import error
 from typing import Dict
 
+from app.api.error_report.report import Report
+from app.external.result_type.src.result.result import Err, Result
 from app.system.models import (
     ConnectionInfo,
     LoginInput,
@@ -24,12 +27,12 @@ class SystemBase:
         raise NotImplementedError()
 
     @abstractmethod
-    async def get_connection_info(self) -> ConnectionInfo:
-        raise NotImplementedError()
+    async def get_connection_info(self) -> Result[ConnectionInfo, Report]:
+        Err(Report("not implemented", error=NotImplementedError()))
 
     @abstractmethod
-    async def login(self, i: LoginInput) -> Dict[str, str]:
-        raise NotImplementedError()
+    async def login(self, i: LoginInput) -> Result[Dict[str, str], Report]:
+        Err(Report("not implemented", error=NotImplementedError()))
 
     @abstractmethod
     async def change_password(self, type: str, old_password: str, new_password: str):

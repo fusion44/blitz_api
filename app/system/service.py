@@ -2,9 +2,12 @@ import asyncio
 from typing import Dict, Optional
 
 from fastapi import HTTPException, Request, status
+from loguru import logger
 
 from app.api.config import config
+from app.api.error_report.report import Frame
 from app.api.utils import SSE, broadcast_sse_msg
+from app.external.result_type.src.result.result import Err, Ok
 from app.system.models import (
     APIPlatform,
     ConnectionInfo,
@@ -16,8 +19,10 @@ from app.system.models import (
 
 PLATFORM = config("BAPI_PLATFORM", default=APIPlatform.RASPIBLITZ)
 if PLATFORM == APIPlatform.RASPIBLITZ:
+    logger.info("using RaspiBlitz system implementation")
     from app.system.impl.raspiblitz import RaspiBlitzSystem as System
 elif PLATFORM == APIPlatform.NATIVE_PYTHON:
+    logger.info("using native python system implementation")
     from app.system.impl.native_python import NativePythonSystem as System
 else:
     raise RuntimeError(
@@ -70,12 +75,28 @@ async def get_hardware_info() -> map:
 
 
 async def get_connection_info() -> ConnectionInfo:
-    try:
-        return await system.get_connection_info()
-    except HTTPException:
-        raise
-    except NotImplementedError as r:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+    result = await system.get_connection_info()
+    match result:
+        case Ok(data):
+            return data
+        case Err(report):
+            e = report.last_error
+            report.attach_frame(Frame("unable to get connection info"))
+            if e is None:
+                logger.error(report.format_verbose())
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=report.format_verbose(),
+                )
+            if isinstance(e, HTTPException):
+                raise e
+            if isinstance(e, NotImplementedError):
+                raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=e)
+
+    raise HTTPException(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="unknown error getting connection info",
+    )
 
 
 async def shutdown(reboot: bool) -> bool:
@@ -127,9 +148,36 @@ async def register_hardware_info_gatherer():
 
 
 async def login(i: LoginInput) -> Dict[str, str]:
-    try:
-        return await system.login(i)
-    except HTTPException:
-        raise
-    except NotImplementedError as r:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+    result = await system.login(i)
+    match result:
+        case Ok(data):
+            return data
+        case Err(report):
+            e = report.last_error
+            report.attach_frame(Frame("error during login"))
+            if e is None:
+                logger.error("got report without error")
+                logger.error(report.format_verbose())
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=report.format_verbose(),
+                )
+            if (
+                isinstance(e, HTTPException)
+                and e.status_code == status.HTTP_401_UNAUTHORIZED
+            ):
+                logger.info("unauthorized login attempt")
+                raise e
+            if (
+                isinstance(e, HTTPException)
+                and e.status_code != status.HTTP_401_UNAUTHORIZED
+            ):
+                logger.error(report.format_verbose())
+                raise e
+            if isinstance(e, NotImplementedError):
+                raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=e)
+
+    raise HTTPException(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="unknown error",
+    )
