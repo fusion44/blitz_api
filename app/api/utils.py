@@ -10,6 +10,7 @@ from typing import Dict, Optional
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 from loguru import logger
+from redis.asyncio import Redis
 
 from app.api.error_report.report import Report
 from app.api.models import ProcessResult
@@ -43,8 +44,11 @@ async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
 
 
 async def redis_get(key: str) -> str:
-    v = await redis_plugin.redis.get(key)
+    redis = redis_plugin.redis
+    if not isinstance(redis, Redis):
+        raise Exception("Redis not initialized, got a Sentinel")
 
+    v = await redis.get(key)
     if not v:
         logstr = f"Key '{key}' not found in Redis DB."
         if "tor_web_addr" in key:
