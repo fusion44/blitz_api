@@ -29,6 +29,7 @@ googleapis-common-protos = "^1.66.0"
 protobuf = "^5.29.3"
 deepdiff = "^8.2.0"
 loguru = "^0.7.2"
+celery = {extras = ["redis"], version = "^5.4.0"}
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"

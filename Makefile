@@ -1,3 +1,11 @@
+CELERY_APP ?= app.celery_app
+CELERY_BROKER_URL ?= redis://localhost:6379/0
+TASK_NAME ?= app.apps.tasks.update_app_state_task
+TASK_ARGS ?= '[]'
+TASK_KWARGS ?= '{}'
+
+.PHONY: celery-list-tasks celery-run-task
+
 # The @ makes sure that the command itself isn't echoed in the terminal
 help:
 	@echo "---------------HELP-----------------"
@@ -11,6 +19,8 @@ help:
 	@echo "To sync current changes to a blitz for testing, type 'make sync-to-blitz'.\n   ℹ️  Adjust connection values in scripts/push_to_blitz.sh"
 	@echo "To generate the client libraries type 'make generate-client-libs'"
 	@echo "To build the Docker regtest image type 'make docker-regtest-image'.\n   ℹ️  The image will be available to docker as 'blitz_api'"
+	@echo "To list all celery tasks type 'make celery-list-tasks'"
+	@echo "To manually trigger a celery task type 'make celery-run-task [TASK_NAME TASK_ARGS TASK_KWARGS]'"
 	@echo "------------------------------------"
 
 clean:
@@ -54,3 +64,13 @@ enable-remote-debugging:
 
 disable-remote-debugging:
 	bash scripts/remote_debugging.sh disable
+
+celery-list-tasks:
+	@echo "Listing registered Celery tasks..."
+	@poetry run celery -A $(CELERY_APP) inspect registered
+
+celery-run-task:
+	@echo "Manually triggering Celery task: $(TASK_NAME)"
+	@echo "  Args: $(TASK_ARGS)"
+	@echo "  Kwargs: $(TASK_KWARGS)"
+	@poetry run celery -A $(CELERY_APP) call $(TASK_NAME) --args=$(TASK_ARGS) --kwargs=$(TASK_KWARGS)

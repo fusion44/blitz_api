@@ -6,10 +6,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException, RequestValidationError
-from fastapi_plugins import RedisSettings, redis_plugin, registered_configuration
+from fastapi_plugins import RedisSettings
 from fastapi_plugins import get_config as get_redis_config
+from fastapi_plugins import redis_plugin, registered_configuration
 from loguru import logger
 from pydantic import BaseModel
+from redis.asyncio import Redis
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, RedirectResponse
@@ -23,6 +25,7 @@ from app.api.warmup import (
     get_full_client_warmup_data,
     get_full_client_warmup_data_bitcoinonly,
 )
+from app.apps.router import register_app_status_update_handlers
 from app.apps.router import router as app_router
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import (
@@ -36,6 +39,7 @@ from app.bitcoind.service import (
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
 )
+from app.external.result_type.src.result.result import Ok
 from app.lightning.models import LnInitState
 from app.lightning.router import router as ln_router
 from app.lightning.service import initialize_ln_repo, register_lightning_listener
@@ -85,11 +89,15 @@ async def lifespan(app: FastAPI):
     # setup
     await redis_plugin.init_app(app, config=config)
     await redis_plugin.init()
+    redis = redis_plugin.redis
+    if not isinstance(redis, Redis):
+        raise RuntimeError("Redis not initialized correctly, got a Sentinel")
+
     register_cookie_updater()
     await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
     loop = asyncio.get_event_loop()
-    loop.create_task(_initialize_bitcoin())
-    loop.create_task(_initialize_lightning())
+    btc_task = loop.create_task(_initialize_bitcoin())
+    ln_task = loop.create_task(_initialize_lightning())
     await register_all_handlers()
     handle_local_cookie()
 
@@ -97,6 +105,8 @@ async def lifespan(app: FastAPI):
 
     # cleanup
     await redis_plugin.terminate()
+    await btc_task
+    await ln_task
     remove_local_cookie()
 
 
@@ -267,8 +277,8 @@ def index(req: Request):
 new_connections = []
 
 
-def _send_sse_event(id, event, data):
-    return sse_mgr.send_to_single(id, build_sse_event(event, data))
+async def _send_sse_event(id, event, data):
+    return await sse_mgr.send_to_single(id, build_sse_event(event, data))
 
 
 @app.get(
@@ -319,10 +329,21 @@ async def warmup_new_connections():
     # is rather data intensive. This is OK for now, to keep the code simple.
 
     async def _handle(id, event, res):
-        if isinstance(res, BaseModel):
-            return await _send_sse_event(id, event, res.model_dump())
-        elif isinstance(res, dict) or isinstance(res, list):
-            return await _send_sse_event(id, event, res)
+        match res:
+            case BaseModel():
+                return await _send_sse_event(id, event, res.model_dump())
+            case dict() | list():
+                return await _send_sse_event(id, event, res)
+            case Ok(data) if data and isinstance(data, BaseModel):
+                return await _send_sse_event(id, event, data.model_dump())
+            case Ok(data) if not data:
+                logger.debug(f"No data to send for warmup event {event}")
+                return
+            case data:
+                logger.warning(
+                    f"Got unknown data type while handling warmup "
+                    f"data {event}: {type(res)}"
+                )
 
         logger.error(f"Error while fetching warmup_data for {event}: {res}")
         return await _send_sse_event(id, event, {"error": f"{res}"})
@@ -410,6 +431,7 @@ async def register_all_handlers():
     if register_handlers_finished:
         raise RuntimeError("register_all_handlers() must not be called twice.")
 
+    await register_app_status_update_handlers()
     await register_hardware_info_gatherer()
 
     register_handlers_finished = True

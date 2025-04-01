@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import random
+import time
 from typing import List
 
 from fastapi import HTTPException, status
@@ -243,7 +244,11 @@ class RaspiBlitzApps(AppsBase):
                         AppStatusQueryError(id=app_id, error=report.format())
                     )
 
-        return Ok(AppStatusQueryResult(data=app_status_list, errors=report_list))
+        return Ok(
+            AppStatusQueryResult(
+                data=app_status_list, errors=report_list, timestamp=int(time.time())
+            )
+        )
 
     async def get_app_status_sub(self):
         switch = True

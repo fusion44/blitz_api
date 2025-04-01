@@ -1,11 +1,15 @@
 import asyncio
-from typing import List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from loguru import logger
 
-from app.apps.service import get_app_status
+from app.api.error_report.report import Report
+from app.apps.cache import get_cached_app_status, get_lock_status
+from app.apps.models import AppStatusQueryResult
+from app.apps.tasks import update_app_state_task
 from app.bitcoind.service import get_btc_info
+from app.external.result_type.src.result.result import Err, Ok, Result
 from app.lightning.service import get_fee_revenue, get_ln_info, get_wallet_balance
 from app.system.service import get_hardware_info, get_system_info
 
@@ -22,10 +26,44 @@ async def get_bitcoin_client_warmup_data() -> List:
     return [*res]
 
 
-async def _get_app_status_data():
+async def _get_app_status_data() -> Result[Optional[AppStatusQueryResult], Report]:
     """Transform the result of get_app_status."""
-    status = await get_app_status()
-    return status.data + status.errors
+    try:
+        result = await get_cached_app_status()
+        cached_status_raw = None
+        match result:
+            case Ok(cached_status_data) if cached_status_data:
+                return Ok(cached_status_data)
+            case Ok(_):
+                # Query executed, but no data was returned
+                # This means the cache is empty or stale => trigger update
+                update_app_state_task.delay()  # type: ignore
+                return Ok(None)
+            case Err(report):
+                # TODO: return error message
+                logger.error(f"Failed to fetch app status: {report.format_verbose()}")
+
+        result = await get_lock_status()
+        match result:
+            case Ok(True):
+                logger.info(
+                    "App status update lock exists. Assuming update is in progress."
+                )
+            case Ok(False) if not cached_status_raw:
+                logger.info(
+                    "App status cache is missing and no update lock exists. "
+                    "Triggering update task."
+                )
+                update_app_state_task.delay()  # type: ignore
+            case Err(report):
+                return Err(report)
+
+    except Exception as e:
+        return Err(
+            Report(f"Error during app status cache handling for new client {id}: {e}")
+        )
+
+    return Ok(None)
 
 
 @logger.catch(exclude=(HTTPException,))
