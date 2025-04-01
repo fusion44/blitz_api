@@ -4,6 +4,10 @@
 RTLVERSION="v0.15.2"
 
 if [ "$1" = "status" ]; then
+  sleep 2s
+  # raise a fake error
+  echo "result='FAKE ERROR FOR TESTING'" >&2
+  exit 1
 
   # get LNTYPE and CHAIN parameters
   LNTYPE="$2" # lnd or cl

@@ -19,10 +19,6 @@ class AppsBase:
         raise NotImplementedError()
 
     @abstractmethod
-    async def get_app_status_sub(self):
-        raise NotImplementedError()
-
-    @abstractmethod
     async def install_app_sub(self, app_id: str):
         raise NotImplementedError()
 

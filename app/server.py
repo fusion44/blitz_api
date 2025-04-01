@@ -5,7 +5,6 @@ from app.api.config import config
 import click  # isort:skip
 
 
-
 @click.command()
 @click.option("--port", default="5000", help="Port to run Blitz API on")
 @click.option("--host", default="127.0.0.1", help="Host to run Blitz API on")

@@ -5,8 +5,6 @@ from typing import List, Optional, Union
 from fastapi import Query
 from pydantic.main import BaseModel
 
-from loguru import logger
-
 
 class FeeEstimationMode(str, Enum):
     CONSERVATIVE = "conservative"
@@ -157,7 +155,7 @@ class NetworkInfo(BaseModel):
     local_addresses: List[BtcLocalAddress] = Query(
         [], description="List of local addresses"
     )
-    warnings: List[str] = Query(None, description="Any network and blockchain warnings")
+    warnings: str = Query("", description="Any network and blockchain warnings")
 
     @classmethod
     def from_rpc(cls, r):
@@ -177,7 +175,7 @@ class NetworkInfo(BaseModel):
             relay_fee=r["relayfee"],
             incremental_fee=r["incrementalfee"],
             local_addresses=[BtcLocalAddress.from_rpc(n) for n in r["localaddresses"]],
-            warnings=r["warnings"],
+            warnings="" if "warnings" not in r else str(r["warnings"]),
         )
 
 
@@ -371,7 +369,7 @@ class BlockchainInfo(BaseModel):
             "enabled)"
         ),
     )
-    warnings: List[str] = Query(..., description="Any network and blockchain warnings")
+    warnings: str = Query("", description="Any network and blockchain warnings")
     softforks: List[SoftFork] = Query(..., description="Status of softforks")
 
     @classmethod
@@ -401,7 +399,7 @@ class BlockchainInfo(BaseModel):
             prune_target_size=(
                 None if "prune_target_size" not in r else int(r["prune_target_size"])
             ),
-            warnings=r["warnings"],
+            warnings="" if "warnings" not in r else str(r["warnings"]),
             softforks=softforks,
         )
 

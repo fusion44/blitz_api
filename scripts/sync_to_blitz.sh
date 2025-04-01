@@ -72,7 +72,7 @@ fi
 
 # Needs sshpass installed
 echo "# syncing local code to: ${remote}"
-sshpass -p "$passwordA" rsync -rvz --exclude .git/ -e "ssh -p ${sshPort}" $local $remote
+sshpass -p "$passwordA" rsync -rvz --exclude .venv/ --exclude test_env_data/ --exclude .git/ -e "ssh -p ${sshPort}" $local $remote
 result=$?
 echo "result(${result})"
 if [ "$result" != "0" ]; then

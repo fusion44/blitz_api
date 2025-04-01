@@ -17,7 +17,7 @@ def config(
     option: str,
     default: Any | Undefined = Undefined(),
     cast: Any | Undefined = Undefined(),
-):
+) -> Any:
     if _config is None:
         _setup_config()
         logger.trace("Configuration was not initialized => calling setup_config()")

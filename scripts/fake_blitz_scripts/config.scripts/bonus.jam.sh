@@ -8,7 +8,7 @@ REPO=joinmarket-webui/jam
 if [ "$1" = "status" ]; then
   sleep 2s
   echo "version='${WEBUI_VERSION}'"
-  echo "installed='1'"
+  echo "installed='0'"
   echo "localIP='192.168.1.18'"
   echo "httpPort='7500'"
   echo "httpsPort='7501'"

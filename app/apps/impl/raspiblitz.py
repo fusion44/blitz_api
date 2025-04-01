@@ -250,25 +250,6 @@ class RaspiBlitzApps(AppsBase):
             )
         )
 
-    async def get_app_status_sub(self):
-        switch = True
-        while True:
-            status = "online" if switch else "offline"
-            app_list = [
-                # Specter is deactivated for now because it uses its own self signed
-                # HTTPS cert that makes trouble in Chrome on last test
-                # also see: app/constants.py where specter is deactivated
-                # {"id": "specter", "name": "Specter Desktop", "status": status},
-                {"id": "sphinx", "name": "Sphinx Chat", "status": status},
-                {"id": "btc-pay", "name": "BTCPay Server", "status": status},
-                {"id": "rtl", "name": "Ride the Lightning", "status": status},
-                {"id": "bos", "name": "Balance of Satoshis", "status": status},
-            ]
-            i = random.randint(1, len(app_list))
-            yield json.dumps(app_list[i - 1])
-            await asyncio.sleep(4)
-            switch = not switch
-
     async def install_app_sub(self, app_id: str):
         if app_id not in available_app_ids:
             raise HTTPException(
