@@ -8,7 +8,7 @@ if [ "$1" = "status" ]; then
   sleep 2s
   echo "appID='albyhub'"
   echo "version='${VERSION}'"
-  echo "installed=1"
+  echo "installed=0"
   echo "localIP='192.168.1.18'"
   echo "toraddress='toraddress'"
   echo "fingerprint='fingerprint'"
