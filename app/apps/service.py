@@ -4,7 +4,9 @@ from loguru import logger
 from app.api.config import config
 from app.api.error_report.report import Report
 from app.api.models import ApiErrors
+from app.apps.cache import get_cached_app_status
 from app.apps.models import AppStatus, AppStatusQueryResult
+from app.apps.tasks import update_app_state_task
 from app.external.result_type.src.result import Err, Ok
 from app.main import ErrorMessage
 from app.system.models import APIPlatform
@@ -26,6 +28,11 @@ if apps is None:
     raise RuntimeError(f"Unknown platform {PLATFORM}")
 
 
+async def update_app_state_cache():
+    """Starts an update task to the app status cache."""
+    update_app_state_task.delay()  # type: ignore
+
+
 async def get_app_status_single(id: str) -> AppStatus:
     match await apps.get_app_status_single(id):
         case Ok(value):
@@ -39,9 +46,17 @@ async def get_app_status_single(id: str) -> AppStatus:
 
 
 async def get_app_status() -> AppStatusQueryResult:
-    match await apps.get_app_status():
-        case Ok(values):
+    match await get_cached_app_status():
+        case Ok(values) if values:
             return values
+        case Ok(_):
+            # query executed, but no data was returned
+            # This means the cache is empty or stale => trigger update
+            update_app_state_task.delay()  # type: ignore
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Cached app status is empty. App status update task triggered.",
+            )
         case Err(report):
             _handle_error(report)
 

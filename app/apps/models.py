@@ -98,6 +98,9 @@ class AppStatusQueryResult(BaseModel):
     errors: List[AppStatusQueryError] = Query(
         [], description="Contains the error messages for unsuccessful queries"
     )
+    timestamp: int = Query(
+        0, description="The UTC timestamp of when the data was fetched"
+    )
 
 
 class UninstallData(BaseModel):

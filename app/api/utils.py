@@ -5,12 +5,12 @@ import os
 import random
 import re
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from fastapi_plugins import redis_plugin
 from loguru import logger
-from redis.asyncio import Redis
+from redis.asyncio import Redis, TimeoutError
 
 from app.api.error_report.report import Report
 from app.api.models import ProcessResult
@@ -43,10 +43,82 @@ async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
     await sse_mgr.broadcast_to_all(build_sse_event(event, json_data))
 
 
-async def redis_get(key: str) -> str:
-    redis = redis_plugin.redis
-    if not isinstance(redis, Redis):
-        raise Exception("Redis not initialized, got a Sentinel")
+async def redis_set(
+    key: str,
+    value: str | bytes | int | float,
+    nx: bool = False,
+    ex: int | None = None,
+    custom_redis: Redis | None = None,
+) -> Result[None, Report]:
+    """Set the value at key `name` to `value`
+
+    Parameters
+    ----------
+    name: str
+        The key to set
+    value: str | bytes | int | float
+        The value to set
+    nx : bool
+        If set to True, set the value at `key` to `value` only
+        if it does not exist.
+    ex : int
+        sets an expire flag on `key` for `ex` seconds.
+    custom_redis: Redis | None
+        The custom Redis instance to use.
+        If None, the default Redis instance will be used.
+    """
+    logger.trace(f"redis_set(key={key}, value={value}, nx={nx}, ex={ex})")
+
+    try:
+        redis = None
+        if custom_redis:
+            redis = custom_redis
+        else:
+            redis = redis_plugin.redis
+            if not isinstance(redis, Redis):
+                return Err(
+                    Report(
+                        f"Redis not initialized, got a {type(redis)}",
+                        error=RuntimeError(
+                            f"Redis not initialized, got a {type(redis)}"
+                        ),
+                    )
+                )
+
+        result = await redis.set(name=key, value=value, nx=nx, ex=ex)
+        if result is None:
+            return Err(Report(message=f"SET operation failed for key {key}"))
+        return Ok(None)
+    except TypeError as e:
+        return Err(Report(message=f"Invalid Redis value type: {e}", error=e))
+    except ValueError as e:
+        return Err(Report(message=f"Invalid Redis key: {e}", error=e))
+    except RuntimeError as e:
+        return Err(Report(message=f"Redis SET operation failed: {e}", error=e))
+    except Exception as e:
+        return Err(Report(message=f"Unexpected error setting key {key}: {e}", error=e))
+
+
+# TODO: return type should be bytes | str | int | float
+async def redis_get(key: str, custom_redis: Redis | None = None) -> Any:
+    """Get the value at key `name`
+
+    Parameters
+    ----------
+    name: str
+        The key to get
+    custom_redis: Redis | None
+        The custom Redis instance to use.
+        If None, the default Redis instance will be used.
+    """
+
+    redis = None
+    if custom_redis:
+        redis = custom_redis
+    else:
+        redis = redis_plugin.redis
+        if not isinstance(redis, Redis):
+            raise Exception("Redis not initialized, got a Sentinel")
 
     v = await redis.get(key)
     if not v:
@@ -61,6 +133,181 @@ async def redis_get(key: str) -> str:
         return v.decode("utf-8")
     except AttributeError:
         return v
+
+
+async def redis_get_raw(
+    key: str, custom_redis: Redis | None = None
+) -> Result[str | bytes | int | float | None, Report]:
+    """Get the value at key `name` without decoding it
+
+    Parameters
+    ----------
+    name: str
+        The key to get
+    custom_redis: Redis | None
+        The custom Redis instance to use.
+        If None, the default Redis instance will be used.
+    """
+
+    redis = None
+    if custom_redis:
+        redis = custom_redis
+    else:
+        redis = redis_plugin.redis
+        if not isinstance(redis, Redis):
+            raise Exception("Redis not initialized, got a Sentinel")
+
+    try:
+        data = await redis.get(key)
+        return Ok(data)
+    except Exception as e:
+        return Err(
+            Report(
+                f"Error getting key {key}",
+                error=e,
+            )
+        )
+
+
+async def redis_delete(
+    key: str, custom_redis: Redis | None = None
+) -> Result[int, Report]:
+    """Delete the value at key `name`
+
+    Parameters
+    ----------
+    name: str
+        The key to delete
+
+    custom_redis: Redis | None
+        The custom Redis instance to use.
+        If None, the default Redis instance will be used.
+
+    Returns
+    -------
+    Result[int, Report]
+        Ok[int] if successful with the number of deleted keys
+        Err[Report]
+    """
+    try:
+        redis = None
+        if custom_redis:
+            redis = custom_redis
+        else:
+            redis = redis_plugin.redis
+            if not isinstance(redis, Redis):
+                return Err(
+                    Report(
+                        f"Redis not initialized, got a {type(redis)}",
+                        error=RuntimeError(
+                            f"Redis not initialized, got a {type(redis)}"
+                        ),
+                    )
+                )
+
+        result: int = await redis.delete(key)
+        if not isinstance(result, int):
+            return Err(
+                Report(
+                    f"Error deleting key {key}",
+                    error=RuntimeError(f"Unexpected result type {type(result)}"),
+                )
+            )
+
+        return Ok(result)
+
+    except Exception as e:
+        return Err(Report(f"Error deleting key {key}", error=e))
+
+
+async def redis_exists(
+    key: str, custom_redis: Redis | None = None
+) -> Result[bool, Report]:
+    """Check if a key exists in Redis
+
+    Parameters
+    ----------
+    key: str
+        The key to check
+    custom_redis: Redis | None
+        The custom Redis instance to use.
+        If None, the default Redis instance will be used.
+    """
+    try:
+        redis = None
+        if custom_redis:
+            redis = custom_redis
+        else:
+            redis = redis_plugin.redis
+            if not isinstance(redis, Redis):
+                return Err(
+                    Report(
+                        f"Redis not initialized, got a {type(redis)}",
+                        error=RuntimeError(
+                            f"Redis not initialized, got a {type(redis)}"
+                        ),
+                    )
+                )
+
+        res = await redis.exists(key)
+        match res:
+            case 0:
+                return Ok(False)
+            case 1:
+                return Ok(True)
+            case _:
+                return Err(
+                    Report(
+                        f"Unexpected result type {type(res)} for key {key}",
+                        error=RuntimeError(f"Unexpected result type {type(res)}"),
+                    )
+                )
+    except Exception as e:
+        return Err(Report(f"Error checking if key {key} exists", error=e))
+
+
+async def redis_publish(
+    channel: str, message: int | str | bytes | float, custom_redis: Redis | None = None
+) -> Result[int, Report]:
+    """Publish a message to a Redis channel
+
+    Parameters
+    ----------
+    channel : str
+        The name of the Redis channel
+    message : int | str | bytes | float
+        The message to publish
+
+    Returns
+    -------
+    Result[int, Report]
+        Ok[int]
+            an integer representing active subscriber count
+            zero indicates no active subscribers
+        Err[Report]
+    """
+    try:
+        redis = None
+        if custom_redis:
+            redis = custom_redis
+        else:
+            redis = redis_plugin.redis
+            if not isinstance(redis, Redis):
+                return Err(
+                    Report(
+                        f"Redis not initialized, got a {type(redis)}",
+                        error=RuntimeError(
+                            f"Redis not initialized, got a {type(redis)}"
+                        ),
+                    )
+                )
+
+        subscriber_count = await redis.publish(channel, message)
+        return Ok(subscriber_count)
+    except Exception as e:
+        return Err(
+            Report(f"Error publishing message to channel {channel}: {e}", error=e)
+        )
 
 
 # TODO
@@ -81,6 +328,9 @@ class SSE:
 
     INSTALL_APP = "install"
     INSTALLED_APP_STATUS = "installed_app_status"
+    APP_STATE_UPDATING = "app_state_updating"
+    APP_STATE_UPDATE_ERROR = "app_state_update_error"
+    APP_STATE_UPDATING_SUCCESS = "app_state_updating_success"
 
     BTC_NETWORK_STATUS = "btc_network_status"
     BTC_MEMPOOL_STATUS = "btc_mempool_status"
@@ -204,7 +454,7 @@ async def _terminate_process(proc, timeout=5) -> Result[bool, Report]:
     try:
         proc.kill()
         await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"failed to terminate process {proc.pid} within {timeout} seconds")
         return Err(
             Report(
@@ -266,7 +516,7 @@ async def exec_bash_command(
                     stderr.decode() if stderr else "",
                 )
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.debug(f"{cmd} timed out after {timeout} seconds")
             res = await _terminate_process(proc)
             match res:

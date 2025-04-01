@@ -26,6 +26,8 @@ class ProcessResult:
 class ApiErrors(str, Enum):
     INVALID_REQUEST_INPUT = "invalid_request_input"
     UNABLE_TO_PROCESS_ERROR = "unable_to_process_error"
+    APP_STATUS_UPDATE_FAILED = "app_status_update_failed"
+    BACKGROUND_TASK_FAILED = "background_task_failed"
 
 
 class ErrorMessage(BaseModel):

@@ -122,6 +122,12 @@ in {
       sleep 3
       nu ./scripts/fake_blitz_scripts/update_redis_values.nu
     '';
+    celery_worker.exec = ''
+      poetry run celery -A app.celery_app worker --loglevel=info
+    '';
+    celery_beat.exec = ''
+      poetry run celery -A app.celery_app beat --loglevel=info
+    '';
   };
 
   # https://devenv.sh/services/

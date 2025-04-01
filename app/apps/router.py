@@ -1,15 +1,25 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Path
 from fastapi.params import Depends
 from loguru import logger
 
 import app.apps.docs as docs
 import app.apps.service as service
+from app.apps.cache import watch_app_status_changes
 from app.apps.models import AppId, AppStatus, AppStatusQueryResult, UninstallData
 from app.auth.auth_bearer import JWTBearer
 
 _PREFIX = "apps"
 
 router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
+
+
+async def register_app_status_update_handlers():
+    # This handler watches for messages from the update app cache celery task
+    # it is also responsible for notifying clients of the change
+    loop = asyncio.get_event_loop()
+    loop.create_task(watch_app_status_changes())
 
 
 @router.get(
@@ -22,6 +32,17 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
 @logger.catch(exclude=(HTTPException,))
 async def get_status() -> AppStatusQueryResult:
     return await service.get_app_status()
+
+
+@router.post(
+    "/update-cache",
+    name=f"{_PREFIX}/update-cache",
+    summary="Update the app status cache. Results will be broadcasted to SSE clients.",
+    dependencies=[Depends(JWTBearer())],
+)
+@logger.catch(exclude=(HTTPException,))
+async def update_cache():
+    return await service.update_app_state_cache()
 
 
 @router.get(
