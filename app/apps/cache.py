@@ -6,16 +6,9 @@ from redis.asyncio import Redis
 
 from app.api.channel import BaseChannelListener
 from app.api.config import config
-from app.api.error_report.report import Frame, Report
+from app.api.error_report.report import Report
 from app.api.models import ErrorMessage
-from app.api.utils import (
-    SSE,
-    broadcast_sse_msg,
-    redis_delete,
-    redis_get,
-    redis_get_raw,
-    redis_set,
-)
+from app.api.utils import SSE, broadcast_sse_msg, redis_get, redis_get_raw, redis_set
 from app.apps.constants import AppsServiceActions, AppsServiceKeys
 from app.apps.models import AppStatusQueryResult
 from app.external.result_type.src.result.result import Err, Ok, Result
@@ -265,78 +258,3 @@ async def get_cache_timestamp(
         return Err(
             Report(message="Error retrieving cache timestamp from Redis", error=e)
         )
-
-
-async def get_lock_status(redis: Redis | None = None) -> Result[bool, Report]:
-    """
-    Checks if the update lock is held.
-    Returns True if lock is held.
-    """
-    logger.trace("get_lock_status()")
-    result = await redis_get_raw(
-        AppsServiceKeys.APP_STATUS_LOCK_KEY, custom_redis=redis
-    )
-    match result:
-        case Ok(None):
-            logger.debug("App status update lock not held.")
-            return Ok(False)
-        case Ok(data) if isinstance(data, bytes) and data.decode("utf-8") == "locked":
-            logger.debug("App status update lock held.")
-            return Ok(True)
-        case Ok(data) if not isinstance(data, bytes):
-            return Err(Report(message=f"Unexpected data from Redis: {data}"))
-        case Err(e):
-            logger.error("Error checking if app status update lock is held: %s", e)
-            return Err(e)
-
-    return Err(Report(message="Error checking if app status update lock is held"))
-
-
-async def acquire_update_lock(redis: Redis | None = None) -> Result[bool, Report]:
-    """
-    Attempts to acquire a lock to prevent concurrent updates.
-    Returns True if lock acquired.
-    """
-    logger.trace("acquire_update_lock()")
-
-    result = await get_lock_status(redis)
-    match result:
-        case Ok(lock_status):
-            if lock_status:
-                return Ok(False)
-        case Err(report):
-            return Err(report)
-
-    # nx: Only set the key if it does not already exist.
-    # ex: Set the specified expire time, in seconds.
-    match await redis_set(
-        AppsServiceKeys.APP_STATUS_LOCK_KEY,
-        "locked",
-        nx=True,
-        ex=LOCK_TTL_SECONDS,
-        custom_redis=redis,
-    ):
-        case Ok(_):
-            return Ok(True)
-        case Err(report):
-            return Err(
-                report.attach_frame(
-                    Frame(message="Error acquiring update lock in Redis")
-                )
-            )
-
-    return Err(Report(message="Error acquiring update lock in Redis"))
-
-
-async def release_update_lock(redis: Redis | None = None) -> Result[None, Report]:
-    """Releases the update lock."""
-    logger.trace("release_update_lock()")
-    match await redis_delete(AppsServiceKeys.APP_STATUS_LOCK_KEY, custom_redis=redis):
-        case Ok(_):
-            return Ok(None)
-        case Err(report):
-            return Err(
-                report.attach_frame(
-                    Frame(message="Error releasing update lock in Redis")
-                )
-            )
