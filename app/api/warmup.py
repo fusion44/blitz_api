@@ -5,7 +5,9 @@ from fastapi import HTTPException, status
 from loguru import logger
 
 from app.api.error_report.report import Report
-from app.apps.cache import get_cached_app_status, get_lock_status
+from app.api.task_utils import get_lock_status
+from app.apps.cache import get_cached_app_status
+from app.apps.constants import AppsServiceKeys
 from app.apps.models import AppStatusQueryResult
 from app.apps.tasks import update_app_state_task
 from app.bitcoind.service import get_btc_info
@@ -43,7 +45,7 @@ async def _get_app_status_data() -> Result[Optional[AppStatusQueryResult], Repor
                 # TODO: return error message
                 logger.error(f"Failed to fetch app status: {report.format_verbose()}")
 
-        result = await get_lock_status()
+        result = await get_lock_status(AppsServiceKeys.APP_STATUS_LOCK_KEY)
         match result:
             case Ok(True):
                 logger.info(
