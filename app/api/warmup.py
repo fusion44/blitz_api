@@ -6,7 +6,7 @@ from loguru import logger
 
 from app.api.error_report.report import Report
 from app.api.task_utils import get_lock_status
-from app.apps.cache import get_cached_app_status
+from app.apps.cache import cache as app_cache
 from app.apps.constants import AppsServiceKeys
 from app.apps.models import AppStatusQueryResult
 from app.apps.tasks import update_app_state_task
@@ -31,7 +31,7 @@ async def get_bitcoin_client_warmup_data() -> List:
 async def _get_app_status_data() -> Result[Optional[AppStatusQueryResult], Report]:
     """Transform the result of get_app_status."""
     try:
-        result = await get_cached_app_status()
+        result = await app_cache.get_cached_app_status()
         cached_status_raw = None
         match result:
             case Ok(cached_status_data) if cached_status_data:
