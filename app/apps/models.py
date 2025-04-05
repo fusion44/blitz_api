@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Protocol
 
 from fastapi import Query
 from pydantic.main import BaseModel
@@ -105,3 +105,39 @@ class AppStatusQueryResult(BaseModel):
 
 class UninstallData(BaseModel):
     keepData: bool = True
+class RedisInterface(Protocol):
+    """An interface for Redis operations to allow for dependency injection."""
+
+    async def get(self, name: str) -> bytes: ...
+
+    async def set(self, name: str, value: str, ex: Optional[int] = None) -> bool: ...
+
+    async def close(self) -> None: ...
+
+
+class CacheOperations(Protocol):
+    """Interface for cache operations to avoid circular dependencies."""
+
+    async def set_cached_app_status(
+        self, status: AppStatusQueryResult, redis=None
+    ) -> Result[None, Report]: ...
+
+    async def get_cached_app_status(
+        self, redis=None
+    ) -> Result[Optional[AppStatusQueryResult], Report]: ...
+
+
+class ChannelOperations(Protocol):
+    """Interface for channel notification operations."""
+
+    async def notify_key_change(
+        self, key: str, action: str, old_value=None, new_value=None
+    ) -> Result[None, Report]: ...
+
+    async def connect(self) -> Result[None, Report]: ...
+
+
+class CacheStatus(str, Enum):
+    UPDATING = "updating"
+    UPDATED = "updated"
+    ERROR = "error"

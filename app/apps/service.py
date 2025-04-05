@@ -4,9 +4,9 @@ from loguru import logger
 from app.api.config import config
 from app.api.error_report.report import Report
 from app.api.models import ApiErrors
-from app.apps.cache import get_cached_app_status
 from app.apps.models import AppStatus, AppStatusQueryResult
 from app.apps.tasks import update_app_state_task
+from app.apps.cache import cache as app_cache
 from app.external.result_type.src.result import Err, Ok
 from app.main import ErrorMessage
 from app.system.models import APIPlatform
@@ -46,7 +46,7 @@ async def get_app_status_single(id: str) -> AppStatus:
 
 
 async def get_app_status() -> AppStatusQueryResult:
-    match await get_cached_app_status():
+    match await app_cache.get_cached_app_status():
         case Ok(values) if values:
             return values
         case Ok(_):

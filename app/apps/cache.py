@@ -1,151 +1,128 @@
-import json
+"""
+This module contains the caching implementation for app status data.
+
+It provides functions to retrieve, store, and monitor app status data in Redis.
+"""
+
 from typing import Optional
 
 from loguru import logger
 from redis.asyncio import Redis
 
-from app.api.channel import BaseChannelListener
 from app.api.config import config
 from app.api.error_report.report import Report
 from app.api.models import ErrorMessage
-from app.api.utils import SSE, broadcast_sse_msg, redis_get, redis_get_raw, redis_set
-from app.apps.constants import AppsServiceActions, AppsServiceKeys
-from app.apps.models import AppStatusQueryResult
-from app.external.result_type.src.result.result import Err, Ok, Result
+from app.api.utils import redis_get, redis_get_raw, redis_set
+from app.apps.constants import AppsServiceKeys
+from app.apps.models import AppStatusQueryResult, CacheOperations
+from app.external.result_type.src.result import Err, Ok, Result
 from app.logging import configure_logger
 
 CACHE_TTL_SECONDS = int(config("BAPI_CACHE_TTL_SECONDS", default=35 * 60))
 if not isinstance(CACHE_TTL_SECONDS, int):
     raise TypeError("BAPI_CACHE_TTL_SECONDS must be an integer")
 
-LOCK_TTL_SECONDS = int(config("BAPI_LOCK_TTL_SECONDS", default=5 * 60))
-if not isinstance(LOCK_TTL_SECONDS, int):
-    raise TypeError("BAPI_LOCK_TTL_SECONDS must be an integer")
 
 configure_logger()
 
 
-BAPI_REDIS_URL = config("BAPI_REDIS_URL", "redis://127.0.0.1:6379/0")
-if BAPI_REDIS_URL == "":
-    raise Exception("BAPI_REDIS_URL is not set")
+class AppCache(CacheOperations):
+    """
+    Implementation of the CacheOperations interface for app status caching.
+    """
 
-
-class _AppsChannelListener(BaseChannelListener):
-    def __init__(self):
-        super().__init__(AppsServiceKeys.APP_STATE_CHANNEL, BAPI_REDIS_URL)
-
-    async def handle_event(self, event):
-        """Process app state change events from the Redis channel"""
-        logger.debug(f"Received app state event: {event}")
-
-        key = action = new_value = None
+    async def get_cached_app_status(
+        self,
+        redis: Redis | None = None,
+    ) -> Result[Optional[AppStatusQueryResult], Report]:
+        """Retrieves the cached app status from Redis."""
+        logger.trace("get_cached_app_status()")
         try:
-            key = event.get("key")
-            action = event.get("action")
-            new_value = event.get("new_value")
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse channel event JSON data: {e}")
-        except KeyError as e:
-            logger.error(f"Missing required key in channel event: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error handling channel event: {e}")
-
-        if not key or not action:
-            logger.error("Missing key or action in channel event")
-            return
-
-        match (key, action):
-            case (AppsServiceKeys.APP_STATUS_CACHE_KEY, AppsServiceActions.STARTED):
-                await broadcast_sse_msg(SSE.APP_STATE_UPDATING, None)
-            case (AppsServiceKeys.APP_STATUS_CACHE_KEY, AppsServiceActions.UPDATED):
-                try:
-                    if new_value:
-                        parsed_status = json.loads(new_value)
-                        await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, parsed_status)
-                        await broadcast_sse_msg(SSE.APP_STATE_UPDATING_SUCCESS, None)
-                        logger.info(
-                            "App state updated via channel and broadcasted to clients"
-                        )
-                    else:
-                        logger.warning("Received app status update with no value")
-                except Exception as e:
-                    logger.error(f"Failed to process app status update: {e}")
-            case (
-                AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
-                AppsServiceActions.ERROR,
-            ):
-                try:
-                    if new_value:
-                        error_payload = json.loads(new_value)
-                        await broadcast_sse_msg(
-                            SSE.APP_STATE_UPDATE_ERROR, error_payload
-                        )
-                        logger.info("App state update error broadcasted to clients")
-                    else:
-                        logger.warning("Received app status error with no value")
-                except Exception as e:
-                    logger.error(f"Failed to process app status error: {e}")
-            case (AppsServiceKeys.APP_STATUS_LOCK_KEY, AppsServiceActions.LOCKED):
-                logger.debug(f"Received lock status change: {action}")
-            case _:
-                logger.warning(
-                    f"Received unknown channel event - key: {key}, action: {action}"
-                )
-
-
-async def watch_app_status_changes() -> Result[None, Report]:
-    """
-    Listens for app status changes on the custom Redis channel.
-    This function implements the channel listener for app state changes.
-    """
-
-    logger.info("Starting app status channel listener")
-
-    try:
-        listener = _AppsChannelListener()
-        await listener.connect()
-        # This will loop forever
-        await listener.listen()
-
-    except Exception as e:
-        return Err(Report(f"App status channel listener error: {e}", error=e))
-
-    logger.info("App status channel listener stopped")
-    return Ok(None)
-
-
-async def get_cached_app_status(
-    redis: Redis | None = None,
-) -> Result[Optional[AppStatusQueryResult], Report]:
-    """Retrieves the cached app status from Redis."""
-    logger.trace("get_cached_app_status()")
-    try:
-        result = await redis_get_raw(
-            AppsServiceKeys.APP_STATUS_CACHE_KEY, custom_redis=redis
-        )
-        match result:
-            case Ok(None):
-                logger.debug("App status cache not hit.")
-                return Ok(None)
-            case Ok(data) if isinstance(data, str) and data:
-                logger.debug("App status cache hit.")
-                data = AppStatusQueryResult.model_validate_json(data)
-            case Ok(data):
-                logger.error(f"Error decoding app status from Redis cache: {data}")
-                return Err(
-                    Report(f"Error decoding app status from Redis cache: {data}")
-                )
-            case Err(e):
-                logger.error(f"Error getting app status from Redis cache: {e}")
-                return Err(e)
-
-        return Ok(data)
-    except Exception as e:
-        return Err(
-            Report(
-                message=f"Error retrieving app status from Redis cache: {e}", error=e
+            result = await redis_get_raw(
+                AppsServiceKeys.APP_STATUS_CACHE_KEY, custom_redis=redis
             )
-        )
+            match result:
+                case Ok(None):
+                    logger.debug("App status cache not hit.")
+                    return Ok(None)
+                case Ok(data) if isinstance(data, str) and data:
+                    logger.debug("App status cache hit.")
+                    data = AppStatusQueryResult.model_validate_json(data)
+                case Ok(data):
+                    logger.error(f"Error decoding app status from Redis cache: {data}")
+                    return Err(
+                        Report(f"Error decoding app status from Redis cache: {data}")
+                    )
+                case Err(e):
+                    logger.error(f"Error getting app status from Redis cache: {e}")
+                    return Err(e)
+
+            return Ok(data)
+        except Exception as e:
+            return Err(
+                Report(
+                    message=f"Error retrieving app status from Redis cache: {e}",
+                    error=e,
+                )
+            )
+
+    async def set_cached_app_status(
+        self,
+        status: AppStatusQueryResult,
+        redis: Redis | None = None,
+    ) -> Result[None, Report]:
+        """Stores the app status in the Redis cache."""
+        logger.trace("set_cached_app_status()")
+        try:
+            json_data = status.model_dump_json()
+            match await redis_set(
+                AppsServiceKeys.APP_STATUS_CACHE_KEY,
+                json_data,
+                ex=CACHE_TTL_SECONDS,
+                custom_redis=redis,
+            ):
+                case Ok(_):
+                    logger.debug(
+                        "App status cache updated. "
+                        f"Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
+                    )
+                case Err(e):
+                    logger.error(
+                        "Error storing app status in Redis cache."
+                        f"Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
+                    )
+                    return Err(e)
+
+            match await redis_set(
+                AppsServiceKeys.APP_STATUS_TIMESTAMP_KEY,
+                status.timestamp,
+                custom_redis=redis,
+                ex=CACHE_TTL_SECONDS,
+            ):
+                case Ok(_):
+                    logger.debug(
+                        "App status cache updated. "
+                        f"Key: {AppsServiceKeys.APP_STATUS_TIMESTAMP_KEY}"
+                    )
+                case Err(e):
+                    logger.error(
+                        "Error storing app status in Redis cache."
+                        f"Key: {AppsServiceKeys.APP_STATUS_TIMESTAMP_KEY}"
+                    )
+                    return Err(e)
+
+            logger.debug(
+                f"App status cache updated. Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
+            )
+
+            return Ok(None)
+        except Exception as e:
+            return Err(
+                Report(message="Error storing app status in Redis cache", error=e)
+            )
+
+
+cache = AppCache()
 
 
 async def set_cached_app_status_failed(
@@ -182,59 +159,6 @@ async def set_cached_app_status_failed(
         )
 
 
-async def set_cached_app_status(
-    status: AppStatusQueryResult,
-    redis: Redis | None = None,
-) -> Result[None, Report]:
-    """Stores the app status in the Redis cache."""
-    logger.trace("set_cached_app_status()")
-    try:
-        json_data = status.model_dump_json()
-        match await redis_set(
-            AppsServiceKeys.APP_STATUS_CACHE_KEY,
-            json_data,
-            ex=CACHE_TTL_SECONDS,
-            custom_redis=redis,
-        ):
-            case Ok(_):
-                logger.debug(
-                    "App status cache updated. "
-                    f"Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
-                )
-            case Err(e):
-                logger.error(
-                    "Error storing app status in Redis cache."
-                    f"Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
-                )
-                return Err(e)
-
-        match await redis_set(
-            AppsServiceKeys.APP_STATUS_TIMESTAMP_KEY,
-            status.timestamp,
-            custom_redis=redis,
-            ex=CACHE_TTL_SECONDS,
-        ):
-            case Ok(_):
-                logger.debug(
-                    "App status cache updated. "
-                    f"Key: {AppsServiceKeys.APP_STATUS_TIMESTAMP_KEY}"
-                )
-            case Err(e):
-                logger.error(
-                    "Error storing app status in Redis cache."
-                    f"Key: {AppsServiceKeys.APP_STATUS_TIMESTAMP_KEY}"
-                )
-                return Err(e)
-
-        logger.debug(
-            f"App status cache updated. Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
-        )
-
-        return Ok(None)
-    except Exception as e:
-        return Err(Report(message="Error storing app status in Redis cache", error=e))
-
-
 async def get_cache_timestamp(
     redis: Redis | None = None,
 ) -> Result[Optional[int], Report]:
@@ -258,3 +182,26 @@ async def get_cache_timestamp(
         return Err(
             Report(message="Error retrieving cache timestamp from Redis", error=e)
         )
+
+
+async def watch_app_status_changes() -> Result[None, Report]:
+    """
+    Listens for app status changes on the custom Redis channel.
+    This function implements the channel listener for app state changes.
+    """
+    # import the listener here to avoid circular imports
+    from app.apps.tasks_impl.listeners import AppStatusUpdateListener
+
+    logger.info("Starting app status channel listener")
+
+    try:
+        listener = AppStatusUpdateListener()
+        await listener.connect()
+        # This will loop forever
+        await listener.listen()
+
+    except Exception as e:
+        return Err(Report(f"App status channel listener error: {e}", error=e))
+
+    logger.info("App status channel listener stopped")
+    return Ok(None)

@@ -1,4 +1,20 @@
-import json
+"""
+This module defines a Celery task `update_app_state_task_impl` responsible for updating
+the application state cache and notifying changes via a Redis channel. The task performs
+the following operations:
+
+1. Initializes a Redis client and logs an error if initialization fails.
+2. Attempts to acquire a lock to ensure only one instance of the task runs at a time.
+3. Connects to a Redis channel for notifications.
+4. Fetches the latest application status using the platform-specific implementation.
+5. Updates the application status cache in Redis.
+6. Notifies the Redis channel about the status update or any errors encountered.
+7. Releases the lock after the task is completed, ensuring proper cleanup.
+
+The task handles various error scenarios, logging detailed error messages and notifying
+the Redis channel about failures.
+"""
+
 from typing import Optional
 
 from loguru import logger
@@ -8,11 +24,12 @@ from redis.asyncio import from_url as redis_from_url
 from app.api.channel import BaseChannelNotifier
 from app.api.config import config
 from app.api.error_report.report import Report
-from app.api.models import ApiErrors, ErrorMessage
+from app.api.models import ApiErrors
 from app.api.task_utils import acquire_lock, release_update_lock
-from app.apps.cache import LOCK_TTL_SECONDS, set_cached_app_status
 from app.apps.constants import AppsServiceActions, AppsServiceKeys
-from app.external.result_type.src.result import Err, Ok, Result
+from app.apps.models import CacheOperations
+from app.apps.tasks_impl.utils import handle_task_error
+from app.external.result_type.src.result import Err, Ok
 from app.system.models import APIPlatform
 
 PLATFORM = config("BAPI_PLATFORM", default=APIPlatform.UNKNOWN)
@@ -25,8 +42,19 @@ else:
         f"Unsupported platform '{PLATFORM}'. Options: {APIPlatform.values_as_list()}."
     )
 
+LOCK_TTL_SECONDS = int(config("BAPI_LOCK_TTL_SECONDS", default=5 * 60))
+if not isinstance(LOCK_TTL_SECONDS, int):
+    raise TypeError("BAPI_LOCK_TTL_SECONDS must be an integer")
 
-async def update_app_state_task_impl(redis_url: str):
+
+async def update_app_state_task_impl(
+    redis_url: str, cache_ops: Optional[CacheOperations] = None
+):
+    if cache_ops is None:
+        from app.apps.cache import cache
+
+        cache_ops = cache
+
     redis_client = None
     try:
         redis_client = redis_from_url(redis_url, decode_responses=False)
@@ -75,7 +103,7 @@ async def update_app_state_task_impl(redis_url: str):
         match result:
             case Ok(data):
                 logger.info("Successfully fetched app status.")
-                res = await set_cached_app_status(data, redis_client)
+                res = await cache_ops.set_cached_app_status(data, redis_client)
                 match res:
                     case Ok(_):
                         res = await channel_notifier.notify_key_change(
@@ -90,7 +118,7 @@ async def update_app_state_task_impl(redis_url: str):
                             f"Failed to update app status cache: "
                             f"{report.format_verbose()}"
                         )
-                        await _handle_task_error(
+                        await handle_task_error(
                             channel_notifier,
                             AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
                             AppsServiceActions.ERROR,
@@ -101,7 +129,7 @@ async def update_app_state_task_impl(redis_url: str):
                         )
             case Err(report):
                 logger.error(f"Failed to fetch app status: {report.format()}")
-                await _handle_task_error(
+                await handle_task_error(
                     channel_notifier,
                     AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
                     AppsServiceActions.ERROR,
@@ -115,7 +143,7 @@ async def update_app_state_task_impl(redis_url: str):
         error_report = Report(
             f"Unexpected error during app status update: {str(e)}", error=e
         )
-        await _handle_task_error(
+        await handle_task_error(
             channel_notifier,
             AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
             AppsServiceActions.ERROR,
@@ -135,7 +163,7 @@ async def update_app_state_task_impl(redis_url: str):
                 logger.error(
                     f"Failed to release app status update lock: {report.format()}"
                 )
-                await _handle_task_error(
+                await handle_task_error(
                     channel_notifier,
                     AppsServiceKeys.APP_STATUS_LOCK_KEY,
                     AppsServiceActions.LOCK_ERROR,
@@ -159,51 +187,3 @@ def _handle_result(res):
             logger.error(
                 f"Failed to update app status cache: {report.format_verbose()}"
             )
-
-
-async def _handle_task_error(
-    channel_notifier: BaseChannelNotifier,
-    key: str,
-    action: str,
-    error_message: str,
-    error_code: str,
-    report: Optional[Report] = None,
-) -> Result[None, Report]:
-    """Centralized error handling for tasks with channel notification
-
-    Parameters
-    ----------
-    channel_notifier : BaseChannelNotifier
-        The channel notifier to use for sending the error notification
-    key : str
-        The key to use for the notification
-    action : str
-        The action to use for the notification
-    error_message : str
-        The error message to include in the notification
-    error_code : str
-        The error code to include in the notification
-    report : Optional[Report]
-        The error report to include in the notification, if any
-
-    Returns
-    -------
-    Result[None, Report]
-        The result of the notification operation
-    """
-    try:
-        error_payload = ErrorMessage(
-            detail=error_message,
-            error_code=error_code,
-            report=report.format_verbose() if report else None,
-        ).model_dump()
-
-        return await channel_notifier.notify_key_change(
-            key,
-            action,
-            None,
-            json.dumps(error_payload),
-        )
-    except Exception as e:
-        logger.exception(f"Error handling task error: {e}")
-        return Err(Report(f"Error handling task error: {e}", error=e))
