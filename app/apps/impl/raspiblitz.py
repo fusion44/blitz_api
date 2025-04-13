@@ -1,31 +1,28 @@
 # ruff: noqa: E722
 
 import asyncio
-import json
 import os
-import random
 import time
-from typing import List
+from typing import AsyncGenerator, List
 
 from fastapi import HTTPException, status
-from fastapi.encoders import jsonable_encoder
 from loguru import logger as logging
 
 from app.api.config import config
-from app.api.error_report.report import Report
-from app.api.utils import (
-    SSE,
-    broadcast_sse_msg,
-    exec_bash_command,
-    parse_key_value_text,
-)
-from app.apps.impl.apps_base import AppsBase
+from app.api.error_report.report import Frame, Report
+from app.api.models import ApiErrors, ErrorMessage
+from app.api.utils import exec_bash_command, parse_key_value_text
+from app.apps.impl.apps_base import AppManageResult, AppsBase
 from app.apps.models import (
     AppId,
+    AppManagementProcessState,
+    AppManageTaskMessage,
     AppOnlineStatus,
     AppStatus,
     AppStatusQueryError,
     AppStatusQueryResult,
+    AppUninstallInput,
+    InstallMode,
 )
 from app.apps.utils import check_app_id
 from app.external.result_type.src.result import Err, Ok, Result
@@ -250,49 +247,107 @@ class RaspiBlitzApps(AppsBase):
             )
         )
 
-    async def install_app_sub(self, app_id: str):
-        if app_id not in available_app_ids:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail=app_id + " install script does not exist / is not supported",
+    async def install_app(self, app_id: AppId) -> AppManageResult:
+        async for result in self._manage_app(app_id, InstallMode.ON):
+            yield result
+
+    async def uninstall_app(self, input: AppUninstallInput) -> AppManageResult:
+        async for result in self._manage_app(input.app_id, InstallMode.OFF):
+            yield result
+
+    async def _manage_app(self, app_id: AppId, mode: InstallMode) -> AppManageResult:
+        """
+        Manages the installation or uninstallation process for a specified application.
+
+        This function validates the application ID, checks the installation status,
+        and manages the process by running the appropriate scripts.
+        It yields progress updates and handles errors during the process.
+
+        Args:
+            app_id (AppId): The ID of the application to be managed.
+            action (InstallMode): The action to perform
+
+        Yields:
+            AppManageResult: A generator yielding the status
+            of the process, including any errors encountered.
+        """
+        installing = mode == InstallMode.ON
+        action = "installing" if installing else "uninstalling"
+
+        res = _validate_app_id(app_id)
+        if isinstance(res, Err):
+            yield Ok(
+                AppManageTaskMessage(
+                    id=app_id,
+                    mode=mode,
+                    state=AppManagementProcessState.FAILURE,
+                    message=ErrorMessage(
+                        error_code=ApiErrors.APP_INVALID_FOR_PLATFORM,
+                        detail=res.err_value.format(),
+                    ),
+                )
             )
+            return
 
-        if NODE_TYPE == "cln_grpc" and (app_id == "thunderhub" or app_id == "albyhub"):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail=app_id + " not available for Core Lightning nodes",
+        res = await self._valid_installed_status(app_id, installing=installing)
+        if isinstance(res, Err):
+            yield Ok(
+                AppManageTaskMessage(
+                    id=app_id,
+                    mode=mode,
+                    state=AppManagementProcessState.FAILURE,
+                    message=ErrorMessage(
+                        error_code=ApiErrors.APP_MANAGE_ON_IS_ALREADY_INSTALLED
+                        if mode == InstallMode.ON
+                        else ApiErrors.APP_MANAGE_OFF_IS_NOT_INSTALLED,
+                        detail=res.err_value.format(),
+                    ),
+                )
             )
+            return
 
-        await broadcast_sse_msg(
-            SSE.INSTALL_APP,
-            {"id": app_id, "mode": "on", "result": "running", "details": ""},
-        )
-
-        loop = asyncio.get_event_loop()
-        loop.create_task(self.run_bonus_script(app_id, "on"))
-
-        return jsonable_encoder({"id": app_id})
-
-    async def uninstall_app_sub(self, app_id: str, delete_data: bool):
-        if app_id not in available_app_ids:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, detail="script not exist/supported"
+        if NODE_TYPE == "cln_grpc" and app_id in {"thunderhub", "albyhub"}:
+            yield Ok(
+                AppManageTaskMessage(
+                    id=app_id,
+                    mode=mode,
+                    state=AppManagementProcessState.FAILURE,
+                    message=ErrorMessage(
+                        error_code=ApiErrors.APP_INVALID_FOR_PLATFORM,
+                        detail=f"{app_id} not available for Core Lightning nodes",
+                    ),
+                )
             )
+            return
 
-        await broadcast_sse_msg(
-            SSE.INSTALL_APP,
-            {"id": app_id, "mode": "off", "result": "running", "details": ""},
-        )
+        try:
+            async for data in self.run_bonus_script(
+                app_id, "on" if installing else "off"
+            ):
+                if isinstance(data, str):
+                    yield Ok(
+                        AppManageTaskMessage(
+                            id=app_id,
+                            mode=mode,
+                            state=AppManagementProcessState.RUNNING,
+                            message=data,
+                        ),
+                    )
+                elif isinstance(data, AppManageTaskMessage):
+                    yield Ok(data)
+                else:
+                    logging.error(
+                        f"Unexpected data type {type(data)} in async generator"
+                    )
 
-        deleteDataFlag = " --keep-data"
-        if delete_data:
-            deleteDataFlag = " --delete-data"
-        loop = asyncio.get_event_loop()
-        loop.create_task(self.run_bonus_script(app_id, f"off{deleteDataFlag}"))
+                await asyncio.sleep(0)  # Yield control back to event loop
+        except Exception as e:
+            logging.error(f"Error {action} app {app_id}: {e}")
+            yield Err(Report(f"Error {action} app {app_id}: {e}", error=e))
 
-        return jsonable_encoder({"id": app_id})
-
-    async def run_bonus_script(self, app_id: str, params: str):
+    async def run_bonus_script(
+        self, app_id: AppId, params: str
+    ) -> AsyncGenerator[str | AppManageTaskMessage, None]:
         # to satisfy CodeQL: test again against predefined array and
         # don't use 'user value'
         tested_app_id = ""
@@ -308,135 +363,122 @@ class RaspiBlitzApps(AppsBase):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
 
-        # extracting mode from params
-        mode = params.split()[0]
+        assert proc.stdout is not None, "Process stdout is unexpectedly None"
 
-        # logging to console
-        if stdout:
-            logging.debug(f"[stdout]\n{stdout.decode()}")
-        else:
-            logging.debug("NO [stdout]")
-        if stderr:
-            logging.debug(f"[stderr]\n{stderr.decode()}")
-        else:
-            logging.debug("NO [stderr]")
+        mode = None
+        try:
+            mode = InstallMode.ON if params.split()[0] == "on" else InstallMode.OFF
+        except IndexError:
+            logging.error(
+                "Failed to extract mode from params: params is empty or malformed"
+            )
+            return
 
-        # create log file
-        logFileName = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
-        logging.info(f"WRITING LOG FILE: {logFileName}")
-        with open(logFileName, "w", encoding="utf-8") as f:
-            f.write(f"API triggered script: {cmd}\n")
-            f.write("###### STDOUT #######\n")
-            if stdout:
-                f.write(stdout.decode())
-            f.write("\n###### STDERR #######\n")
-            if stderr:
-                f.write(stderr.decode())
+        try:
+            log_file_name = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
+            stdout_full = ""
+            stderr_full = ""
+            data = {}
+            while True:
+                stdout_line = stderr_line = None
+                try:
+                    if proc.stderr:
+                        stderr_line = await asyncio.wait_for(
+                            proc.stderr.readline(), timeout=0.5
+                        )
+                        if stderr_line:
+                            decoded = stderr_line.decode()
+                            stderr_full += f"{decoded}\n"
+                            logging.debug(f"[stderr]\n{decoded}")
+                            yield decoded.strip()
+                        else:
+                            break
+                except TimeoutError:
+                    pass
 
-        # sending final feedback event
-        logging.debug("SENDING RESULT EVENT ...")
-        if stdout:
-            stdoutData = parse_key_value_text(stdout.decode())
-            logging.debug(f"PARSED STDOUT DATA: {stdoutData}")
-            # when there is a defined error message (if multiple it will
-            # be the last one)
-            if "error" in stdoutData:
-                logging.error(
-                    f"FOUND `error=` returned by script: {stdoutData['error']}"
-                )
-                await broadcast_sse_msg(
-                    SSE.INSTALL_APP,
-                    {
-                        "id": app_id,
-                        "mode": mode,
-                        "result": "fail",
-                        "details": stdoutData["error"],
-                    },
-                )
-            # when there is no result (e.g. result="OK") at the end of install script
-            # stdout - consider also script had error
-            elif "result" not in stdoutData:
-                logging.error("NO `result=` returned by script:")
-                await broadcast_sse_msg(
-                    SSE.INSTALL_APP,
-                    {
-                        "id": app_id,
-                        "mode": mode,
-                        "result": "fail",
-                        "details": "install script threw an error",
-                    },
-                )
-            # nothing above consider success
-            else:
-                # check if script was effective
-                updatedAppData = await self.get_app_status_single(app_id)
-
-                # in case of script error
-                if "error" in updatedAppData and updatedAppData["error"] != "":
-                    logging.warning("Error Detected ...")
-                    logging.warning(f"updatedAppData: {updatedAppData}")
-                    await broadcast_sse_msg(
-                        SSE.INSTALL_APP,
-                        {
-                            "id": app_id,
-                            "mode": mode,
-                            "result": "fail",
-                            "details": updatedAppData["error"],
-                        },
+                try:
+                    stdout_line = await asyncio.wait_for(
+                        proc.stdout.readline(), timeout=0.5
                     )
+                    if stdout_line:
+                        decoded = stdout_line.decode()
+                        stdout_full += f"{decoded}\n"
+                        logging.debug(f"[stdout]\n{decoded}")
+                        if len(decoded) == 0:
+                            continue
 
-                # if install was running
-                elif mode == "on":
-                    if updatedAppData["installed"]:
-                        logging.info(f"WIN - install of {app_id} was effective")
-                        await broadcast_sse_msg(
-                            SSE.INSTALL_APP,
-                            {
-                                "id": app_id,
-                                "mode": mode,
-                                "result": "win",
-                                "httpsForced": updatedAppData["httpsForced"],
-                                "httpsSelfsigned": updatedAppData["httpsSelfsigned"],
-                                "details": stdoutData["result"],
-                            },
-                        )
-                        await broadcast_sse_msg(
-                            SSE.INSTALLED_APP_STATUS, [updatedAppData]
-                        )
+                        yield decoded.strip()
+
+                        if "=" not in decoded:
+                            continue
+
+                        key, value = decoded.split("=", 1)
+                        data[key] = value.strip('"').strip("'")
                     else:
-                        logging.error(f"FAIL - {app_id} was not installed")
-                        logging.debug(f"updatedAppData: {updatedAppData}")
-                        logging.debug(f"params: {params}")
-                        await broadcast_sse_msg(
-                            SSE.INSTALL_APP,
-                            {
-                                "id": app_id,
-                                "mode": mode,
-                                "result": "fail",
-                                "details": "install was not effective",
-                            },
-                        )
-                        await broadcast_sse_msg(
-                            SSE.INSTALLED_APP_STATUS, [updatedAppData]
-                        )
+                        break
+                except TimeoutError:
+                    pass
 
-                elif mode == "off":
-                    await broadcast_sse_msg(
-                        SSE.INSTALL_APP,
-                        {"id": app_id, "mode": mode, "result": "win"},
+            await proc.wait()
+
+            logging.debug(f"PARSED STDOUT DATA: {data}")
+            if "error" in data:
+                logging.error(f"FOUND `error=` returned by script: {data['error']}")
+                yield AppManageTaskMessage(
+                    id=app_id,
+                    mode=mode,
+                    state=AppManagementProcessState.FAILURE,
+                    message=data["error"],
+                )
+
+            logging.info(f"WRITING LOG FILE: {log_file_name}")
+            try:
+                with open(log_file_name, "w", encoding="utf-8") as f:
+                    f.write(f"API triggered script: {cmd}\n")
+                    f.write("###### STDOUT #######\n")
+                    if len(stdout_full) > 0:
+                        f.write(stdout_full)
+                    f.write("\n###### STDERR #######\n")
+                    if len(stderr_full) > 0:
+                        f.write(stderr_full)
+            except Exception as e:
+                logging.error(f"Error while writing log file: {e}")
+                yield AppManageTaskMessage(
+                    id=app_id,
+                    mode=mode,
+                    state=AppManagementProcessState.RUNNING,
+                    message=f"Installation completed successfully, but encountered an "
+                    f"error while writing the log file: {e}.",
+                )
+
+        except asyncio.CancelledError:
+            proc.terminate()
+            raise
+        finally:
+            if proc.returncode is None:
+                proc.terminate()
+
+        return
+
+    async def _valid_installed_status(
+        self, app_id: AppId, installing: bool
+    ) -> Result[None, Report]:
+        res = await self.get_app_status_single(app_id)
+        match res:
+            case Ok(value):
+                if installing and value.installed:
+                    return Err(Report(f"Script {app_id} is already installed"))
+                if not installing and not value.installed:
+                    return Err(Report(f"Script {app_id} is not installed"))
+            case Err(report):
+                return Err(
+                    report.attach_frame(
+                        Frame(f"Error while checking app status: {report.format()}")
                     )
-                    await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, [updatedAppData])
+                )
 
-                    if not updatedAppData["installed"]:
-                        logging.info(f"WIN - uninstall of {app_id} was effective")
-                        return
-
-                    logging.error(f"FAIL - {app_id} was not uninstalled")
-                    logging.debug(f"updatedAppData: {updatedAppData}")
-                    logging.debug(f"params: {params}")
-                    return
+        return Ok(None)
 
 
 async def _do_electrs_status_advanced() -> Result[AppStatus, Report]:
@@ -562,3 +604,20 @@ async def _do_electrs_status_advanced() -> Result[AppStatus, Report]:
         report.attach(script_call_sync, "script_name")
 
         return Err(report)
+
+
+def _validate_app_id(app_id: AppId) -> Result[None, Report]:
+    if app_id not in AppId.as_str_list():
+        return Err(
+            Report(
+                f"Script {app_id} does not exist or is not "
+                "supported for current platform",
+                error=HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f"Script {app_id} does not exist or is not "
+                    "supported for current platform",
+                ),
+            )
+        )
+
+    return Ok(None)

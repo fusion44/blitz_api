@@ -5,6 +5,8 @@ from fastapi import Query
 from pydantic.main import BaseModel
 
 from app.api.error_report.report import Report
+from app.api.models import ApiErrors, ErrorMessage
+from app.apps.constants import AppManagementProcessState, InstallMode
 from app.external.result_type.src.result import Err, Ok, Result
 
 
@@ -103,8 +105,28 @@ class AppStatusQueryResult(BaseModel):
     )
 
 
-class UninstallData(BaseModel):
-    keepData: bool = True
+class AppManageTaskMessage(BaseModel):
+    id: AppId = Query(..., description="Id of the application")
+    mode: InstallMode = Query(..., description="Install mode")
+    state: AppManagementProcessState = Query(
+        ..., description="State of the installation process"
+    )
+    message: str | ErrorMessage | None = Query(
+        None, description="Details of the update (str, ErrorMessage, or None)"
+    )
+
+    def __str__(self) -> str:
+        return (
+            f"AppManageTaskMessage(id={self.id}, mode={self.mode}, "
+            f"state={self.state}, details={self.message})"
+        )
+
+
+class AppUninstallInput(BaseModel):
+    app_id: AppId = Query(..., description="Id of the applications")
+    keep_data: bool = Query(True, description="Whether to keep the app data")
+
+
 class RedisInterface(Protocol):
     """An interface for Redis operations to allow for dependency injection."""
 

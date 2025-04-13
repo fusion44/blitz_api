@@ -3,6 +3,7 @@ from redis.asyncio import Redis
 
 from app.api.error_report.report import Frame, Report
 from app.api.utils import redis_delete, redis_get_raw, redis_set
+from app.apps.constants import DB_LOCKED_KEY
 from app.external.result_type.src.result.result import Err, Ok, Result
 
 
@@ -18,7 +19,11 @@ async def get_lock_status(key: str, redis: Redis | None = None) -> Result[bool, 
         case Ok(None):
             logger.debug(f"Lock for key {key} not held.")
             return Ok(False)
-        case Ok(data) if isinstance(data, bytes) and data.decode("utf-8") == "locked":
+        # data can either be a str or a bytes object depending on whether the Redis
+        # client is configured to decode responses or not
+        case Ok(data) if (isinstance(data, str) and data == DB_LOCKED_KEY) or (
+            isinstance(data, bytes) and data.decode("utf-8") == DB_LOCKED_KEY
+        ):
             logger.debug(f"Lock held for key {key}.")
             return Ok(True)
         case Ok(data) if not isinstance(data, bytes):
@@ -53,7 +58,7 @@ async def acquire_lock(
     #       do we need to do some cleanup if the status update takes too long?
     match await redis_set(
         key,
-        "locked",
+        DB_LOCKED_KEY,
         nx=True,
         ex=lock_ttl,
         custom_redis=redis,

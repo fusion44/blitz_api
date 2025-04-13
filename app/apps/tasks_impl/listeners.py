@@ -9,16 +9,62 @@ broadcasting updates to clients via SSE (Server-Sent Events).
 import json
 
 from loguru import logger
+from pydantic import ValidationError
 
 from app.api.channel import BaseChannelListener
 from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg
 from app.apps.constants import AppsServiceActions, AppsServiceKeys
-from app.apps.models import InstallState
+from app.apps.models import AppManagementProcessState, AppManageTaskMessage
 
 BAPI_REDIS_URL = config("BAPI_REDIS_URL", "redis://127.0.0.1:6379/0")
 if BAPI_REDIS_URL == "":
     raise Exception("BAPI_REDIS_URL is not set")
+
+
+class AppManageListener(BaseChannelListener):
+    """Listener for app manage events from Redis channels."""
+
+    def __init__(self):
+        super().__init__(AppsServiceKeys.APP_MANAGE_CHANNEL_KEY, BAPI_REDIS_URL)
+
+    async def handle_event(self, event):
+        """Process app manage progress events from the Redis channel"""
+        # This handler basically just forwards events from the task to the client
+        # Most of this logic here is just error handling and logging
+        logger.debug(f"Received app manage progress event: {event}")
+
+        key = message = None
+        try:
+            key = event.get("key")
+            message = event.get("new_value")
+        except json.JSONDecodeError as e:
+            return logger.error(f"Failed to parse channel event JSON data: {e}")
+        except KeyError as e:
+            return logger.error(f"Missing required key in channel event: {e}")
+        except Exception as e:
+            return logger.exception(f"Unexpected error handling channel event: {e}")
+
+        if key != AppsServiceKeys.APP_MANAGE_MESSAGE_KEY:
+            return logger.warning(f"Received unknown key '{key}' in app install event")
+
+        if message is None:
+            return logger.warning(
+                f"Received app install event without message: {event}"
+            )
+
+        try:
+            message = AppManageTaskMessage.model_validate_json(message)
+        except ValidationError as e:
+            return logger.error(f"Failed to validate app install message: {e}")
+        except Exception as e:
+            return logger.error(f"Failed to parse app install message: {e}")
+
+        logger.trace("Broadcasting app management message")
+        await broadcast_sse_msg(SSE.APP_MANAGE_MESSAGE, message.model_dump())
+
+        if message.state == AppManagementProcessState.FINISHED:
+            await self.stop()
 
 
 class AppStatusUpdateListener(BaseChannelListener):

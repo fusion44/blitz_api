@@ -37,7 +37,7 @@ class BaseChannelNotifier:
         return Ok(None)
 
     async def notify_key_change(
-        self, key: str, action: str, old_value=None, new_value=None
+        self, key: str, action: str | None = None, old_value=None, new_value=None
     ) -> Result[None, Report]:
         """Publish a formatted notification"""
         if not self.redis:
@@ -71,61 +71,6 @@ class BaseChannelNotifier:
                     error=e,
                 )
             )
-
-    async def set_with_notification(
-        self, key: str, value: str | bytes | int | float
-    ) -> Result[None, Report]:
-        """Set a value and notify listeners"""
-        if not self.redis:
-            return Err(
-                Report(
-                    message="Redis connection not established. Call connect() first.",
-                    error=None,
-                )
-            )
-
-        result = await redis_get_raw(key, custom_redis=self.redis)
-        old_value = ""
-        match result:
-            case Ok(v) if value:
-                old_value = v
-            case Err(report):
-                return Err(report)
-
-        result = await redis_set(key, value, custom_redis=self.redis)
-        match result:
-            case Ok(_):
-                await self.notify_key_change(key, "SET", old_value, value)
-                return Ok(None)
-            case Err(report):
-                return Err(report)
-
-    async def delete_with_notification(self, key: str) -> Result[int, Report]:
-        """Delete a key and notify listeners"""
-        if not self.redis:
-            return Err(
-                Report(
-                    message="Redis connection not established. Call connect() first.",
-                    error=None,
-                )
-            )
-
-        result = await redis_get_raw(key)
-        old_value = ""
-        match result:
-            case Ok(value) if value:
-                old_value = value
-            case Err(report):
-                return Err(report)
-
-        result = await redis_delete(key)
-        match result:
-            case Ok(num_deleted):
-                if num_deleted > 0:
-                    await self.notify_key_change(key, "DELETE", old_value)
-                return Ok(num_deleted)
-            case Err(report):
-                return Err(report)
 
 
 class BaseChannelListener:
@@ -186,6 +131,7 @@ class BaseChannelListener:
                 except Exception as e:
                     logger.error(f"Error handling channel message: {e}")
 
+            logger.info(f"Closing channel listener for channel: {self.channel}")
         except Exception as e:
             logger.error(f"Error listening to channel: {e}")
         finally:

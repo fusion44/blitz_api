@@ -1,8 +1,8 @@
 from fastapi import HTTPException, status
 
 from app.api.error_report.report import Report
-from app.apps.impl.apps_base import AppsBase
-from app.apps.models import AppStatus, AppStatusQueryResult
+from app.apps.impl.apps_base import AppManageResult, AppsBase
+from app.apps.models import AppId, AppStatus, AppStatusQueryResult, AppUninstallInput
 from app.external.result_type.src.result import Result
 
 
@@ -24,8 +24,8 @@ class NativePythonApps(AppsBase):
     async def get_app_status_advanced(self, app_id: str) -> Result[AppStatus, Report]:
         raise _NotImplemented()
 
-    async def install_app_sub(self, app_id: str):
-        raise _NotImplemented()
+    def install_app(self, app_id: AppId) -> AppManageResult:
+        raise NotImplementedError()
 
-    async def uninstall_app_sub(self, app_id: str, delete_data: bool):
-        raise _NotImplemented()
+    def uninstall_app(self, input: AppUninstallInput) -> AppManageResult:
+        raise NotImplementedError()

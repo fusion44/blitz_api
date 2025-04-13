@@ -328,6 +328,7 @@ class SSE:
 
     INSTALL_APP = "install"
     INSTALLED_APP_STATUS = "installed_app_status"
+    APP_MANAGE_MESSAGE = "app_manage_message"
     APP_STATE_UPDATING = "app_state_updating"
     APP_STATE_UPDATE_ERROR = "app_state_update_error"
     APP_STATE_UPDATING_SUCCESS = "app_state_updating_success"
