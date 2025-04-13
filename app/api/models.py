@@ -27,7 +27,12 @@ class ApiErrors(str, Enum):
     INVALID_REQUEST_INPUT = "invalid_request_input"
     UNABLE_TO_PROCESS_ERROR = "unable_to_process_error"
     APP_STATUS_UPDATE_FAILED = "app_status_update_failed"
+    APP_INVALID_FOR_PLATFORM = "app_invalid_for_platform"
+    APP_MANAGE_ON_IS_ALREADY_INSTALLED = "app_manage_on_is_already_installed"
+    APP_MANAGE_OFF_IS_NOT_INSTALLED = "app_manage_off_is_not_installed"
+    APP_MANAGE_LOCK_HELD = "app_manage_lock_held"
     BACKGROUND_TASK_FAILED = "background_task_failed"
+    UNKNOWN = "unknown"
 
 
 class ErrorMessage(BaseModel):

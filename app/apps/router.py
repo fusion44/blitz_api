@@ -7,7 +7,7 @@ from loguru import logger
 import app.apps.docs as docs
 import app.apps.service as service
 from app.apps.cache import watch_app_status_changes
-from app.apps.models import AppId, AppStatus, AppStatusQueryResult, UninstallData
+from app.apps.models import AppId, AppStatus, AppStatusQueryResult, AppUninstallInput
 from app.auth.auth_bearer import JWTBearer
 
 _PREFIX = "apps"
@@ -78,22 +78,42 @@ async def get_single_status_advanced(id: str = Path(..., required=True)):
 
 
 @router.post(
-    "/install/{name}",
+    "/install/{app_id}",
     name=f"{_PREFIX}/install",
-    summary="Install app",
+    summary="Install an app",
+    description="""Attempts to install an app. The installation process results are
+    not returned on this endpoint. Instead, the results are communicated via the SSE
+    channels. This call only verifies if the app is available for installation on the
+    given platform.""",
+    responses={
+        400: {
+            "description": "If the app is already installed "
+            "or not available for the platform."
+        },
+        404: {"description": "If no or an invalid app id is given."},
+        423: {"description": "If an app install task is already running."},
+    },
     dependencies=[Depends(JWTBearer())],
 )
 @logger.catch(exclude=(HTTPException,))
-async def install_app(name: str):
-    return await service.install_app_sub(name)
+async def install_app(app_id: AppId):
+    await service.install_app(app_id)
 
 
 @router.post(
-    "/uninstall/{name}",
-    name=f"{_PREFIX}/install",
+    "/uninstall",
+    name=f"{_PREFIX}/uninstall",
     summary="Uninstall app",
+    description="""Attempts to uninstall an app. The uninstallation process results are
+    not returned on this endpoint. Instead, the results are communicated via the SSE
+    channels. This call only verifies if the app is available for uninstallation on the
+    given platform.""",
+    responses={
+        400: {"description": ("If the app is already installed.")},
+        404: {"description": ("If no or an invalid app id is given.")},
+    },
     dependencies=[Depends(JWTBearer())],
 )
 @logger.catch(exclude=(HTTPException,))
-async def uninstall_app(name: str, data: UninstallData):
-    return await service.uninstall_app_sub(name, data.keepData)
+async def uninstall_app(input: AppUninstallInput):
+    await service.uninstall_app(input)

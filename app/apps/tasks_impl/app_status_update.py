@@ -57,7 +57,7 @@ async def update_app_state_task_impl(
 
     redis_client = None
     try:
-        redis_client = redis_from_url(redis_url, decode_responses=False)
+        redis_client = redis_from_url(redis_url, decode_responses=True)
     except Exception as e:
         logger.error(f"Failed to initialize Redis client: {e}")
         logger.info("Attempting to run update_app_state_task...")
@@ -125,7 +125,7 @@ async def update_app_state_task_impl(
                             f"Failed to update app status cache: "
                             f"{report.frames[0].message}",
                             ApiErrors.APP_STATUS_UPDATE_FAILED,
-                            report,
+                            report=report,
                         )
             case Err(report):
                 logger.error(f"Failed to fetch app status: {report.format()}")
