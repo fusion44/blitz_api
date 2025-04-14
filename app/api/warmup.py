@@ -7,8 +7,8 @@ from loguru import logger
 from app.api.error_report.report import Report
 from app.api.task_utils import get_lock_status
 from app.apps.cache import cache as app_cache
-from app.apps.constants import AppsServiceKeys
-from app.apps.models import AppStatusQueryResult
+from app.apps.constants import AppManagementProcessState, AppsServiceKeys
+from app.apps.models import AppStatusUpdateTaskMessage
 from app.apps.tasks import update_app_state_task
 from app.bitcoind.service import get_btc_info
 from app.external.result_type.src.result.result import Err, Ok, Result
@@ -28,14 +28,21 @@ async def get_bitcoin_client_warmup_data() -> List:
     return [*res]
 
 
-async def _get_app_status_data() -> Result[Optional[AppStatusQueryResult], Report]:
+async def _get_app_status_data() -> Result[
+    Optional[AppStatusUpdateTaskMessage], Report
+]:
     """Transform the result of get_app_status."""
     try:
         result = await app_cache.get_cached_app_status()
         cached_status_raw = None
         match result:
             case Ok(cached_status_data) if cached_status_data:
-                return Ok(cached_status_data)
+                return Ok(
+                    AppStatusUpdateTaskMessage(
+                        state=AppManagementProcessState.SUCCESS,
+                        message=cached_status_data,
+                    )
+                )
             case Ok(_):
                 # Query executed, but no data was returned
                 # This means the cache is empty or stale => trigger update

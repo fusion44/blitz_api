@@ -39,7 +39,7 @@ class AppCache(CacheOperations):
         logger.trace("get_cached_app_status()")
         try:
             result = await redis_get_raw(
-                AppsServiceKeys.APP_STATUS_CACHE_KEY, custom_redis=redis
+                AppsServiceKeys.APP_STATUS_MESSAGE_KEY, custom_redis=redis
             )
             match result:
                 case Ok(None):
@@ -76,7 +76,7 @@ class AppCache(CacheOperations):
         try:
             json_data = status.model_dump_json()
             match await redis_set(
-                AppsServiceKeys.APP_STATUS_CACHE_KEY,
+                AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
                 json_data,
                 ex=CACHE_TTL_SECONDS,
                 custom_redis=redis,
@@ -84,12 +84,12 @@ class AppCache(CacheOperations):
                 case Ok(_):
                     logger.debug(
                         "App status cache updated. "
-                        f"Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
+                        f"Key: {AppsServiceKeys.APP_STATUS_MESSAGE_KEY}"
                     )
                 case Err(e):
                     logger.error(
                         "Error storing app status in Redis cache."
-                        f"Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
+                        f"Key: {AppsServiceKeys.APP_STATUS_MESSAGE_KEY}"
                     )
                     return Err(e)
 
@@ -112,7 +112,7 @@ class AppCache(CacheOperations):
                     return Err(e)
 
             logger.debug(
-                f"App status cache updated. Key: {AppsServiceKeys.APP_STATUS_CACHE_KEY}"
+                f"App status cache updated. Key: {AppsServiceKeys.APP_STATUS_MESSAGE_KEY}"
             )
 
             return Ok(None)

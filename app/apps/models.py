@@ -105,6 +105,25 @@ class AppStatusQueryResult(BaseModel):
     )
 
 
+class AppStatusUpdateTaskMessage(BaseModel):
+    state: AppManagementProcessState = Query(
+        ..., description="The state of the app status update task"
+    )
+    message: AppStatusQueryResult | ErrorMessage | None = Query(
+        None,
+        description="""
+        The result of the app status update task, or an error message if the
+        task itself failed.
+
+        Note one the failure modes. There are two possible failure modes:
+        1. The task totally failed, in which case the message will be an error
+           message of type ErrorMessage.
+        2. The task failed to update fetch an app status, in which case the error
+           message will be in the AppStatusQueryResult errors list.
+        """,
+    )
+
+
 class AppManageTaskMessage(BaseModel):
     id: AppId = Query(..., description="Id of the application")
     mode: InstallMode = Query(..., description="Install mode")
