@@ -60,6 +60,8 @@ async def update_app_state_task_impl(
 
         cache_ops = cache
 
+    logger.debug("update_app_state_task_impl: Starting task...")
+
     redis_client = None
     try:
         redis_client = redis_from_url(redis_url, decode_responses=True)

@@ -372,7 +372,7 @@ async def warmup_new_connections():
                         _handle(id, SSE.LN_INFO, res[2]),
                         _handle(id, SSE.LN_FEE_REVENUE, res[3]),
                         _handle(id, SSE.WALLET_BALANCE, res[4]),
-                        _handle(id, SSE.INSTALLED_APP_STATUS, res[5]),
+                        _handle(id, SSE.APP_STATE_MESSAGE, res[5]),
                         _handle(id, SSE.HARDWARE_INFO, res[6]),
                     ]
                 )

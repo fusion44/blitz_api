@@ -72,7 +72,7 @@ fi
 
 # Needs sshpass installed
 echo "# syncing local code to: ${remote}"
-sshpass -p "$passwordA" rsync -rvz --exclude .venv/ --exclude test_env_data/ --exclude .git/ -e "ssh -p ${sshPort}" $local $remote
+sshpass -p "$passwordA" rsync -rvz --exclude .venv/ --exclude .env --exclude test_env_data/ --exclude .git/ -e "ssh -p ${sshPort}" $local $remote
 result=$?
 echo "result(${result})"
 if [ "$result" != "0" ]; then
@@ -81,17 +81,21 @@ if [ "$result" != "0" ]; then
     exit 1
 fi
 
-# make sure uploaded/synced files belog again to the correct raspiblitz user to run
+# make sure uploaded/synced files belong again to the correct raspiblitz user to run
 sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP "sudo chown -R blitzapi:blitzapi ${remoteRepoPath}"
 
 # Restart the blitz service to activate changes
-echo "# restarting blitzapi.service"
+echo "# restarting service 'blitzapi.service'"
 sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo systemctl restart blitzapi.service'
+echo "# restarting service 'blitzapi-celery-beat.service'"
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo systemctl restart blitzapi-celery-beat.service'
+echo "# restarting service 'blitzapi-celery-worker.service'"
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo systemctl restart blitzapi-celery-worker.service'
 
 # Get latest logs entries
 echo "# latest log entries"
-sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo journalctl -u blitzapi.service -n 10 --no-pager --no-hostname'
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP "sudo journalctl -u blitzapi-celery-worker.service -n 40 --no-pager --no-hostname"
 
 # Watch the logs
 echo "# watching logs - CTRL+C to exit"
-sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP 'sudo journalctl -u blitzapi.service -f --no-hostname'
+sshpass -p "$passwordA" ssh -p $sshPort admin@$localIP "sudo journalctl -u 'blitzapi*' -f --no-hostname"
