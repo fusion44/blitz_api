@@ -39,13 +39,6 @@ if not isinstance(LOCK_TTL_SECONDS, int):
     raise TypeError("BAPI_LOCK_TTL_SECONDS must be an integer")
 
 
-def _log_notify_listeners_error(action: str, id: AppId, message: Report):
-    logger.error(
-        f"Failed to notify Redis channel {action} task "
-        f"is started for {id}: {message.format()}"
-    )
-
-
 async def app_manage_task_impl(
     redis_url: str, id: AppId, mode: InstallMode, keep_data: bool
 ):
@@ -81,9 +74,9 @@ async def app_manage_task_impl(
                 _log_notify_listeners_error(action, id, message)
                 return await redis_client.close()
 
-        res = await notifier.notify_key_change(
+        res = await notifier.send_message(
             key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-            new_value=AppManageTaskMessage(
+            contents=AppManageTaskMessage(
                 id=id,
                 mode=mode,
                 state=AppManagementProcessState.INITIATED,
@@ -96,16 +89,16 @@ async def app_manage_task_impl(
                 return await redis_client.close()
 
         alock_res = await acquire_lock(
-            key=AppsServiceKeys.APP_INSTALL_LOCK_KEY,
+            key=AppsServiceKeys.APP_MANAGE_LOCK_KEY,
             lock_ttl=LOCK_TTL_SECONDS,
             redis=redis_client,
         )
         match alock_res:
             case Ok(acquired) if not acquired:
                 logger.warning(f"{action} app lock already held. Skipping task run.")
-                res = await notifier.notify_key_change(
+                res = await notifier.send_message(
                     key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-                    new_value=AppManageTaskMessage(
+                    contents=AppManageTaskMessage(
                         id=id,
                         mode=mode,
                         state=AppManagementProcessState.FAILURE,
@@ -140,9 +133,9 @@ async def app_manage_task_impl(
                 case Ok(message) if isinstance(message, AppManageTaskMessage):
                     # OK(AppManageTaskMessage) is used to send the message to the client
                     # regardless of whether the message is an error or not
-                    res = await notifier.notify_key_change(
+                    res = await notifier.send_message(
                         key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-                        new_value=message.model_dump_json(),
+                        contents=message.model_dump_json(),
                     )
                     match res:
                         case Err(err_message):
@@ -152,9 +145,9 @@ async def app_manage_task_impl(
                     logger.error(
                         f"Unknown error while {action}ing {id}: {report.format()}"
                     )
-                    res = await notifier.notify_key_change(
+                    res = await notifier.send_message(
                         key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-                        new_value=AppManageTaskMessage(
+                        contents=AppManageTaskMessage(
                             id=id,
                             mode=mode,
                             state=AppManagementProcessState.FAILURE,
@@ -179,9 +172,9 @@ async def app_manage_task_impl(
         error_report = Report(
             f"Unexpected error during app {action}: {str(e)}", error=e
         )
-        res = await notifier.notify_key_change(
+        res = await notifier.send_message(
             key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-            new_value=AppManageTaskMessage(
+            contents=AppManageTaskMessage(
                 id=id,
                 mode=mode,
                 state=AppManagementProcessState.FAILURE,
@@ -193,16 +186,16 @@ async def app_manage_task_impl(
                 _log_notify_listeners_error(action, id, report)
     finally:
         res = await release_update_lock(
-            key=AppsServiceKeys.APP_INSTALL_LOCK_KEY, redis=redis_client
+            key=AppsServiceKeys.APP_MANAGE_LOCK_KEY, redis=redis_client
         )
         match res:
             case Ok(_):
                 logger.info(f"App {action} lock released.")
             case Err(message):
                 logger.error(f"Failed to release app {action} lock: {message.format()}")
-                res = await notifier.notify_key_change(
+                res = await notifier.send_message(
                     key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-                    new_value=AppManageTaskMessage(
+                    contents=AppManageTaskMessage(
                         id=id,
                         mode=mode,
                         state=AppManagementProcessState.FAILURE,
@@ -228,11 +221,18 @@ async def _send_finish_message(
         state=AppManagementProcessState.FINISHED,
         message="",
     )
-    res = await notifier.notify_key_change(
+    res = await notifier.send_message(
         key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-        new_value=message.model_dump_json(),
+        contents=message.model_dump_json(),
     )
     match res:
         case Err(message):
             action = "installing" if mode == InstallMode.ON else "uninstalling"
             _log_notify_listeners_error(action, app_id, message)
+
+
+def _log_notify_listeners_error(action: str, id: AppId, message: Report):
+    logger.error(
+        f"Failed to notify Redis channel {action} task "
+        f"is started for {id}: {message.format()}"
+    )

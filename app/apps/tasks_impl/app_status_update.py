@@ -24,11 +24,16 @@ from redis.asyncio import from_url as redis_from_url
 from app.api.channel import BaseChannelNotifier
 from app.api.config import config
 from app.api.error_report.report import Report
-from app.api.models import ApiErrors
+from app.api.models import ApiErrors, ErrorMessage
 from app.api.task_utils import acquire_lock, release_update_lock
-from app.apps.constants import AppsServiceActions, AppsServiceKeys
-from app.apps.models import CacheOperations
-from app.apps.tasks_impl.utils import handle_task_error
+from app.apps.constants import (
+    AppManagementProcessState,
+    AppsServiceKeys,
+)
+from app.apps.models import (
+    AppStatusUpdateTaskMessage,
+    CacheOperations,
+)
 from app.external.result_type.src.result import Err, Ok
 from app.system.models import APIPlatform
 
@@ -79,8 +84,9 @@ async def update_app_state_task_impl(
             return await redis_client.close()
 
     channel_notifier = BaseChannelNotifier(
-        AppsServiceKeys.APP_STATE_CHANNEL, redis_url=redis_url
+        AppsServiceKeys.APP_STATUS_CHANNEL_KEY, redis_url=redis_url
     )
+
     result = await channel_notifier.connect()
     match result:
         case Ok(_):
@@ -91,12 +97,19 @@ async def update_app_state_task_impl(
             )
             return await redis_client.close()
 
+    res = await channel_notifier.send_message(
+        AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+        contents=AppStatusUpdateTaskMessage(
+            state=AppManagementProcessState.INITIATED,
+            message=None,
+        ).model_dump_json(),
+    )
+    match res:
+        case Err(message):
+            _log_notify_listeners_error(message)
+
     try:
         logger.info("App state update lock acquired. Fetching app status...")
-
-        await channel_notifier.notify_key_change(
-            AppsServiceKeys.APP_STATUS_CACHE_KEY, AppsServiceActions.STARTED
-        )
 
         apps_impl = Apps()
         result = await apps_impl.get_app_status()
@@ -106,51 +119,69 @@ async def update_app_state_task_impl(
                 res = await cache_ops.set_cached_app_status(data, redis_client)
                 match res:
                     case Ok(_):
-                        res = await channel_notifier.notify_key_change(
-                            AppsServiceKeys.APP_STATUS_CACHE_KEY,
-                            AppsServiceActions.UPDATED,
-                            None,
-                            data.model_dump_json(),
+                        res = await channel_notifier.send_message(
+                            AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+                            contents=AppStatusUpdateTaskMessage(
+                                state=AppManagementProcessState.SUCCESS,
+                                message=data,
+                            ).model_dump_json(),
                         )
-                        _handle_result(res)
+                        match res:
+                            case Err(message):
+                                _log_notify_listeners_error(message)
                     case Err(report):
                         logger.error(
                             f"Failed to update app status cache: "
                             f"{report.format_verbose()}"
                         )
-                        await handle_task_error(
-                            channel_notifier,
-                            AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
-                            AppsServiceActions.ERROR,
-                            f"Failed to update app status cache: "
-                            f"{report.frames[0].message}",
-                            ApiErrors.APP_STATUS_UPDATE_FAILED,
-                            report=report,
-                        )
+                        match await channel_notifier.send_message(
+                            AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+                            contents=AppStatusUpdateTaskMessage(
+                                state=AppManagementProcessState.FAILURE,
+                                message=ErrorMessage(
+                                    error_code=ApiErrors.APP_STATUS_UPDATE_FAILED,
+                                    detail="Unexpected error during app status update.",
+                                    report=report.format(),
+                                ),
+                            ).model_dump_json(),
+                        ):
+                            case Err(message):
+                                _log_notify_listeners_error(message)
             case Err(report):
                 logger.error(f"Failed to fetch app status: {report.format()}")
-                await handle_task_error(
-                    channel_notifier,
-                    AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
-                    AppsServiceActions.ERROR,
-                    f"Failed to update app status: {report.frames[0].message}",
-                    ApiErrors.APP_STATUS_UPDATE_FAILED,
-                    report,
-                )
+                match await channel_notifier.send_message(
+                    AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+                    contents=AppStatusUpdateTaskMessage(
+                        state=AppManagementProcessState.FAILURE,
+                        message=ErrorMessage(
+                            error_code=ApiErrors.APP_STATUS_UPDATE_FAILED,
+                            detail="Unexpected error during app status update.",
+                            report=report.format(),
+                        ),
+                    ).model_dump_json(),
+                ):
+                    case Err(message):
+                        _log_notify_listeners_error(message)
 
     except Exception as e:
         logger.exception(f"Unexpected error during update_app_state_task: {e}")
         error_report = Report(
             f"Unexpected error during app status update: {str(e)}", error=e
         )
-        await handle_task_error(
-            channel_notifier,
-            AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
-            AppsServiceActions.ERROR,
-            f"Unexpected error during app status update: {str(e)}",
-            ApiErrors.BACKGROUND_TASK_FAILED,
-            error_report,
-        )
+
+        match await channel_notifier.send_message(
+            AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+            contents=AppStatusUpdateTaskMessage(
+                state=AppManagementProcessState.FAILURE,
+                message=ErrorMessage(
+                    error_code=ApiErrors.APP_STATUS_UPDATE_FAILED,
+                    detail="Unexpected error during app status update.",
+                    report=error_report.format_verbose(),
+                ),
+            ).model_dump_json(),
+        ):
+            case Err(message):
+                _log_notify_listeners_error(message)
 
     finally:
         res = await release_update_lock(
@@ -163,27 +194,37 @@ async def update_app_state_task_impl(
                 logger.error(
                     f"Failed to release app status update lock: {report.format()}"
                 )
-                await handle_task_error(
-                    channel_notifier,
-                    AppsServiceKeys.APP_STATUS_LOCK_KEY,
-                    AppsServiceActions.LOCK_ERROR,
-                    "Failed to release app status update lock:"
-                    f" {report.frames[0].message}",
-                    ApiErrors.APP_STATUS_UPDATE_FAILED,
-                    report,
-                )
+                match await channel_notifier.send_message(
+                    AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+                    contents=AppStatusUpdateTaskMessage(
+                        state=AppManagementProcessState.FAILURE,
+                        message=ErrorMessage(
+                            error_code=ApiErrors.APP_STATUS_UPDATE_FAILED,
+                            detail=f"Failed to release app status update lock:"
+                            f" {report.frames[0].message}",
+                        ),
+                    ).model_dump_json(),
+                ):
+                    case Err(message):
+                        _log_notify_listeners_error(message)
+
         logger.debug("App state update lock released.")
+
+    match await channel_notifier.send_message(
+        AppsServiceKeys.APP_STATUS_MESSAGE_KEY,
+        contents=AppStatusUpdateTaskMessage(
+            state=AppManagementProcessState.FINISHED,
+            message=None,
+        ).model_dump_json(),
+    ):
+        case Err(message):
+            _log_notify_listeners_error(message)
 
     if redis_client:
         await redis_client.close()
 
 
-def _handle_result(res):
-    """Simple helper to log result of operations"""
-    match res:
-        case Ok(_):
-            logger.info("App status cache updated.")
-        case Err(report):
-            logger.error(
-                f"Failed to update app status cache: {report.format_verbose()}"
-            )
+def _log_notify_listeners_error(message: Report):
+    logger.error(
+        f"Failed to notify Redis channel update state task message: {message.format()}"
+    )

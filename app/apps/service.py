@@ -78,7 +78,7 @@ async def get_app_status_advanced(app_id: str) -> AppStatus:
 
 
 async def install_app(app_id: AppId):
-    res = await get_lock_status(AppsServiceKeys.APP_INSTALL_LOCK_KEY)
+    res = await get_lock_status(AppsServiceKeys.APP_MANAGE_LOCK_KEY)
     match res:
         case Ok(value):
             if value:
@@ -96,7 +96,7 @@ async def install_app(app_id: AppId):
 
 
 async def uninstall_app(data: AppUninstallInput):
-    res = await get_lock_status(AppsServiceKeys.APP_INSTALL_LOCK_KEY)
+    res = await get_lock_status(AppsServiceKeys.APP_MANAGE_LOCK_KEY)
     match res:
         case Ok(value):
             if value:

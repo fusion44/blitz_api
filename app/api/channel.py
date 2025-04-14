@@ -6,6 +6,7 @@ from loguru import logger
 
 from app.api.config import config
 from app.api.error_report.report import Report
+from app.api.models import RedisChannelMessageData
 from app.api.utils import redis_delete, redis_get_raw, redis_publish, redis_set
 from app.external.result_type.src.result.result import Err, Ok, Result
 
@@ -36,9 +37,7 @@ class BaseChannelNotifier:
 
         return Ok(None)
 
-    async def notify_key_change(
-        self, key: str, action: str | None = None, old_value=None, new_value=None
-    ) -> Result[None, Report]:
+    async def send_message(self, key: str, contents=None) -> Result[None, Report]:
         """Publish a formatted notification"""
         if not self.redis:
             return Err(
@@ -48,20 +47,15 @@ class BaseChannelNotifier:
                 )
             )
 
-        event = {
-            "timestamp": datetime.now().isoformat(),
-            "key": key,
-            "action": action,
-            "old_value": old_value,
-            "new_value": new_value,
-        }
-
         try:
-            data = json.dumps(event)
+            data = RedisChannelMessageData(
+                timestamp=datetime.now().isoformat(),
+                key=key,
+                json_contents=contents,
+            ).model_dump_json()
+
             await redis_publish(self.channel, data, custom_redis=self.redis)
-            logger.debug(
-                f"Published notification to channel {self.channel}: {action} on {key}"
-            )
+            logger.debug(f"Published notification to channel {self.channel} on {key}")
 
             return Ok(None)
         except Exception as e:
@@ -128,8 +122,13 @@ class BaseChannelListener:
                     await self.handle_event(event)
                 except json.JSONDecodeError:
                     logger.error(f"Failed to parse message data: {message['data']}")
+                except AttributeError as e:
+                    logger.error(f"AttributeError while handling channel message: {e}")
                 except Exception as e:
-                    logger.error(f"Error handling channel message: {e}")
+                    print(type(e))
+                    logger.error(
+                        f"Error handling channel message: {e}. Error type: {type(e)}"
+                    )
 
             logger.info(f"Closing channel listener for channel: {self.channel}")
         except Exception as e:

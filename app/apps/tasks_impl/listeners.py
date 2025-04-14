@@ -14,8 +14,12 @@ from pydantic import ValidationError
 from app.api.channel import BaseChannelListener
 from app.api.config import config
 from app.api.utils import SSE, broadcast_sse_msg
-from app.apps.constants import AppsServiceActions, AppsServiceKeys
-from app.apps.models import AppManagementProcessState, AppManageTaskMessage
+from app.apps.constants import AppsServiceKeys
+from app.apps.models import (
+    AppManagementProcessState,
+    AppManageTaskMessage,
+    AppStatusUpdateTaskMessage,
+)
 
 BAPI_REDIS_URL = config("BAPI_REDIS_URL", "redis://127.0.0.1:6379/0")
 if BAPI_REDIS_URL == "":
@@ -34,10 +38,10 @@ class AppManageListener(BaseChannelListener):
         # Most of this logic here is just error handling and logging
         logger.debug(f"Received app manage progress event: {event}")
 
-        key = message = None
+        key = message_json = None
         try:
             key = event.get("key")
-            message = event.get("new_value")
+            message_json = event.get("json_contents")
         except json.JSONDecodeError as e:
             return logger.error(f"Failed to parse channel event JSON data: {e}")
         except KeyError as e:
@@ -48,13 +52,13 @@ class AppManageListener(BaseChannelListener):
         if key != AppsServiceKeys.APP_MANAGE_MESSAGE_KEY:
             return logger.warning(f"Received unknown key '{key}' in app install event")
 
-        if message is None:
+        if message_json is None:
             return logger.warning(
                 f"Received app install event without message: {event}"
             )
 
         try:
-            message = AppManageTaskMessage.model_validate_json(message)
+            message = AppManageTaskMessage.model_validate_json(message_json)
         except ValidationError as e:
             return logger.error(f"Failed to validate app install message: {e}")
         except Exception as e:
@@ -71,62 +75,42 @@ class AppStatusUpdateListener(BaseChannelListener):
     """Listener for app status update events from Redis channels."""
 
     def __init__(self):
-        super().__init__(AppsServiceKeys.APP_STATE_CHANNEL, BAPI_REDIS_URL)
+        super().__init__(AppsServiceKeys.APP_STATUS_CHANNEL_KEY, BAPI_REDIS_URL)
 
     async def handle_event(self, event):
         """Process app state change events from the Redis channel"""
-        logger.debug(f"Received app state event: {event}")
+        logger.debug(f"Received app state update event: {event}")
 
-        key = action = new_value = None
+        key = message_json = None
         try:
             key = event.get("key")
-            action = event.get("action")
-            new_value = event.get("new_value")
+            message_json = event.get("json_contents")
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse channel event JSON data: {e}")
+            return logger.error(f"Failed to parse channel event JSON data: {e}")
         except KeyError as e:
-            logger.error(f"Missing required key in channel event: {e}")
+            return logger.error(f"Missing required key in channel event: {e}")
         except Exception as e:
-            logger.exception(f"Unexpected error handling channel event: {e}")
+            return logger.exception(f"Unexpected error handling channel event: {e}")
 
-        if not key or not action:
-            logger.error("Missing key or action in channel event")
-            return
+        if key != AppsServiceKeys.APP_STATUS_MESSAGE_KEY:
+            return logger.warning(
+                f"Received unexpected key '{key}' in app status update event"
+            )
 
-        match (key, action):
-            case (AppsServiceKeys.APP_STATUS_CACHE_KEY, AppsServiceActions.STARTED):
-                await broadcast_sse_msg(SSE.APP_STATE_UPDATING, None)
-            case (AppsServiceKeys.APP_STATUS_CACHE_KEY, AppsServiceActions.UPDATED):
-                try:
-                    if new_value:
-                        parsed_status = json.loads(new_value)
-                        await broadcast_sse_msg(SSE.INSTALLED_APP_STATUS, parsed_status)
-                        await broadcast_sse_msg(SSE.APP_STATE_UPDATING_SUCCESS, None)
-                        logger.info(
-                            "App state updated via channel and broadcasted to clients"
-                        )
-                    else:
-                        logger.warning("Received app status update with no value")
-                except Exception as e:
-                    logger.error(f"Failed to process app status update: {e}")
-            case (
-                AppsServiceKeys.APP_STATUS_UPDATE_FAILED_KEY,
-                AppsServiceActions.ERROR,
-            ):
-                try:
-                    if new_value:
-                        error_payload = json.loads(new_value)
-                        await broadcast_sse_msg(
-                            SSE.APP_STATE_UPDATE_ERROR, error_payload
-                        )
-                        logger.info("App state update error broadcasted to clients")
-                    else:
-                        logger.warning("Received app status error with no value")
-                except Exception as e:
-                    logger.error(f"Failed to process app status error: {e}")
-            case (AppsServiceKeys.APP_STATUS_LOCK_KEY, AppsServiceActions.LOCKED):
-                logger.debug(f"Received lock status change: {action}")
-            case _:
-                logger.warning(
-                    f"Received unknown channel event - key: {key}, action: {action}"
-                )
+        if message_json is None:
+            return logger.warning(
+                f"Received app app status update event without message: {event}"
+            )
+
+        try:
+            message = AppStatusUpdateTaskMessage.model_validate_json(message_json)
+        except ValidationError as e:
+            return logger.error(f"Failed to validate app status update message: {e}")
+        except Exception as e:
+            return logger.error(f"Failed to parse app status update message: {e}")
+
+        logger.trace("Broadcasting app management message")
+        await broadcast_sse_msg(SSE.APP_STATE_MESSAGE, message.model_dump())
+
+        if message.state == AppManagementProcessState.FINISHED:
+            await self.stop()

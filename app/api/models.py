@@ -35,6 +35,12 @@ class ApiErrors(str, Enum):
     UNKNOWN = "unknown"
 
 
+class RedisChannelMessageData(BaseModel):
+    timestamp: str = Query(..., description="The timestamp of the message")
+    key: str = Query(..., description="The key of the message")
+    json_contents: str | None = Query(None, description="The contents of the message")
+
+
 class ErrorMessage(BaseModel):
     detail: str = Query(..., description="short text representation of the error")
     error_code: str = Query("", description="a unique identifier for the error")

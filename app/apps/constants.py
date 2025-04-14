@@ -3,17 +3,6 @@ from enum import Enum
 DB_LOCKED_KEY = "bapi:app_install_lock"
 
 
-# Actions used by the API to communicate the internal
-# state of the app management process
-# These actions are not intended to be sent to the client
-class AppsServiceActions(str, Enum):
-    STARTED = "started"
-    UPDATED = "updated"
-    ERROR = "error"
-    LOCKED = "locked"
-    LOCK_ERROR = "lock_error"
-
-
 class InstallMode(str, Enum):
     ON = "on"
     OFF = "off"
@@ -38,13 +27,13 @@ class AppManagementProcessState(str, Enum):
 
 class AppsServiceKeys(str, Enum):
     # App status keys
-    APP_STATE_CHANNEL = "bapi:app_state_channel"
+    APP_STATUS_CHANNEL_KEY = "bapi:app_status_channel"
     APP_STATUS_LOCK_KEY = "bapi_app_status_update_lock"
-    APP_STATUS_CACHE_KEY = "bapi_app_status_cache"
+    APP_STATUS_MESSAGE_KEY = "bapi_app_status_message"
     APP_STATUS_TIMESTAMP_KEY = "bapi_app_status_timestamp"
     APP_STATUS_UPDATE_FAILED_KEY = "bapi_app_status_update_failed"
 
     # App install keys
-    APP_MANAGE_CHANNEL_KEY = "bapi:app_install_channel"
-    APP_MANAGE_MESSAGE_KEY = "bapi_app_install_message"
-    APP_INSTALL_LOCK_KEY = "bapi_app_install_lock"
+    APP_MANAGE_CHANNEL_KEY = "bapi:app_manage_channel"
+    APP_MANAGE_MESSAGE_KEY = "bapi_app_manage_message"
+    APP_MANAGE_LOCK_KEY = "bapi_app_manage_lock"
