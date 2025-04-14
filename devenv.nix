@@ -68,6 +68,7 @@ in {
       poetry = {
         enable = true;
         activate.enable = true;
+        package = pkgs-unstable.poetry;
       };
     };
   };
@@ -80,7 +81,6 @@ in {
     alejandra
     statix
     ruff
-    ruff-lsp
     redis
     nushell
     typos

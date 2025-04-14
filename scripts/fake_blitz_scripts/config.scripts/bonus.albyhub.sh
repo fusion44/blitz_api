@@ -8,7 +8,7 @@ if [ "$1" = "status" ]; then
   sleep 2s
   echo "appID='albyhub'"
   echo "version='${VERSION}'"
-  echo "installed=0"
+  echo "installed=1"
   echo "localIP='192.168.1.18'"
   echo "toraddress='toraddress'"
   echo "fingerprint='fingerprint'"
@@ -71,6 +71,9 @@ if [ "$1" = "0" ] || [ "$1" = "off" ]; then
 
   echo "# Closing firewall ports"
   sleep 1s
+
+  echo "error='FAKE ERROR FOR TESTING'"
+  exit 1
 
   echo "# Removing NGINX configurations"
   sleep 2s
