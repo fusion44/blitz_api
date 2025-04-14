@@ -112,5 +112,5 @@ class AppStatusUpdateListener(BaseChannelListener):
         logger.trace("Broadcasting app management message")
         await broadcast_sse_msg(SSE.APP_STATE_MESSAGE, message.model_dump())
 
-        if message.state == AppManagementProcessState.FINISHED:
-            await self.stop()
+        # Note: the app status listener will listen for the entire duration of the
+        #       API running, so we don't need to stop it here

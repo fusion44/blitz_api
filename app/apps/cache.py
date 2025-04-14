@@ -184,7 +184,7 @@ async def get_cache_timestamp(
         )
 
 
-async def watch_app_status_changes() -> Result[None, Report]:
+async def watch_app_status_changes():
     """
     Listens for app status changes on the custom Redis channel.
     This function implements the channel listener for app state changes.
@@ -195,13 +195,12 @@ async def watch_app_status_changes() -> Result[None, Report]:
     logger.info("Starting app status channel listener")
 
     try:
-        listener = AppStatusUpdateListener()
-        await listener.connect()
-        # This will loop forever
-        await listener.listen()
+        while True:
+            listener = AppStatusUpdateListener()
+            await listener.connect()
+            # This will loop forever
+            await listener.listen()
+            logger.error("Recreating app status channel listener, as it stopped!")
 
     except Exception as e:
         return Err(Report(f"App status channel listener error: {e}", error=e))
-
-    logger.info("App status channel listener stopped")
-    return Ok(None)
