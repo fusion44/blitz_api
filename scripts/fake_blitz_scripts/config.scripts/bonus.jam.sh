@@ -35,6 +35,9 @@ if [ "$1" = "1" ] || [ "$1" = "on" ]; then
   echo "# Generating SSL certificates"
   sleep 2s
 
+  echo "result='FAKE ERROR FOR TESTING'" >&2
+  exit 1
+
   echo "# Installing systemd service"
   sleep 2s
 

@@ -48,6 +48,17 @@ if [ "$1" = "1" ] || [ "$1" = "on" ]; then
   echo "# Configuring database"
   sleep 3s
 
+  # loop and print a number every second
+  i=0
+  while true; do
+    sleep 1s
+    i=$((i+1))
+    if [ ${i} -gt 10 ]; then
+      break
+    fi
+    echo "# (${i}) Waiting for database to be ready"
+  done
+
   echo "# Updating firewall rules"
   sleep 1s
 
