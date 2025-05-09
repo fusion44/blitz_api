@@ -10,38 +10,36 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12 | ^3.11"
-fastapi = {extras = ["standard"], version = "^0.115.8"}
-fastapi-plugins = "^0.13.1"
-anyio = "^4.8.0"
-redis = "^4.6.0"
-aioredis = "^2.0.1"
-pydantic = "^2.10.6"
-uvicorn = {extras = ["standard"], version = "^0.34.0"}
-pyjwt = "^2.10.1"
-python-decouple = "^3.8"
-psutil = "^6.1.1"
-requests = "^2.32.3"
-pyzmq = "^26.2.1"
-aiohttp = "^3.11.12"
-grpcio = "^1.70.0"
-grpcio-tools = "^1.70.0"
-googleapis-common-protos = "^1.66.0"
-protobuf = "^5.29.3"
-deepdiff = "^8.2.0"
-loguru = "^0.7.2"
-celery = {extras = ["redis"], version = "^5.4.0"}
+fastapi = {extras = ["standard"], version = "0.115.12"}
+fastapi-plugins = "0.13.2"
+starlette = "0.45.3"
+anyio = "4.9.0"
+uvicorn = {extras = ["standard"], version = "0.34.2"}
+pydantic = "2.10.6"
+pydantic-core = "2.27.2"
+typing-extensions = "4.12.2"
+pyjwt = "2.10.1"
+python-decouple = "3.8"
+psutil = "7.0.0"
+requests = "2.32.3"
+pyzmq = "26.4.0"
+aiohttp = "3.11.18"
+grpcio = "1.71.0"
+grpcio-tools = "1.71.0"
+protobuf = "5.29.3"
+deepdiff = "8.4.2"
+loguru = "0.7.3"
+celery = {extras = ["redis"], version = "5.5.2"}
+
 
 [tool.poetry.group.dev.dependencies]
-black = "^25.1.0"
-pytest = "^8.3.4"
-pytest-asyncio = "^0.25.3"
-coverage = "^7.6.10"
-isort = "^6.0.0"
-ruff = "^0.9.5"
-ruff-lsp = "^0.0.61"
-debugpy = "^1.8.12"
-click = "^8.1.8"
-watchfiles = "^0.24.0"
+pytest = "8.3.5"
+pytest-asyncio = "0.25.3"
+coverage = "7.8.0"
+ruff = "0.9.6"
+debugpy = "1.8.14"
+click = "8.1.8"
+watchfiles = "0.24.0"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"

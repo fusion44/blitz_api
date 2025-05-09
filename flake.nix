@@ -5,7 +5,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     poetry2nix = {
-      url = "github:fusion44/poetry2nix";
+      url = "github:fusion44/poetry2nix/nb";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
