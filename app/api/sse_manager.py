@@ -2,7 +2,6 @@ import asyncio
 from asyncio.log import logger
 from typing import Tuple
 
-import async_timeout
 from fastapi import Request
 
 from app.external.sse_starlette import EventSourceResponse, ServerSentEvent
@@ -55,7 +54,7 @@ class SSEManager:
     async def _broadcast_data_sse(self):
         while True:
             try:
-                async with async_timeout.timeout(1):
+                async with asyncio.timeout(1):
                     msg = await self._sse_queue.get()
                     if msg is not None:
                         for k in self._connections.keys():
