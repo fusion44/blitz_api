@@ -75,6 +75,7 @@ class RaspiBlitzApps(AppsBase):
                 )
                 + " status"
             )
+            timeout = 30 if app_id == AppId.ELECTRS else None
         except Exception as e:
             exception_str = str(e)
             report = Report(
@@ -86,7 +87,7 @@ class RaspiBlitzApps(AppsBase):
 
             return Err(report)
 
-        result = await exec_bash_command(script_call, use_sudo=True)
+        result = await exec_bash_command(script_call, use_sudo=True, timeout=timeout)
         match result:
             case Ok(value):
                 if value.stderr is not None and value.stderr != "":
@@ -504,14 +505,14 @@ async def _do_electrs_status_advanced() -> Result[AppStatus, Report]:
 
         return Err(report)
 
-    result_status = await exec_bash_command(script_call_status)
+    result_status = await exec_bash_command(script_call_status, timeout=30)
     match result_status:
         case Ok(data):
             result_status = data.stdout
         case Err(report):
             return Err(report)
 
-    result_sync = await exec_bash_command(script_call_sync)
+    result_sync = await exec_bash_command(script_call_sync, timeout=30)
     match result_sync:
         case Ok(data):
             result_sync = data.stdout

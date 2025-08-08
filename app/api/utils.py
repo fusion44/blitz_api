@@ -467,7 +467,7 @@ async def _terminate_process(proc, timeout=5) -> Result[bool, Report]:
 async def exec_bash_command(
     command: str,
     use_sudo: bool = False,
-    timeout: float | None = 10.0,
+    timeout: float | None = 15.0,
     sensitive: bool = False,
 ) -> Result[ProcessResult, Report]:
     """
