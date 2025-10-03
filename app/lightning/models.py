@@ -93,8 +93,13 @@ class InvoiceState(str, Enum):
             return InvoiceState.SETTLED
         elif id == "expired":
             return InvoiceState.CANCELED
+        elif id == "unknown" or id is None:
+            # Handle missing or unknown status gracefully
+            return InvoiceState.OPEN
         else:
-            raise NotImplementedError(f"InvoiceState {id} is not implemented")
+            # Log warning and default to OPEN instead of crashing
+            logger.warning(f"Unknown InvoiceState '{id}', defaulting to OPEN")
+            return InvoiceState.OPEN
 
     @classmethod
     def from_cln_grpc(cls, i) -> "InvoiceState":
@@ -729,18 +734,26 @@ class Invoice(BaseModel):
 
     @classmethod
     def from_cln_json(cls, i) -> "Invoice":
-        amt = parse_cln_msat(i["amount_msat"])
+        # Handle missing amount_msat field (e.g., in BOLT12 offers or certain invoice types)
+        # Use amount_received_msat if amount_msat is not present and invoice is paid
+        amt = 0
+        if "amount_msat" in i:
+            amt = parse_cln_msat(i["amount_msat"])
+        elif "amount_received_msat" in i:
+            amt = parse_cln_msat(i["amount_received_msat"])
+
         return cls(
-            add_index=str(i["label"]),
-            memo=i["description"],
-            r_preimage=i["payment_preimage"] if "payment_preimage" in i else None,
-            r_hash=i["payment_hash"],
+            add_index=str(i.get("label", "unknown")),
+            memo=i.get("description", ""),
+            r_preimage=i.get("payment_preimage"),
+            r_hash=i.get("payment_hash"),
             value_msat=amt,
-            settled=True if i["status"] == "paid" else False,
-            expiry_date=i["expires_at"],
-            settle_date=i["paid_at"] if "paid_at" in i else None,
-            payment_request=i["bolt11"],
-            settle_index=i["pay_index"] if "pay_index" in i else None,
+            settled=True if i.get("status") == "paid" else False,
+            expiry_date=i.get("expires_at"),
+            settle_date=i.get("paid_at"),
+            # bolt11 field is not present in BOLT12 offers or keysend payments
+            payment_request=i.get("bolt11"),
+            settle_index=i.get("pay_index"),
             amt_paid_sat=(
                 round(parse_cln_msat(i["amount_received_msat"]) / 1000)
                 if "amount_received_msat" in i
@@ -751,7 +764,7 @@ class Invoice(BaseModel):
                 if "amount_received_msat" in i
                 else None
             ),
-            state=InvoiceState.from_cln_json(i["status"]),
+            state=InvoiceState.from_cln_json(i.get("status", "unknown")),
         )
 
     @classmethod
