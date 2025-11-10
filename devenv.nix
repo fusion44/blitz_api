@@ -57,18 +57,16 @@
   lndDataDir = "${dataDir}/lnd";
   clnDataDir = "${dataDir}/cln";
 
-  pkgs-unstable = import inputs.nixpkgs-unstable {system = pkgs.stdenv.system;};
+  pkgs-unstable = import inputs.nixpkgs-unstable {inherit (pkgs.stdenv) system;};
 in {
-  # https://devenv.sh/basics/
-  env.GREET = "devenv";
-
   languages = {
     python = {
       enable = true;
-      poetry = {
+      # 3.11 is default on RaspiBlitz 1.12
+      package = pkgs-unstable.python311;
+      uv = {
         enable = true;
-        activate.enable = true;
-        package = pkgs-unstable.poetry;
+        package = pkgs-unstable.uv;
       };
     };
   };
@@ -123,23 +121,16 @@ in {
       nu ./scripts/fake_blitz_scripts/update_redis_values.nu
     '';
     celery_worker.exec = ''
-      poetry run celery -A app.celery_app worker --loglevel=info
+      uv run celery -A app.celery_app worker --loglevel=info
     '';
     celery_beat.exec = ''
-      poetry run celery -A app.celery_app beat --loglevel=info
+      uv run celery -A app.celery_app beat --loglevel=info
     '';
   };
 
-  # https://devenv.sh/services/
   services = {
     redis.enable = true;
   };
-
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
 
   enterShell = ''
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${
@@ -147,20 +138,4 @@ in {
         lib.makeLibraryPath [stdenv.cc.cc.lib]
     }"
   '';
-
-  # https://devenv.sh/tests/
-  # disable tests for now. They don't work well, yet
-  # enterTest = ''
-  #   echo "Running tests"
-  #   wait_for_port 18443
-  #   bitcoin-cli -regtest --datadir=${bitcoinDataDir} createwallet testwallet
-  #   bitcoin-cli -regtest --datadir=${bitcoinDataDir} -generate 160
-  #
-  #   lncli --chain=bitcoin --network=regtest --lnddir=${lndDataDir} getinfo
-  # '';
-
-  # https://devenv.sh/pre-commit-hooks/
-  # pre-commit.hooks.shellcheck.enable = true;
-
-  # See full reference at https://devenv.sh/reference/options/
 }

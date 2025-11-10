@@ -16,9 +16,9 @@ help:
 	@echo "To test the project type 'make test'"
 	@echo "To assess test coverage type 'make coverage'"
 	@echo "To generate the requirements.txt file for pip type 'make update-requirements-file'"
-	@echo "To sync current changes to a blitz for testing, type 'make sync-to-blitz'.\n   ℹ️  Adjust connection values in scripts/push_to_blitz.sh"
+	@echo "To sync current changes to a blitz for testing, type 'make sync-to-blitz'.\n   ℹ️  Adjust connection values in scripts/push_to_blitz.sh"
 	@echo "To generate the client libraries type 'make generate-client-libs'"
-	@echo "To build the Docker regtest image type 'make docker-regtest-image'.\n   ℹ️  The image will be available to docker as 'blitz_api'"
+	@echo "To build the Docker regtest image type 'make docker-regtest-image'.\n   ℹ️  The image will be available to docker as 'blitz_api'"
 	@echo "To list all celery tasks type 'make celery-list-tasks'"
 	@echo "To manually trigger a celery task type 'make celery-run-task [TASK_NAME TASK_ARGS TASK_KWARGS]'"
 	@echo "------------------------------------"
@@ -26,32 +26,33 @@ help:
 clean:
 	echo "Removing htmlcov folder and .coverage file"
 	rm -rf htmlcov .coverage
-	poetry run python -m pyclean .
+	uv run python -m pyclean .
 
 install:
-	poetry run python -m pip install -r requirements.txt
+	uv pip install -r requirements.txt
 
 install-dev:
-	poetry install
+	# This command reads pyproject.toml and installs all dependencies (main + dev)
+	uv sync
 
 run:
-	poetry run python -m uvicorn app.main:app --reload
+	uv run python -m uvicorn app.main:app --reload
 
 test:
-	poetry run python -m pytest
+	uv run python -m pytest
 
 coverage:
-	poetry run python -m coverage run --source=. -m pytest
-	poetry run python -m coverage html
+	uv run python -m coverage run --source=. -m pytest
+	uv run python -m coverage html
 
 update-requirements-file:
-	poetry update && poetry export --without dev --output requirements.txt
+	uv pip compile --all-extras --output-file requirements.txt pyproject.toml
 
 sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
 
 generate-client-libs:
-	poetry run python gen_client_libs.py
+	uv run python gen_client_libs.py
 
 docker-regtest-image:
 	docker build -f Dockerfile.regtest -t blitz_api .
@@ -67,10 +68,10 @@ disable-remote-debugging:
 
 celery-list-tasks:
 	@echo "Listing registered Celery tasks..."
-	@poetry run celery -A $(CELERY_APP) inspect registered
+	@uv run celery -A $(CELERY_APP) inspect registered
 
 celery-run-task:
 	@echo "Manually triggering Celery task: $(TASK_NAME)"
 	@echo "  Args: $(TASK_ARGS)"
 	@echo "  Kwargs: $(TASK_KWARGS)"
-	@poetry run celery -A $(CELERY_APP) call $(TASK_NAME) --args=$(TASK_ARGS) --kwargs=$(TASK_KWARGS)
+	@uv run celery -A $(CELERY_APP) call $(TASK_NAME) --args=$(TASK_ARGS) --kwargs=$(TASK_KWARGS)

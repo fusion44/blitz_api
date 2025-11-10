@@ -1,52 +1,59 @@
-[tool.poetry]
+[project]
 name = "blitz_api"
 version = "0.5.1"
 description = "A backend for the Raspiblitz project"
-authors = ["fusion44 <some.fusion@gmail.com>"]
+authors = [{ name = "fusion44", email = "some.fusion@gmail.com" }]
+requires-python = ">=3.11,<3.13"
 license = "MIT"
-packages = [
-    { include = "app" },
+dependencies = [
+    "fastapi[standard-no-fastapi-cloud-cli]==0.120.4",
+    "fastapi-plugins[redis]==0.14.0",
+    "starlette==0.49.1",
+    "anyio==4.9.0",
+    "uvicorn[standard]==0.34.2",
+    "pydantic==2.10.6",
+    "pydantic-core==2.27.2",
+    "typing-extensions==4.12.2",
+    "pyjwt==2.10.1",
+    "python-decouple==3.8",
+    "psutil==7.0.0",
+    "requests==2.32.4",
+    "pyzmq==26.4.0",
+    "aiohttp==3.12.14",
+    "grpcio==1.71.0",
+    "grpcio-tools==1.71.0",
+    "protobuf==5.29.5",
+    "deepdiff==8.6.1",
+    "loguru==0.7.3",
+    "celery[redis]==5.5.2",
+    # Required for the fastapi-plugins[redis]
+    # Maybe remove and use redis-py directly instead as this is deprecated
+    "async_timeout==5.0.1",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.12 | ^3.11"
-fastapi = {extras = ["standard"], version = "0.115.12"}
-fastapi-plugins = "0.13.2"
-starlette = "0.45.3"
-anyio = "4.9.0"
-uvicorn = {extras = ["standard"], version = "0.34.2"}
-pydantic = "2.10.6"
-pydantic-core = "2.27.2"
-typing-extensions = "4.12.2"
-pyjwt = "2.10.1"
-python-decouple = "3.8"
-psutil = "7.0.0"
-requests = "2.32.3"
-pyzmq = "26.4.0"
-aiohttp = "3.11.18"
-grpcio = "1.71.0"
-grpcio-tools = "1.71.0"
-protobuf = "5.29.3"
-deepdiff = "8.4.2"
-loguru = "0.7.3"
-celery = {extras = ["redis"], version = "5.5.2"}
+[project.scripts]
+api = "app.server:main"
 
+[dependency-groups]
+dev = [
+    "pytest==8.3.5",
+    "pytest-asyncio==0.25.3",
+    "coverage==7.8.0",
+    "ruff==0.9.6",
+    "debugpy==1.8.14",
+    "click==8.1.8",
+    "watchfiles==0.24.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "8.3.5"
-pytest-asyncio = "0.25.3"
-coverage = "7.8.0"
-ruff = "0.9.6"
-debugpy = "1.8.14"
-click = "8.1.8"
-watchfiles = "0.24.0"
+[tool.hatch.build.targets.sdist]
+include = ["app"]
 
-[tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.8"
+[tool.hatch.build.targets.wheel]
+include = ["app"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.isort]
 profile = "black"
@@ -97,6 +104,3 @@ target-version = "py311"
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
-
-[tool.poetry.scripts]
-api = "app.server:main"
