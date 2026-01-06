@@ -2,7 +2,7 @@
 #    uv pip compile --all-extras --output-file requirements.txt pyproject.toml
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.12.14
+aiohttp==3.13.3
     # via blitz-api (pyproject.toml)
 aiojobs==1.4.0
     # via fastapi-plugins
