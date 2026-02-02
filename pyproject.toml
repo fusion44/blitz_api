@@ -6,29 +6,23 @@ authors = [{ name = "fusion44", email = "some.fusion@gmail.com" }]
 requires-python = ">=3.11,<3.13"
 license = "MIT"
 dependencies = [
-    "fastapi[standard-no-fastapi-cloud-cli]==0.120.4",
-    "fastapi-plugins[redis]==0.14.0",
+    "fastapi[standard-no-fastapi-cloud-cli]==0.128.0",
     "starlette==0.49.1",
     "anyio==4.9.0",
-    "uvicorn[standard]==0.34.2",
-    "pydantic==2.10.6",
-    "pydantic-core==2.27.2",
-    "typing-extensions==4.12.2",
+    "uvicorn[standard]==0.40.0",
+    "pydantic==2.12.5",
+    "typing-extensions==4.15.0",
     "pyjwt==2.10.1",
     "python-decouple==3.8",
-    "psutil==7.0.0",
-    "requests==2.32.4",
-    "pyzmq==26.4.0",
-    "aiohttp==3.12.14",
-    "grpcio==1.71.0",
-    "grpcio-tools==1.71.0",
-    "protobuf==5.29.5",
+    "psutil==7.2.2",
+    "requests==2.32.5",
+    "pyzmq==27.1.0",
+    "aiohttp==3.13.3",
+    "grpcio==1.76.0",
+    "grpcio-tools==1.76.0",
     "deepdiff==8.6.1",
     "loguru==0.7.3",
-    "celery[redis]==5.5.2",
-    # Required for the fastapi-plugins[redis]
-    # Maybe remove and use redis-py directly instead as this is deprecated
-    "async_timeout==5.0.1",
+    "celery[redis]==5.6.2",
 ]
 
 [project.scripts]
@@ -36,13 +30,13 @@ api = "app.server:main"
 
 [dependency-groups]
 dev = [
-    "pytest==8.3.5",
-    "pytest-asyncio==0.25.3",
-    "coverage==7.8.0",
-    "ruff==0.9.6",
-    "debugpy==1.8.14",
-    "click==8.1.8",
-    "watchfiles==0.24.0",
+    "pytest==9.0.2",
+    "pytest-asyncio==1.3.0",
+    "coverage==7.13.2",
+    "ruff==0.14.14",
+    "debugpy==1.8.20",
+    "click==8.3.1",
+    "watchfiles==1.1.1",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -99,8 +93,15 @@ line-length = 88
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-target-version = "py311"
+target_version = "py311"
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "app/external/result_type/src"
+]
+asyncio_mode = "auto"
+norecursedirs = [".venv", ".devenv"]

@@ -8,13 +8,13 @@ import time
 from typing import Any, Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
-from fastapi_plugins import redis_plugin
 from loguru import logger
 from redis.asyncio import Redis, TimeoutError
 
 from app.api.error_report.report import Report
 from app.api.models import ProcessResult
 from app.api.sse_manager import SSEManager
+from app.external.fastapi_plugins_redis import redis_plugin
 from app.external.result_type.src.result import Err, Ok, Result
 from app.external.sse_starlette import ServerSentEvent
 

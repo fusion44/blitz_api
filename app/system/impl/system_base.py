@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from logging import error
 from typing import Dict
 
 from app.api.error_report.report import Report

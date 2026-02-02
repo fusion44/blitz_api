@@ -10,11 +10,37 @@
         "tags": [
           "Apps"
         ],
-        "summary": "Get the status available apps.",
+        "summary": "Get the status of all available apps.",
         "operationId": "apps_status_apps_status_get",
         "responses": {
           "200": {
-            "description": "\nReturns a JSON list with the current status of all **installed** apps\n```\n[\n    {\n        id: 'specter',\n        name: 'Specter Desktop',\n        status: 'online'\n    },\n    {\n        id: 'sphinx',\n        name: 'Sphinx Chat',\n        status: 'online'\n    },\n   ...\n]\n```\n",
+            "description": "\nReturns a JSON list with the current status of all available apps\n```\n{\n  \"data\": [\n    {\n      \"id\": \"btcpayserver\",\n      \"version\": \"v1.13.0\",\n      \"installed\": false,\n      \"configured\": false,\n      \"status\": \"offline\",\n      \"local_ip\": null,\n      \"http_port\": null,\n      \"https_port\": null,\n      \"https_forced\": null,\n      \"https_self_signed\": null,\n      \"hidden_service\": null,\n      \"address\": null,\n      \"auth_method\": null,\n      \"details\": null,\n      \"error\": null\n    },\n    {\n      \"id\": \"btc-rpc-explorer\",\n      \"version\": \"v3.4.0\",\n      \"installed\": false,\n      \"configured\": false,\n      \"status\": \"offline\",\n      \"local_ip\": null,\n      ...\n    },\n    ...\n  ],\n  \"errors\": [\n    {\n      \"id\": \"rtl\",\n      \"error\": \"App status script execution failed.\n\u251c\u2574at /home/blitzapi/blitz_api/app/apps/impl/raspiblitz.py:92:10\n\u251c\u2574script_name: /home/admin/config.scripts/bonus.rtl.sh status\n\u2502\n\u2570\u2500\u25b6 500: Something went wrong!\n    \u2570\u2574at /home/blitzapi/blitz_api/app/apps/impl/raspiblitz.py:92:10\"\n    },\n    ...\n  ]\n}\n```\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppStatusQueryResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTBearer": []
+          }
+        ]
+      }
+    },
+    "/apps/update-cache": {
+      "post": {
+        "tags": [
+          "Apps"
+        ],
+        "summary": "Update the app status cache. Results will be broadcasted to SSE clients.",
+        "operationId": "apps_update_cache_apps_update_cache_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
@@ -56,9 +82,14 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AppStatus"
+                }
               }
             }
+          },
+          "404": {
+            "description": "If no or an invalid app id is given."
           },
           "422": {
             "description": "Validation Error",
@@ -79,7 +110,7 @@
           "Apps"
         ],
         "summary": "Get the advanced status of a single app by id.",
-        "description": "Some apps might give status information that is computationally\n    to expensive to include in the normal status endpoint.\n\n> \u2139\ufe0f _This endpoint is not implemented on all platforms_",
+        "description": "Some apps might give status information that is computationally\n    to expensive to include in the normal status endpoint.\n\n    Available app ids for this endpoint:\n    - electrs\n\n> \u2139\ufe0f  _This endpoint is not implemented on all platforms_",
         "operationId": "apps_status_advanced_apps_status_advanced__id__get",
         "security": [
           {
@@ -107,8 +138,8 @@
               }
             }
           },
-          "400": {
-            "description": "If no or invalid app id is given."
+          "404": {
+            "description": "If no or an invalid app id is given."
           },
           "422": {
             "description": "Validation Error",
@@ -123,19 +154,100 @@
         }
       }
     },
-    "/apps/status-sub": {
-      "get": {
+    "/apps/install/{app_id}": {
+      "post": {
         "tags": [
           "Apps"
         ],
-        "summary": "Subscribe to status changes of currently installed apps.",
-        "operationId": "apps_status_sub_apps_status_sub_get",
+        "summary": "Install an app",
+        "description": "Attempts to install an app. The installation process results are\n    not returned on this endpoint. Instead, the results are communicated via the SSE\n    channels. This call only verifies if the app is available for installation on the\n    given platform.",
+        "operationId": "apps_install_apps_install__app_id__post",
+        "security": [
+          {
+            "JWTBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AppId"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "\nSends a JSON object with the status of an app if it changes.\n```\n{\n    id: 'specter',\n    name: 'Specter Desktop',\n    status: 'online'\n},\n```\n",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "If the app is already installed or not available for the platform."
+          },
+          "404": {
+            "description": "If no or an invalid app id is given."
+          },
+          "423": {
+            "description": "If an app install task is already running."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apps/uninstall": {
+      "post": {
+        "tags": [
+          "Apps"
+        ],
+        "summary": "Uninstall app",
+        "description": "Attempts to uninstall an app. The uninstallation process results are\n    not returned on this endpoint. Instead, the results are communicated via the SSE\n    channels. This call only verifies if the app is available for uninstallation on the\n    given platform.",
+        "operationId": "apps_uninstall_apps_uninstall_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppUninstallInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "If the app is already installed."
+          },
+          "404": {
+            "description": "If no or an invalid app id is given."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -145,106 +257,6 @@
             "JWTBearer": []
           }
         ]
-      }
-    },
-    "/apps/install/{name}": {
-      "post": {
-        "tags": [
-          "Apps"
-        ],
-        "summary": "Install app",
-        "operationId": "apps_install_apps_install__name__post",
-        "security": [
-          {
-            "JWTBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/apps/uninstall/{name}": {
-      "post": {
-        "tags": [
-          "Apps"
-        ],
-        "summary": "Uninstall app",
-        "operationId": "apps_install_apps_uninstall__name__post",
-        "security": [
-          {
-            "JWTBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UninstallData"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/bitcoin/btc-info": {
@@ -1735,7 +1747,7 @@
         "operationId": "system_hardware_info_sub_system_hardware_info_sub_get",
         "responses": {
           "200": {
-            "description": "Yields a JSON string with hardware information every 2.5 seconds\n\n```JSON\n{\n  \"cpu_overall_percent\": 15.8,\n  \"cpu_per_cpu_percent\": [\n    11.8,\n    6.1,\n    12.5\n  ],\n  \"vram_total_bytes\": 25134919680,\n  \"vram_available_bytes\": 17240051712,\n  \"vram_used_bytes\": 6044856320,\n  \"vram_usage_percent\": 31.4,\n  \"swap_ram_total_bytes\": 2147479552,\n  \"swap_used_bytes\": 0,\n  \"swap_usage_bytes\": 0,\n  \"temperatures_celsius\": {\n    \"coretemp\": [\n      [\n        \"Core 1\",\n        51,\n        84,\n        100\n      ],\n      [\n        \"Core 2\",\n        53,\n        84,\n        100\n      ],\n      [\n        \"Core 3\",\n        50,\n        84,\n        100\n      ]\n    ]\n  },\n  \"boot_time_timestamp\": 1623486468,\n  \"disk_io_read_count\": 254574,\n  \"disk_io_write_count\": 133353,\n  \"disk_io_read_bytes\": 5306839040,\n  \"disk_io_write_bytes\": 5593076736,\n  \"disks\": [\n    {\n      \"device\": \"/dev/sda1\",\n      \"mountpoint\": \"/boot/efi\",\n      \"filesystem_type\": \"vfat\",\n      \"partition_total_bytes\": 535805952,\n      \"partition_used_bytes\": 8228864,\n      \"partition_free_bytes\": 527577088,\n      \"partition_percent\": 1.5\n    },\n    {\n      \"device\": \"/dev/sda2\",\n      \"mountpoint\": \"/\",\n      \"filesystem_type\": \"ext4\",\n      \"partition_total_bytes\": 250438021120,\n      \"partition_used_bytes\": 177157742592,\n      \"partition_free_bytes\": 60487389184,\n      \"partition_percent\": 74.5\n    }\n  ],\n  \"networks\": [\n    {\n      \"interface_name\": \"lo\",\n      \"address\": \"127.0.0.1\",\n      \"mac_address\": \"00:00:00:00:00:00\"\n    },\n    {\n      \"interface_name\": \"enp4s0\",\n      \"address\": \"192.168.1.23\",\n      \"mac_address\": \"35:a3:5c:6a:4a:f0\"\n    }\n  ],\n  \"networks_bytes_sent\": 137088249,\n  \"networks_bytes_received\": 1603400654\n}\n```\n",
+            "description": "Yields a JSON string with hardware information every 2 seconds\n\n```JSON\n{\n  \"cpu_overall_percent\": 15.8,\n  \"cpu_per_cpu_percent\": [\n    11.8,\n    6.1,\n    12.5\n  ],\n  \"vram_total_bytes\": 25134919680,\n  \"vram_available_bytes\": 17240051712,\n  \"vram_used_bytes\": 6044856320,\n  \"vram_usage_percent\": 31.4,\n  \"swap_ram_total_bytes\": 2147479552,\n  \"swap_used_bytes\": 0,\n  \"swap_usage_bytes\": 0,\n  \"temperatures_celsius\": {\n    \"coretemp\": [\n      [\n        \"Core 1\",\n        51,\n        84,\n        100\n      ],\n      [\n        \"Core 2\",\n        53,\n        84,\n        100\n      ],\n      [\n        \"Core 3\",\n        50,\n        84,\n        100\n      ]\n    ]\n  },\n  \"boot_time_timestamp\": 1623486468,\n  \"disk_io_read_count\": 254574,\n  \"disk_io_write_count\": 133353,\n  \"disk_io_read_bytes\": 5306839040,\n  \"disk_io_write_bytes\": 5593076736,\n  \"disks\": [\n    {\n      \"device\": \"/dev/sda1\",\n      \"mountpoint\": \"/boot/efi\",\n      \"filesystem_type\": \"vfat\",\n      \"partition_total_bytes\": 535805952,\n      \"partition_used_bytes\": 8228864,\n      \"partition_free_bytes\": 527577088,\n      \"partition_percent\": 1.5\n    },\n    {\n      \"device\": \"/dev/sda2\",\n      \"mountpoint\": \"/\",\n      \"filesystem_type\": \"ext4\",\n      \"partition_total_bytes\": 250438021120,\n      \"partition_used_bytes\": 177157742592,\n      \"partition_free_bytes\": 60487389184,\n      \"partition_percent\": 74.5\n    }\n  ],\n  \"networks\": [\n    {\n      \"interface_name\": \"lo\",\n      \"address\": \"127.0.0.1\",\n      \"mac_address\": \"00:00:00:00:00:00\"\n    },\n    {\n      \"interface_name\": \"enp4s0\",\n      \"address\": \"192.168.1.23\",\n      \"mac_address\": \"35:a3:5c:6a:4a:f0\"\n    }\n  ],\n  \"networks_bytes_sent\": 137088249,\n  \"networks_bytes_received\": 1603400654\n}\n```\n",
             "content": {
               "application/json": {
                 "schema": {}
@@ -1856,6 +1868,174 @@
         ]
       }
     },
+    "/setup/status": {
+      "get": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Get Status",
+        "operationId": "get_status_setup_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/setup-start-info": {
+      "get": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Setup Start Info",
+        "operationId": "setup_start_info_setup_setup_start_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/setup-start-done": {
+      "post": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Setup Start Done",
+        "operationId": "setup_start_done_setup_setup_start_done_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartDoneData"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/setup-final-info": {
+      "get": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Setup Final Info",
+        "operationId": "setup_final_info_setup_setup_final_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTBearer": []
+          }
+        ]
+      }
+    },
+    "/setup/setup-final-done": {
+      "post": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Setup Final Done",
+        "operationId": "setup_final_done_setup_setup_final_done_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTBearer": []
+          }
+        ]
+      }
+    },
+    "/setup/shutdown": {
+      "get": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Get Shutdown",
+        "operationId": "get_shutdown_setup_shutdown_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/setup-sync-info": {
+      "post": {
+        "tags": [
+          "RaspiBlitz Setup"
+        ],
+        "summary": "Setup Sync Info",
+        "operationId": "setup_sync_info_setup_setup_sync_info_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "Index",
@@ -1955,6 +2135,259 @@
           "preimage"
         ],
         "title": "Amp"
+      },
+      "AppId": {
+        "type": "string",
+        "enum": [
+          "albyhub",
+          "btcpayserver",
+          "btc-rpc-explorer",
+          "electrs",
+          "jam",
+          "lnbits",
+          "mempool",
+          "rtl",
+          "thunderhub"
+        ],
+        "title": "AppId"
+      },
+      "AppOnlineStatus": {
+        "type": "string",
+        "enum": [
+          "online",
+          "offline"
+        ],
+        "title": "AppOnlineStatus"
+      },
+      "AppStatus": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AppId",
+            "description": "Id of the applications"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Version of the application"
+          },
+          "installed": {
+            "type": "boolean",
+            "title": "Installed",
+            "description": "Whether the application is installed",
+            "default": false
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "description": "Whether the application is configured",
+            "default": false
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppOnlineStatus",
+            "description": "Whether the application is online",
+            "default": "offline"
+          },
+          "local_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Ip",
+            "description": "The local network IP of the application"
+          },
+          "http_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Port",
+            "description": "The http port of the application"
+          },
+          "https_port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Https Port",
+            "description": "The https port of the application"
+          },
+          "https_forced": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Https Forced",
+            "description": "Whether https is forced for this application"
+          },
+          "https_self_signed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Https Self Signed",
+            "description": "Whether the https certificate is self signed"
+          },
+          "hidden_service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden Service",
+            "description": "Whether the application is reachable via a tor hidden service"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address",
+            "description": "The full address where this application is reachable"
+          },
+          "auth_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Method",
+            "description": "The authentication method this application uses"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Additional application specific details\n\n        This field can contain values for the following app ids:\n        - `mempool`: `is_indexed`, `index_info`\n        - `btc-rpc-explorer`: `is_indexed`, `index_info`\n        - `electrs`: `initial_sync_done`, `block_height`,\n                                   `blockheightPercent`, `info_sync`,\n                                   `electrum_responding`,\n        "
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Last known encountered error for this app."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "AppStatus"
+      },
+      "AppStatusQueryError": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AppId",
+            "description": "The app id"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "The error description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "error"
+        ],
+        "title": "AppStatusQueryError"
+      },
+      "AppStatusQueryResult": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AppStatus"
+            },
+            "type": "array",
+            "title": "Data",
+            "description": "Contains the successfully queried app statuses",
+            "default": []
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/AppStatusQueryError"
+            },
+            "type": "array",
+            "title": "Errors",
+            "description": "Contains the error messages for unsuccessful queries",
+            "default": []
+          },
+          "timestamp": {
+            "type": "integer",
+            "title": "Timestamp",
+            "description": "The UTC timestamp of when the data was fetched",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "AppStatusQueryResult"
+      },
+      "AppUninstallInput": {
+        "properties": {
+          "app_id": {
+            "$ref": "#/components/schemas/AppId",
+            "description": "Id of the applications"
+          },
+          "keep_data": {
+            "type": "boolean",
+            "title": "Keep Data",
+            "description": "Whether to keep the app data",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_id"
+        ],
+        "title": "AppUninstallInput"
       },
       "Bip9Data": {
         "properties": {
@@ -2175,7 +2608,8 @@
           "warnings": {
             "type": "string",
             "title": "Warnings",
-            "description": "Any network and blockchain warnings"
+            "description": "Any network and blockchain warnings",
+            "default": ""
           },
           "softforks": {
             "items": {
@@ -2199,7 +2633,6 @@
           "chainwork",
           "size_on_disk",
           "pruned",
-          "warnings",
           "softforks"
         ],
         "title": "BlockchainInfo"
@@ -3632,7 +4065,8 @@
           "warnings": {
             "type": "string",
             "title": "Warnings",
-            "description": "Any network and blockchain warnings"
+            "description": "Any network and blockchain warnings",
+            "default": ""
           }
         },
         "type": "object",
@@ -4297,6 +4731,47 @@
         ],
         "title": "SoftFork"
       },
+      "StartDoneData": {
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "title": "Hostname",
+            "default": ""
+          },
+          "forceFreshSetup": {
+            "type": "boolean",
+            "title": "Forcefreshsetup",
+            "default": false
+          },
+          "keepBlockchain": {
+            "type": "boolean",
+            "title": "Keepblockchain",
+            "default": true
+          },
+          "lightning": {
+            "type": "string",
+            "title": "Lightning",
+            "default": ""
+          },
+          "passwordA": {
+            "type": "string",
+            "title": "Passworda",
+            "default": ""
+          },
+          "passwordB": {
+            "type": "string",
+            "title": "Passwordb",
+            "default": ""
+          },
+          "passwordC": {
+            "type": "string",
+            "title": "Passwordc",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "StartDoneData"
+      },
       "SubSystemHealthInfo": {
         "properties": {
           "name": {
@@ -4457,17 +4932,6 @@
           "receive"
         ],
         "title": "TxType"
-      },
-      "UninstallData": {
-        "properties": {
-          "keepData": {
-            "type": "boolean",
-            "title": "Keepdata",
-            "default": true
-          }
-        },
-        "type": "object",
-        "title": "UninstallData"
       },
       "UnlockWalletInput": {
         "properties": {

@@ -6,9 +6,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException, RequestValidationError
-from fastapi_plugins import RedisSettings
-from fastapi_plugins import get_config as get_redis_config
-from fastapi_plugins import redis_plugin, registered_configuration
 from loguru import logger
 from pydantic import BaseModel
 from redis.asyncio import Redis
@@ -38,6 +35,12 @@ from app.bitcoind.service import (
     initialize_bitcoin_repo,
     register_bitcoin_status_gatherer,
     register_bitcoin_zmq_sub,
+)
+from app.external.fastapi_plugins_redis import (
+    RedisSettings,
+    get_config as get_redis_config,
+    redis_plugin,
+    registered_configuration,
 )
 from app.external.result_type.src.result.result import Ok
 from app.lightning.models import LnInitState

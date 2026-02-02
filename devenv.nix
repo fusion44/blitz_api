@@ -63,9 +63,10 @@ in {
     python = {
       enable = true;
       # 3.11 is default on RaspiBlitz 1.12
-      package = pkgs-unstable.python311;
+      package = pkgs-unstable.python312;
       uv = {
         enable = true;
+        sync.enable = true;
         package = pkgs-unstable.uv;
       };
     };
@@ -112,6 +113,7 @@ in {
     cln.exec = ''
       sleep 3
       lightningd \
+        --bind-addr=127.0.0.1:9736 \
         --regtest \
         --lightning-dir=${clnDataDir} \
         --bitcoin-datadir=${bitcoinDataDir}
