@@ -206,12 +206,13 @@ def regopenchannel [
 ] {
   match $to {
     "cln" => {
-      let k = (clnpubkey)
-      lndcli openchannel $k --local_amt $local_amount --push_amt $push_amount
+      let k = regpubkey cln
+      lndcli connect $"($k)@127.0.0.1:9736"
+      lndcli openchannel --node_key $k --local_amt $local_amount --push_amt $push_amount
     }
     "lnd" => {
-      let k = (lndpubkey)
-      clncli fundchannel $k $local_amount
+      let k = regpubkey lnd
+      clncli fundchannel $"($k)@127.0.0.0:9735" $local_amount
     }
     _ => { print "to must either be \"lnd\" or \"cln\"." }
   }

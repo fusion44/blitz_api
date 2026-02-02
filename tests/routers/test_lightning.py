@@ -2,13 +2,12 @@ from starlette.testclient import TestClient
 
 from app.main import app
 from tests.routers.utils import call_route
-from tests.utils import monkeypatch_auth
 
 test_client = TestClient(app)
 
 
 def test_route_authentications_latest():
-    prefixes = ["/latest/lightning", "/v1/lightning"]
+    prefixes = ["/lightning"]
 
     for prefix in prefixes:
         p = {"value_msat": 1337}

@@ -7,7 +7,7 @@ client = TestClient(app)
 
 
 def test_route_authentications_latest():
-    prefixes = ["/latest/system", "/v1/system"]
+    prefixes = ["/system"]
 
     for prefix in prefixes:
         call_route(client, f"{prefix}/refresh-token", method="p")
