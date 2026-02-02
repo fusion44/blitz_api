@@ -4,7 +4,6 @@ from enum import Enum
 from typing import List, Optional, Union
 
 from deepdiff import DeepDiff
-from fastapi import HTTPException
 from fastapi.param_functions import Query
 from loguru import logger
 from pydantic import BaseModel, validator

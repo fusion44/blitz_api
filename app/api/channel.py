@@ -7,7 +7,7 @@ from loguru import logger
 from app.api.config import config
 from app.api.error_report.report import Report
 from app.api.models import RedisChannelMessageData
-from app.api.utils import redis_delete, redis_get_raw, redis_publish, redis_set
+from app.api.utils import redis_publish
 from app.external.result_type.src.result.result import Err, Ok, Result
 
 

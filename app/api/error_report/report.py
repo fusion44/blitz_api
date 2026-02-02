@@ -3,7 +3,6 @@ import traceback
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
-from fastapi import HTTPException
 
 
 @dataclass

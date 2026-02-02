@@ -674,6 +674,7 @@ This will show more debug information.
                     status.HTTP_409_CONFLICT, detail="invoice is already paid"
                 )
             else:
+                logger.error(error.details())
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
                 )

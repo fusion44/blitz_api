@@ -5,7 +5,7 @@ from fastapi import Query
 from pydantic.main import BaseModel
 
 from app.api.error_report.report import Report
-from app.api.models import ApiErrors, ErrorMessage
+from app.api.models import ErrorMessage
 from app.apps.constants import AppManagementProcessState, InstallMode
 from app.external.result_type.src.result import Err, Ok, Result
 
