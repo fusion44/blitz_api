@@ -46,7 +46,7 @@ coverage:
 	uv run python -m coverage html
 
 update-requirements-file:
-	uv pip compile --all-extras --output-file requirements.txt pyproject.toml
+	uv pip compile --all-extras --universal --output-file requirements.txt pyproject.toml
 
 sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
