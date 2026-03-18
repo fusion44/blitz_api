@@ -55,7 +55,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   click
     #   loguru
     #   uvicorn
-deepdiff==8.6.1
+deepdiff==8.6.2
     # via blitz-api (pyproject.toml)
 dnspython==2.7.0
     # via email-validator
