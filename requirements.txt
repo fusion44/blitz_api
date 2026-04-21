@@ -144,7 +144,7 @@ python-dateutil==2.9.0.post0
     # via celery
 python-decouple==3.8
     # via blitz-api (pyproject.toml)
-python-dotenv==1.1.0
+python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
