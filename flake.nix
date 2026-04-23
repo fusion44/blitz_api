@@ -4,68 +4,65 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    pyproject-nix = {
+      url = "github:pyproject-nix/pyproject.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    pyproject-build-systems = {
+      url = "github:pyproject-nix/build-system-pkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.uv2nix.follows = "uv2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
-    poetry2nix,
+    pyproject-nix,
+    uv2nix,
+    pyproject-build-systems,
+    ...
   }: let
     name = "blitz-api";
 
+    # Load the uv workspace once; reused across systems.
+    workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
+
+    # Pure Nix overlay derived from pyproject.toml + uv.lock. Prefer
+    # prebuilt wheels — a handful of deps (grpcio, psutil, pyzmq) are
+    # painful to compile from source and wheels work fine on linux/darwin.
+    overlay = workspace.mkPyprojectOverlay {
+      sourcePreference = "wheel";
+    };
+
     systems = flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      inherit (poetry2nix.lib.mkPoetry2Nix {inherit pkgs;}) mkPoetryApplication overrides mkPoetryEnv;
-      poetryDev = mkPoetryEnv {
-        projectDir = ./.;
-        preferWheels = true;
-        overrides = overrides.withDefaults (final: prev: {
-          ruff = prev.ruff.override {
-            preferWheel = true;
-          };
-        });
-      };
+      python = pkgs.python312;
+
+      pythonSet =
+        (pkgs.callPackage pyproject-nix.build.packages {
+          inherit python;
+        })
+        .overrideScope (
+          nixpkgs.lib.composeManyExtensions [
+            pyproject-build-systems.overlays.default
+            overlay
+          ]
+        );
     in {
       packages = {
         default = self.packages.${system}.${name};
-        ${name} = mkPoetryApplication {
-          projectDir = ./.;
-          meta.mainProgram = name;
-        };
-        poetryDev = mkPoetryEnv {
-          projectDir = ./.;
-          preferWheels = true;
-        };
-      };
-
-      devShells.default = pkgs.mkShell {
-        # TODO: dirty dirty to be able to run the app. May break other packages.
-        # https://discourse.nixos.org/t/using-nix-shells-without-polluting-repositories/37362
-        shellHook = ''
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${
-            with pkgs;
-              lib.makeLibraryPath [pkgs.stdenv.cc.cc.lib]
-          }"
-        '';
-        nativeBuildInputs = with pkgs; [
-          stdenv.cc.cc
-          poetry
-          poetryDev
-          pyright
-          alejandra
-          statix
-          ruff
-          ruff-lsp
-          redis
-          pueue
-          sshpass
-
-          bitcoind
-          lnd
-          clightning
-          pueue
-        ];
+        ${name} = pythonSet.mkVirtualEnv "${name}-env" workspace.deps.default;
       };
     });
 
