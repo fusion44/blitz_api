@@ -154,7 +154,10 @@ in {
         connectionType = lib.mkOption {
           type = types.enum ["none" "lnd_grpc" "cln_jrpc"];
           default = "none";
-          description = "Whether lighgning is enabled and which implementation is used.";
+          description = ''
+            Which lightning backend (if any) to wire up. "none" means the
+            API runs in Bitcoin-only mode and no LN service is required.
+          '';
         };
 
         lnd = {
@@ -169,6 +172,20 @@ in {
             type = types.port;
             default = 10009;
             description = "The port to connect to";
+          };
+        };
+
+        cln = {
+          jrpcPath = mkOption {
+            type = types.path;
+            default = "${config.services.clightning.dataDir}/bitcoin/lightning-rpc";
+            defaultText = literalExpression
+              ''"''${config.services.clightning.dataDir}/bitcoin/lightning-rpc"'';
+            description = ''
+              Absolute path to the clightning JSON-RPC socket. Must be
+              readable by the blitz-api service user (see the clightning
+              group membership added when connectionType = "cln_jrpc").
+            '';
           };
         };
       };
@@ -283,6 +300,9 @@ in {
         home = mkIf (cfg.home != null) cfg.home;
         group = cfg.group;
         isSystemUser = true;
+        # CLN JSON-RPC mode needs socket access via the clightning group.
+        extraGroups =
+          lib.optional (cfg.ln.connectionType == "cln_jrpc") "clightning";
       };
     };
 
@@ -353,8 +373,8 @@ in {
             ''
           }
           ${
-            lib.strings.optionalString (cfg.ln.connectionType == "cln_grpc") ''
-              echo "# CLN TODO"
+            lib.strings.optionalString (cfg.ln.connectionType == "cln_jrpc") ''
+              echo "BAPI_CLN_JRPC_PATH=${cfg.ln.cln.jrpcPath}" >> .env
             ''
           }
 
@@ -365,7 +385,13 @@ in {
 
       services.${name} = rec {
         wantedBy = ["multi-user.target"];
-        requires = ["bitcoind.service" "lnd.service"];
+        # Bitcoind is always required; pull in the matching lightning
+        # service only when the connectionType asks for it. "none" runs
+        # the API in Bitcoin-only mode.
+        requires =
+          ["bitcoind.service"]
+          ++ lib.optional (cfg.ln.connectionType == "lnd_grpc") "lnd.service"
+          ++ lib.optional (cfg.ln.connectionType == "cln_jrpc") "clightning.service";
         after = requires ++ ["blitz-api-setup-env.target" "nix-bitcoin-secrets.target"];
         description = "${name} server daemon";
         environment = lib.mkMerge [
@@ -379,7 +405,11 @@ in {
           # nbLib.defaultHardening //
           {
             ExecStart = "${cfg.package}/bin/api --port ${toString cfg.port} --host ${cfg.host} --root_path ${cfg.rootPath}";
-            ExecStartPre = [
+            # LND artifacts need to live inside the service's dataDir so
+            # the .env's BAPI_LND_MACAROON / BAPI_LND_CERT paths resolve.
+            # Nothing to copy for CLN (socket access is handled via the
+            # `clightning` group on cfg.user) or "none".
+            ExecStartPre = lib.optionals (cfg.ln.connectionType == "lnd_grpc") [
               (nbLib.rootScript "${name}-prepare-data-dir" ''
                 install -D -o ${cfg.user} -g ${cfg.group} ${lnd.networkDir}/admin.macaroon \
                   '${cfg.dataDir}/macaroons/admin.macaroon'
