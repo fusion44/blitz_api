@@ -18,14 +18,20 @@
   parts = strings.splitString ":" bitcoind.zmqpubrawblock;
   bitcoindZmqPort = builtins.elemAt parts 2;
 
+  # Persist auto-generated secrets so they survive rebuilds. Without
+  # this the JWT secret + local login password would regenerate on
+  # every nixos-rebuild, invalidating every token a logged-in client
+  # holds. Scripts are embedded into the env-file generator below;
+  # the `.jwt-secret` and `.login-password` sidecar files live in
+  # `${cfg.dataDir}`.
   jwtSecretScript =
     if cfg.jwt.secretFile != null
     then "$(head -n1 ${lib.escapeShellArg cfg.jwt.secretFile})"
-    else "$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 50)";
+    else ''"$(head -n1 "${cfg.dataDir}/.jwt-secret")"'';
   loginPasswordScript =
     if cfg.passwordFile != null
     then "$(head -n1 ${lib.escapeShellArg cfg.passwordFile})"
-    else "$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 50)";
+    else ''"$(head -n1 "${cfg.dataDir}/.login-password")"'';
   fullDotEnvPath =
     if cfg.generateDotEnvFile
     then "${cfg.dataDir}/.env"
@@ -347,6 +353,22 @@ in {
           cd "${cfg.dataDir}"
           chown root: .
           chmod 0700 .
+
+          # Seed persistent JWT secret + login password on first boot;
+          # re-read on subsequent activations.
+          ${lib.optionalString (cfg.jwt.secretFile == null) ''
+            if [ ! -s .jwt-secret ]; then
+              tr -dc '[:alnum:]' < /dev/urandom | head -c 50 > .jwt-secret
+              chmod 600 .jwt-secret
+            fi
+          ''}
+          ${lib.optionalString (cfg.passwordFile == null) ''
+            if [ ! -s .login-password ]; then
+              tr -dc '[:alnum:]' < /dev/urandom | head -c 50 > .login-password
+              chmod 600 .login-password
+            fi
+          ''}
+
           echo "BAPI_JWT_SECRET=${jwtSecretScript}" >> .env
           echo "BAPI_JWT_ALGORITHM=${cfg.jwt.algorithm}" >> .env
           echo "BAPI_JWT_EXPIRY_TIME=${toString cfg.jwt.expiry}" >> .env
@@ -427,6 +449,59 @@ in {
             SyslogIdentifier = name;
             ReadWritePaths = [cfg.dataDir];
           };
+      };
+
+      # Celery worker handles async tasks dispatched by the FastAPI
+      # process (hardware polls, LN forward notifications, etc.). It
+      # reads the same .env as the main service and needs Redis + the
+      # prepared dataDir (LND macaroon/cert copied by blitz-api's
+      # ExecStartPre). Requiring blitz-api.service gives us both
+      # ordering and a guarantee that the prep step has finished.
+      services."${name}-celery-worker" = {
+        wantedBy = ["multi-user.target"];
+        requires = ["redis.service" "${name}.service"];
+        after = ["redis.service" "${name}.service"];
+        description = "${name} Celery worker";
+        environment = lib.mkMerge [
+          (lib.mkIf cfg.generateDotEnvFile {
+            BAPI_ENV_PATH = "${cfg.dataDir}/.env";
+          })
+          cfg.env
+        ];
+        serviceConfig = {
+          ExecStart = "${cfg.package}/bin/celery -A app.celery_app worker --loglevel=info";
+          WorkingDirectory = cfg.dataDir;
+          User = cfg.user;
+          Group = cfg.group;
+          Restart = "always";
+          SyslogIdentifier = "${name}-celery-worker";
+          ReadWritePaths = [cfg.dataDir];
+        };
+      };
+
+      # Celery beat runs the periodic task scheduler. Single instance
+      # (never run more than one beat per celery app). Same env as
+      # worker.
+      services."${name}-celery-beat" = {
+        wantedBy = ["multi-user.target"];
+        requires = ["redis.service" "${name}.service"];
+        after = ["redis.service" "${name}.service"];
+        description = "${name} Celery beat scheduler";
+        environment = lib.mkMerge [
+          (lib.mkIf cfg.generateDotEnvFile {
+            BAPI_ENV_PATH = "${cfg.dataDir}/.env";
+          })
+          cfg.env
+        ];
+        serviceConfig = {
+          ExecStart = "${cfg.package}/bin/celery -A app.celery_app beat --loglevel=info";
+          WorkingDirectory = cfg.dataDir;
+          User = cfg.user;
+          Group = cfg.group;
+          Restart = "always";
+          SyslogIdentifier = "${name}-celery-beat";
+          ReadWritePaths = [cfg.dataDir];
+        };
       };
     };
 
