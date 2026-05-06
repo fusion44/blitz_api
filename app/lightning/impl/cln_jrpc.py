@@ -415,8 +415,14 @@ class LnNodeCLNjRPC(LightningNodeBase):
                 continue
 
             if include_incomplete:
-                b11_decoded = await self._decode_bolt11_cached(p["bolt11"])
-                p["amount_msat"] = b11_decoded.num_msat
+                # bolt11 is absent for keysend and BOLT12 payments — only
+                # decode it when present and amount_msat isn't already set.
+                bolt11 = p.get("bolt11")
+                if bolt11 and "amount_msat" not in p:
+                    b11_decoded = await self._decode_bolt11_cached(bolt11)
+                    p["amount_msat"] = b11_decoded.num_msat
+                elif "amount_msat" not in p:
+                    p["amount_msat"] = p.get("amount_sent_msat", 0)
                 pays.append(Payment.from_cln_jrpc(p))
 
         if reversed:
