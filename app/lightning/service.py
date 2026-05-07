@@ -66,9 +66,6 @@ if FWD_GATHER_INTERVAL < 0.3:
 if ln_node != "none":
     ln = LnNode()
 
-if ln_node != "none":
-    ln = LnNode()
-
 
 async def initialize_ln_repo() -> AsyncGenerator[InitLnRepoUpdate, None]:
     async for u in ln.initialize():
@@ -169,6 +166,29 @@ async def channel_close(channel_id: int, force_close: bool) -> str:
 
 
 async def get_ln_info() -> LnInfo:
+    # Bitcoin-only mode (`BAPI_LN_NODE=none`) leaves the module-level
+    # `ln` global unbound — every `await ln.X()` in this file would
+    # NameError. The most-hit caller in bitcoin-only mode is
+    # `NativePythonSystem.get_system_info()`, which always reads
+    # `lninfo.alias` and `lninfo.color` to populate `SystemInfo`.
+    # That call breaks the SSE warmup pipeline (`get_full_client_warmup_data_bitcoinonly`)
+    # so new SSE subscribers never receive `btc_info`. Return a stub
+    # so the bitcoin-only happy path keeps working.
+    if ln_node == "none":
+        return LnInfo(
+            implementation="none",
+            version="",
+            commit_hash="",
+            identity_pubkey="",
+            identity_uri="",
+            alias="",
+            color="#000000",
+            num_pending_channels=0,
+            num_active_channels=0,
+            num_inactive_channels=0,
+            num_peers=0,
+            block_height=0,
+        )
     ln_info = await ln.get_ln_info()
     if PLATFORM == APIPlatform.RASPIBLITZ:
         ln_info.identity_uri = await redis_get("ln_default_address")
