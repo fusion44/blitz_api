@@ -219,8 +219,9 @@ async def app_manage_task_impl(
 
             await _send_finish_message(id, mode, notifier)
 
+        await notifier.aclose()
         if redis_client:
-            await redis_client.close()
+            await redis_client.aclose()
 
 
 async def _send_finish_message(

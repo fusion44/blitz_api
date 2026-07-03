@@ -30,6 +30,9 @@ async def test_lock_already_held_does_not_release_or_finish(monkeypatch):
             sent.append(contents)
             return Ok(None)
 
+        async def aclose(self):
+            pass
+
     async def fake_acquire(key, lock_ttl, redis):
         return Ok(False)  # lock already held by the running install
 
@@ -73,6 +76,9 @@ async def test_acquired_lock_is_released_and_finished(monkeypatch):
         async def send_message(self, key, contents):
             sent.append(contents)
             return Ok(None)
+
+        async def aclose(self):
+            pass
 
     async def fake_acquire(key, lock_ttl, redis):
         return Ok(True)  # lock acquired by this task

@@ -222,8 +222,9 @@ async def update_app_state_task_impl(
         case Err(message):
             _log_notify_listeners_error(message)
 
+    await channel_notifier.aclose()
     if redis_client:
-        await redis_client.close()
+        await redis_client.aclose()
 
 
 def _log_notify_listeners_error(message: Report):

@@ -4,6 +4,7 @@ This module contains the caching implementation for app status data.
 It provides functions to retrieve, store, and monitor app status data in Redis.
 """
 
+import asyncio
 from typing import Optional
 
 from loguru import logger
@@ -197,10 +198,20 @@ async def watch_app_status_changes():
     try:
         while True:
             listener = AppStatusUpdateListener()
-            await listener.connect()
-            # This will loop forever
+            match await listener.connect():
+                case Err(report):
+                    logger.error(
+                        f"App status listener failed to connect: {report.format()}"
+                    )
+                    await listener.aclose()
+                    # back off before retrying so a Redis outage doesn't
+                    # spin this loop
+                    await asyncio.sleep(5)
+                    continue
+            # This will loop forever (listen() closes its own resources)
             await listener.listen()
             logger.error("Recreating app status channel listener, as it stopped!")
+            await asyncio.sleep(1)
 
     except Exception as e:
         return Err(Report(f"App status channel listener error: {e}", error=e))

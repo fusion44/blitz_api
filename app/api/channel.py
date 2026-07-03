@@ -66,6 +66,12 @@ class BaseChannelNotifier:
                 )
             )
 
+    async def aclose(self) -> None:
+        """Release the Redis connection held by this notifier."""
+        if self.redis is not None:
+            await self.redis.aclose()
+            self.redis = None
+
 
 class BaseChannelListener:
     def __init__(self, channel: str, redis_url=None):
@@ -125,7 +131,6 @@ class BaseChannelListener:
                 except AttributeError as e:
                     logger.error(f"AttributeError while handling channel message: {e}")
                 except Exception as e:
-                    print(type(e))
                     logger.error(
                         f"Error handling channel message: {e}. Error type: {type(e)}"
                     )
@@ -134,7 +139,10 @@ class BaseChannelListener:
         except Exception as e:
             logger.error(f"Error listening to channel: {e}")
         finally:
-            await pubsub.unsubscribe()
+            # release the pubsub connection and the listener's Redis client;
+            # aclose() unsubscribes and returns the connection to the pool
+            await pubsub.aclose()
+            await self.aclose()
             logger.info(f"Stopped listening on channel: {self.channel}")
 
         return Ok(None)
@@ -145,6 +153,12 @@ class BaseChannelListener:
         logger.info("Channel listener stopping...")
 
         return Ok(None)
+
+    async def aclose(self) -> None:
+        """Release the Redis connection held by this listener."""
+        if self.redis is not None:
+            await self.redis.aclose()
+            self.redis = None
 
     async def handle_event(self, event):
         """Process incoming events - to be implemented by subclasses"""
