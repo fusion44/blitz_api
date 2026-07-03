@@ -43,7 +43,8 @@ To use a custom path, set the `BAPI_ENV_PATH` env variable to the `.env` file pa
 
 ### Dependencies
 
-- [Python in version 3.7](https://www.python.org/downloads/)
+- [Python](https://www.python.org/downloads/) in version 3.11 or 3.12
+- [uv](https://docs.astral.sh/uv/) for dependency management
 - [Redis](https://redis.io)
 - [Polar](https://github.com/jamaljsr/polar)
   If you need an easy option to run a simple bitcoind & lnd client
@@ -92,15 +93,9 @@ py -m uvicorn app.main:app --reload
 
 ## Development
 
-It is recommended to have [python-poetry installed](<(https://python-poetry.org/docs/master/#installation)>).
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it by following the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
-From within the `blitz_api` folder [open a poetry shell](https://python-poetry.org/docs/master/cli/#shell) via:
-
-```sh
-poetry shell
-```
-
-(To exit the poetry shell use: `exit`)
+`uv` creates and manages a local `.venv` for you. Prefix commands with `uv run` (e.g. `uv run pytest`) to run them inside the project environment, or activate the venv manually via `source .venv/bin/activate`.
 
 #### Using the nix package manager
 Blitz API provides a [Nix](https://github.com/NixOS/nix) Flake file to create a development environment. Execute `nix develop` (make sure you have flakes enabled) to enter the environment.
@@ -116,24 +111,31 @@ folder of the project:
 
 ### Installation
 
-```
-poetry install
+```sh
+make install-dev
 ```
 
 or
 
 ```sh
-make install-dev
+uv sync
 ```
+
+This reads `pyproject.toml` and installs all dependencies (main + dev) into `.venv`.
 
 If python dependencies have been changed it's necessary to freeze all requirements to requirements.txt:
 
 ```sh
-poetry export -f requirements.txt --output requirements.txt
+make update-requirements-file
 ```
 
-> ℹ️ This will skip all dev dependencies by default.\
-> This step is required to avoid having to install poetry for final deployment.
+or
+
+```sh
+uv pip compile --all-extras --universal --output-file requirements.txt pyproject.toml
+```
+
+> ℹ️ The final deployment installs via pip from `requirements.txt` (see `make install`) to avoid having to install uv on the target machine, so keep this file in sync when dependencies change.
 
 ### Sync changes to a RaspiBlitz
 
