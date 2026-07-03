@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 from deepdiff import DeepDiff
 from fastapi.param_functions import Query
 from loguru import logger
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, model_validator
 from pydantic.types import conint
 
 import app.lightning.docs as docs
@@ -1320,12 +1320,10 @@ class SendCoinsInput(BaseModel):
         ),
     )
 
-    @validator("amount", pre=True, always=True)
-    def check_amount_or_send_all(cls, amount, values):
-        if amount is None:
-            amount = 0
-
-        send_all = values.get("send_all") if "send_all" in values else False
+    @model_validator(mode="after")
+    def check_amount_or_send_all(self):
+        amount = self.amount if self.amount is not None else 0
+        send_all = self.send_all
 
         if amount < 0:
             raise ValueError("Amount must not be negative")
@@ -1339,10 +1337,6 @@ class SendCoinsInput(BaseModel):
                 )
             )
 
-        if amount > 0 and not send_all:
-            # amount is set and send_all is false
-            return amount
-
         if amount > 0 and send_all:
             # amount is set and send_all is true
             raise ValueError(
@@ -1352,12 +1346,8 @@ class SendCoinsInput(BaseModel):
                 )
             )
 
-        if amount == 0 and send_all:
-            # amount is not set and send_all is true
-            return amount
-
-        # normally this should never be reached
-        raise ValueError("Unknown input.")
+        # valid: (amount > 0 and not send_all) or (amount == 0 and send_all)
+        return self
 
 
 class SendCoinsResponse(BaseModel):
