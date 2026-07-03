@@ -37,6 +37,7 @@ charset-normalizer==3.4.2
     # via requests
 click==8.3.1
     # via
+    #   blitz-api (pyproject.toml)
     #   celery
     #   click-didyoumean
     #   click-plugins

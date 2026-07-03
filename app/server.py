@@ -14,7 +14,7 @@ import click  # isort:skip
     help="Set the ASGI 'root_path' for applications submounted below a given URL path.",
 )
 def main(port, host, root_path):
-    """Launched with `poetry run api` at root level"""
+    """Launched with `uv run api` at root level"""
 
     p = ""
     if root_path is not None and root_path != "":
