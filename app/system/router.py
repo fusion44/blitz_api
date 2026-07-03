@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.params import Depends, Query
 
@@ -14,6 +12,7 @@ from app.system.docs import (
     get_hw_info_json,
 )
 from app.system.models import (
+    ChangePasswordInput,
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
@@ -74,18 +73,10 @@ def refresh_token():
     response_description="if 200 OK - password change worked",
     dependencies=[Depends(JWTBearer())],
 )
-async def change_password_impl(
-    old_password: str,
-    new_password: str,
-    type: Optional[str] = Query(
-        None,
-        description=(
-            "ℹ️ Used in **RaspiBlitz only**. Password A, B or C. "
-            'Must be one of `["a", "b", "c"]`'
-        ),
-    ),
-):
-    return await change_password(type, old_password, new_password)
+async def change_password_impl(data: ChangePasswordInput):
+    return await change_password(
+        data.type, data.old_password, data.new_password
+    )
 
 
 @router.get(

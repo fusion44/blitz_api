@@ -261,11 +261,11 @@ class RaspiBlitzSystem(SystemBase):
 
     async def change_password(self, type: str, old_password: str, new_password: str):
         # check just allowed type values
-        type = type.lower()
-        if type not in ["a", "b", "c"]:
+        if not type or type.lower() not in ["a", "b", "c"]:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail=f"unknown password type: {type}"
             )
+        type = type.lower()
 
         # check password formatting
         if not password_valid(old_password):
@@ -279,7 +279,8 @@ class RaspiBlitzSystem(SystemBase):
 
         # first check if old password is correct
         result = await exec_bash_command(
-            f'/home/admin/config.scripts/blitz.passwords.sh check {type} "{old_password}"'  # noqa: E501
+            f'/home/admin/config.scripts/blitz.passwords.sh check {type} "{old_password}"',  # noqa: E501
+            sensitive=True,
         )
         data = {}
         match result:
@@ -300,7 +301,7 @@ class RaspiBlitzSystem(SystemBase):
         if type == "c":
             # will set password c of both lnd & core lightning if installed/activated
             script_call = f'/home/admin/config.scripts/blitz.passwords.sh set c "{old_password}" "{new_password}"'  # noqa: E501
-        result = await exec_bash_command(script_call)
+        result = await exec_bash_command(script_call, sensitive=True)
         data = {}
         match result:
             case Ok(in_data):

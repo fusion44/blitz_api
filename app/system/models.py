@@ -16,6 +16,13 @@ class LoginInput(BaseModel):
     ] = None
 
 
+class ChangePasswordInput(BaseModel):
+    old_password: constr(min_length=1)
+    new_password: constr(min_length=1)
+    # RaspiBlitz only: which password (a, b or c) to change
+    type: Optional[str] = None
+
+
 class APIPlatform(str, Enum):
     RASPIBLITZ = "raspiblitz"
     NATIVE_PYTHON = "native_python"
