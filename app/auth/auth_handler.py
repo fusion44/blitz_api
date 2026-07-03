@@ -1,7 +1,6 @@
 import asyncio
 import os
 import time
-from typing import Dict
 
 import jwt
 from loguru import logger
@@ -10,22 +9,30 @@ from app.api.config import config
 
 JWT_SECRET = config("BAPI_JWT_SECRET")
 JWT_ALGORITHM = config("BAPI_JWT_ALGORITHM")
-JWT_EXPIRY_TIME = config("BAPI_JWT_EXPIRY_TIME", default=300, cast=int)
+# Token lifetime in seconds.
+JWT_EXPIRY_TIME = config("BAPI_JWT_EXPIRY_TIME", default=3600, cast=int)
 
 
-def sign_jwt() -> Dict[str, str]:
+def sign_jwt() -> str:
+    now = int(time.time())
     payload = {
         "user_id": "admin",
-        "expires": int(round(time.time() * 1000) + JWT_EXPIRY_TIME),
+        "iat": now,
+        # standard 'exp' claim (seconds) so PyJWT validates expiry itself
+        "exp": now + JWT_EXPIRY_TIME,
     }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def decodeJWT(token: str) -> dict:
     try:
-        decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return decoded_token if decoded_token["expires"] >= time.time() * 1000 else None
+        # PyJWT validates the 'exp' claim and raises on expiry
+        return jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["exp"]},
+        )
     except Exception as e:
         logger.warning(f"Unable to decode jwt_token {e}")
         return {}
@@ -67,8 +74,11 @@ def remove_local_cookie():
 def register_cookie_updater():
     # We need to update the cookie file once the cookie is expired
     async def _cookie_updater():
+        # refresh shortly before expiry; JWT_EXPIRY_TIME is in seconds.
+        # guard against tiny/negative values that would busy-loop.
+        refresh_interval = max(JWT_EXPIRY_TIME - 10, 1)
         while True:
-            await asyncio.sleep(JWT_EXPIRY_TIME - 10)
+            await asyncio.sleep(refresh_interval)
             handle_local_cookie()
 
     loop = asyncio.get_event_loop()
