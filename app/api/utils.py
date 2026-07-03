@@ -21,7 +21,6 @@ from app.external.result_type.src.result import Err, Ok, Result
 from app.external.sse_starlette import ServerSentEvent
 
 sse_mgr = SSEManager()
-sse_mgr.setup()
 
 
 def build_sse_event(event: str, json_data: Optional[Dict]):

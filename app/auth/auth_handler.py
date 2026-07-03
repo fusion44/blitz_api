@@ -81,5 +81,4 @@ def register_cookie_updater():
             await asyncio.sleep(refresh_interval)
             handle_local_cookie()
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(_cookie_updater())
+    asyncio.create_task(_cookie_updater())

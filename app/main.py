@@ -98,9 +98,8 @@ async def lifespan(app: FastAPI):
 
     register_cookie_updater()
     await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
-    loop = asyncio.get_event_loop()
-    btc_task = loop.create_task(_initialize_bitcoin())
-    ln_task = loop.create_task(_initialize_lightning())
+    btc_task = asyncio.create_task(_initialize_bitcoin())
+    ln_task = asyncio.create_task(_initialize_lightning())
     await register_all_handlers()
     handle_local_cookie()
 
@@ -191,8 +190,7 @@ async def _set_startup_status(
     if lightning_msg is not None:
         api_startup_status.lightning_msg = lightning_msg
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(warmup_new_connections())
+    asyncio.create_task(warmup_new_connections())
     await broadcast_sse_msg(SSE.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
 
 
@@ -316,8 +314,7 @@ async def stream(request: Request):
         id, SSE.SYSTEM_STARTUP_INFO, jsonable_encoder(api_startup_status.model_dump())
     )
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(warmup_new_connections())
+    asyncio.create_task(warmup_new_connections())
 
     return event_source
 

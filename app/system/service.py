@@ -143,8 +143,7 @@ async def _handle_gather_hardware_info():
 
 
 async def register_hardware_info_gatherer():
-    loop = asyncio.get_event_loop()
-    loop.create_task(_handle_gather_hardware_info())
+    asyncio.create_task(_handle_gather_hardware_info())
 
 
 async def login(i: LoginInput) -> Dict[str, str]:

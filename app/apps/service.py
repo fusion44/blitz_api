@@ -91,8 +91,7 @@ async def install_app(app_id: AppId):
 
     manage_app_task.delay(app_id, InstallMode.ON)  # type: ignore
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(_watcher(app_id, "install"))
+    asyncio.create_task(_watcher(app_id, "install"))
 
 
 async def uninstall_app(data: AppUninstallInput):
@@ -111,8 +110,7 @@ async def uninstall_app(data: AppUninstallInput):
 
     manage_app_task.delay(app_id, InstallMode.OFF, data.keep_data)  # type: ignore
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(_watcher(app_id, "uninstall"))
+    asyncio.create_task(_watcher(app_id, "uninstall"))
 
 
 async def _watcher(app_id: AppId, action: str):

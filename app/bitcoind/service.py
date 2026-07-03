@@ -192,8 +192,7 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
 
 @logger.catch(exclude=(HTTPException,))
 async def register_bitcoin_zmq_sub():
-    loop = asyncio.get_event_loop()
-    loop.create_task(handle_block_sub_redis())
+    asyncio.create_task(handle_block_sub_redis())
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -221,5 +220,4 @@ async def _handle_gather_bitcoin_status():
 
 @logger.catch(exclude=(HTTPException,))
 async def register_bitcoin_status_gatherer():
-    loop = asyncio.get_event_loop()
-    loop.create_task(_handle_gather_bitcoin_status())
+    asyncio.create_task(_handle_gather_bitcoin_status())

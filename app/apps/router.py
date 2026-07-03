@@ -18,8 +18,7 @@ router = APIRouter(prefix=f"/{_PREFIX}", tags=["Apps"])
 async def register_app_status_update_handlers():
     # This handler watches for messages from the update app cache celery task
     # it is also responsible for notifying clients of the change
-    loop = asyncio.get_event_loop()
-    loop.create_task(watch_app_status_changes())
+    asyncio.create_task(watch_app_status_changes())
 
 
 @router.get(

@@ -202,10 +202,9 @@ async def register_lightning_listener():
 
         await ln.get_ln_info()
 
-        loop = asyncio.get_event_loop()
-        loop.create_task(_handle_info_listener())
-        loop.create_task(_handle_invoice_listener())
-        loop.create_task(_handle_forward_event_listener())
+        asyncio.create_task(_handle_info_listener())
+        asyncio.create_task(_handle_invoice_listener())
+        asyncio.create_task(_handle_forward_event_listener())
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
 
@@ -258,8 +257,7 @@ async def _handle_forward_event_listener():
             _fwd_successes.append(i.model_dump())
 
         if not _fwd_update_scheduled:
-            loop = asyncio.get_event_loop()
-            loop.create_task(_schedule_fwd_update())
+            asyncio.create_task(_schedule_fwd_update())
 
 
 _wallet_balance_update_scheduled = False
@@ -279,5 +277,4 @@ def _schedule_wallet_balance_update():
 
     global _wallet_balance_update_scheduled
     if not _wallet_balance_update_scheduled:
-        loop = asyncio.get_event_loop()
-        loop.create_task(_perform_update())
+        asyncio.create_task(_perform_update())

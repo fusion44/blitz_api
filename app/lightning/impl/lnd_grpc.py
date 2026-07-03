@@ -250,8 +250,7 @@ This will show more debug information.
 
         logger.info("Trying to connect to LND daemon ...")
 
-        loop = asyncio.get_event_loop()
-        task = loop.create_task(self._check_lnd_status(sleep_time=2))
+        task = asyncio.create_task(self._check_lnd_status(sleep_time=2))
 
         while not self._initialized:
             res = await self._init_queue.get()  # type: InitLnRepoUpdate
@@ -267,7 +266,7 @@ This will show more debug information.
                     # created the channel for us.
                     self._create_stubs()
 
-                task = loop.create_task(self._check_lnd_status(sleep_time=0.5))
+                task = asyncio.create_task(self._check_lnd_status(sleep_time=0.5))
             elif res.state == LnInitState.DONE:
                 self._initialized = True
                 if not task.cancelled():

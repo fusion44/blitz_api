@@ -8,20 +8,24 @@ from app.external.sse_starlette import EventSourceResponse, ServerSentEvent
 
 
 class SSEManager:
-    _setup_finished = False
     _num_connections = 0
     _connections = {}
     _sse_queue = asyncio.Queue()
+    _broadcast_task = None
 
-    def setup(self) -> None:
-        if self._setup_finished:
-            raise RuntimeError("SSEManager setup must not be called twice")
-
-        loop = asyncio.get_event_loop()
-        loop.create_task(self._broadcast_data_sse())
-        self._setup_finished = True
+    def _ensure_broadcast_task(self) -> None:
+        # Start the broadcast consumer lazily the first time it's needed from
+        # within a running loop. Doing this at import time relied on the
+        # deprecated asyncio.get_event_loop() and broke when the module was
+        # imported without a running loop (e.g. in a Celery worker).
+        if self._broadcast_task is not None:
+            return
+        self._broadcast_task = asyncio.get_running_loop().create_task(
+            self._broadcast_data_sse()
+        )
 
     def add_connection(self, request: Request) -> Tuple[EventSourceResponse, int]:
+        self._ensure_broadcast_task()
         q = asyncio.Queue()
         id = self._num_connections
         self._num_connections += 1
@@ -33,6 +37,7 @@ class SSEManager:
         await self._connections[id].put(data)
 
     async def broadcast_to_all(self, data: ServerSentEvent):
+        self._ensure_broadcast_task()
         await self._sse_queue.put(data)
 
     async def _subscribe(self, request: Request, id: int, q: asyncio.Queue):
