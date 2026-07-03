@@ -232,23 +232,20 @@ class LnNodeCLNjRPC(LightningNodeBase):
             logger.error("get_ln_info() returned None")
 
         tx = []
-        for invoice in res[0]:
+        for invoice in res[0] or []:
             i = GenericTx.from_invoice(invoice)
-            if successful_only and i.status == "succeeded":
-                tx.append(i)
+            if successful_only and i.status != TxStatus.SUCCEEDED:
                 continue
             tx.append(i)
 
-        for transaction in res[1]:
+        for transaction in res[1] or []:
             t = GenericTx.from_onchain_tx(transaction, res[3].block_height)
-            if successful_only and t.status == TxStatus.SUCCEEDED:
-                tx.append(t)
+            if successful_only and t.status != TxStatus.SUCCEEDED:
                 continue
-
             tx.append(t)
 
-        for pay in res[2]:
-            if pay is not Payment:
+        for pay in res[2] or []:
+            if not isinstance(pay, Payment):
                 logger.error("Payment is not a payment class.")
                 continue
 
@@ -260,10 +257,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
             p = GenericTx.from_payment(pay, comment)
 
-            if successful_only and p.status == "succeeded":
-                tx.append(p)
+            if successful_only and p.status != TxStatus.SUCCEEDED:
                 continue
-
             tx.append(p)
 
         def sortKey(e: GenericTx):
