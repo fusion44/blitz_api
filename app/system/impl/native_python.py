@@ -69,7 +69,7 @@ class NativePythonSystem(SystemBase):
         # return an empty connection info object for now
         return Ok(ConnectionInfo())
 
-    @logger.catch(exclude=(HTTPException,))
+    @logger.catch(exclude=(HTTPException,), reraise=True)
     async def login(self, i: LoginInput) -> Result[Dict[str, str], Report]:
         # https://github.com/fusion44/blitz_api/issues/255
         pw = config("BAPI_NATIVE_LOGIN_PASSWORD", cast=str)
@@ -108,11 +108,11 @@ class NativePythonSystem(SystemBase):
             )
         )
 
-    @logger.catch(exclude=(HTTPException,))
     async def change_password(self, type: str, old_password: str, new_password: str):
+        # no @logger.catch: NotImplementedError must propagate to the service
+        # layer (which turns it into a 501), not be swallowed into a None return
         raise NotImplementedError()
 
-    @logger.catch(exclude=(HTTPException,))
     async def get_debug_logs_raw(self) -> RawDebugLogData:
         raise NotImplementedError()
 
