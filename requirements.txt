@@ -139,7 +139,7 @@ pydantic-settings==2.9.1
     # via fastapi
 pygments==2.19.1
     # via rich
-pyjwt==2.10.1
+pyjwt==2.13.0
     # via blitz-api (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via celery
