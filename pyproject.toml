@@ -21,7 +21,7 @@ dependencies = [
     "async-timeout==5.0.1",
     "grpcio==1.76.0",
     "grpcio-tools==1.76.0",
-    "deepdiff==8.6.1",
+    "deepdiff==8.6.2",
     "loguru==0.7.3",
     "celery[redis]==5.6.2",
     # used by the `api` console script entry point (app/server.py)
