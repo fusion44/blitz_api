@@ -18,7 +18,6 @@ help:
 	@echo "To generate the requirements.txt file for pip type 'make update-requirements-file'"
 	@echo "To sync current changes to a blitz for testing, type 'make sync-to-blitz'.\n   ℹ️  Adjust connection values in scripts/push_to_blitz.sh"
 	@echo "To generate the client libraries type 'make generate-client-libs'"
-	@echo "To build the Docker regtest image type 'make docker-regtest-image'.\n   ℹ️  The image will be available to docker as 'blitz_api'"
 	@echo "To list all celery tasks type 'make celery-list-tasks'"
 	@echo "To manually trigger a celery task type 'make celery-run-task [TASK_NAME TASK_ARGS TASK_KWARGS]'"
 	@echo "------------------------------------"
@@ -53,9 +52,6 @@ sync-to-blitz:
 
 generate-client-libs:
 	uv run python gen_client_libs.py
-
-docker-regtest-image:
-	docker build -f Dockerfile.regtest -t blitz_api .
 
 remote-debugging-help:
 	bash scripts/remote_debugging.sh help
