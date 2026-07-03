@@ -9,7 +9,9 @@ from typing import Any, Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
 from loguru import logger
-from redis.asyncio import Redis, TimeoutError
+# NB: do not import redis's TimeoutError here — it would shadow the builtin
+# and asyncio.wait_for's builtin TimeoutError would never be caught below.
+from redis.asyncio import Redis
 
 from app.api.error_report.report import Report
 from app.api.models import ProcessResult
