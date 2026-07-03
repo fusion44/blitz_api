@@ -65,6 +65,10 @@ async def app_manage_task_impl(
         AppsServiceKeys.APP_MANAGE_CHANNEL_KEY, redis_url=redis_url
     )
     action = "installing" if mode == InstallMode.ON else "uninstalling"
+    # Only this task's own lock may be released, and only its own run may
+    # broadcast FINISHED. Otherwise a duplicate request (lock already held)
+    # would delete the running install's lock and stop its listener early.
+    lock_acquired = False
     try:
         message = await notifier.connect()
         match message:
@@ -119,6 +123,7 @@ async def app_manage_task_impl(
                 )
                 return
 
+        lock_acquired = True
         logger.info(f"App {action} lock acquired for {action}ing app {id}")
         apps_impl = Apps()
         res = (
@@ -185,29 +190,35 @@ async def app_manage_task_impl(
             case Err(report):
                 _log_notify_listeners_error(action, id, report)
     finally:
-        res = await release_update_lock(
-            key=AppsServiceKeys.APP_MANAGE_LOCK_KEY, redis=redis_client
-        )
-        match res:
-            case Ok(_):
-                logger.info(f"App {action} lock released.")
-            case Err(message):
-                logger.error(f"Failed to release app {action} lock: {message.format()}")
-                res = await notifier.send_message(
-                    key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
-                    contents=AppManageTaskMessage(
-                        id=id,
-                        mode=mode,
-                        state=AppManagementProcessState.FAILURE,
-                        message=f"Failed to release app {action} lock:"
-                        f" {message.frames[0].message}",
-                    ).model_dump_json(),
-                )
-                match res:
-                    case Err(report):
-                        _log_notify_listeners_error(action, id, report)
+        # Only release the lock and finish the run if this task actually
+        # acquired the lock; otherwise we'd interfere with the task that owns it.
+        if lock_acquired:
+            res = await release_update_lock(
+                key=AppsServiceKeys.APP_MANAGE_LOCK_KEY, redis=redis_client
+            )
+            match res:
+                case Ok(_):
+                    logger.info(f"App {action} lock released.")
+                case Err(message):
+                    logger.error(
+                        f"Failed to release app {action} lock: {message.format()}"
+                    )
+                    res = await notifier.send_message(
+                        key=AppsServiceKeys.APP_MANAGE_MESSAGE_KEY,
+                        contents=AppManageTaskMessage(
+                            id=id,
+                            mode=mode,
+                            state=AppManagementProcessState.FAILURE,
+                            message=f"Failed to release app {action} lock:"
+                            f" {message.frames[0].message}",
+                        ).model_dump_json(),
+                    )
+                    match res:
+                        case Err(report):
+                            _log_notify_listeners_error(action, id, report)
 
-        await _send_finish_message(id, mode, notifier)
+            await _send_finish_message(id, mode, notifier)
+
         if redis_client:
             await redis_client.close()
 
