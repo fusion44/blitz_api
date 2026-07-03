@@ -161,7 +161,7 @@ pyzmq==27.1.0
     # via blitz-api (pyproject.toml)
 redis==6.4.0
     # via kombu
-requests==2.32.5
+requests==2.33.0
     # via blitz-api (pyproject.toml)
 rich==15.0.0
     # via
