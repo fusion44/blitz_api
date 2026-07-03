@@ -20,6 +20,8 @@ _TEST_ENV_DEFAULTS = {
     "BAPI_BITCOIND_RPC_PW": "test",
     "BAPI_BITCOIND_ZMQ_BLOCK_RPC": "hashblock",
     "BAPI_BITCOIND_ZMQ_BLOCK_PORT": "28332",
+    # must be an existing directory for the raspiblitz apps impl to import
+    "BAPI_RB_SHELL_SCRIPT_PATH": "/tmp",
 }
 
 for _key, _value in _TEST_ENV_DEFAULTS.items():

@@ -253,10 +253,14 @@ class RaspiBlitzApps(AppsBase):
             yield result
 
     async def uninstall_app(self, input: AppUninstallInput) -> AppManageResult:
-        async for result in self._manage_app(input.app_id, InstallMode.OFF):
+        async for result in self._manage_app(
+            input.app_id, InstallMode.OFF, keep_data=input.keep_data
+        ):
             yield result
 
-    async def _manage_app(self, app_id: AppId, mode: InstallMode) -> AppManageResult:
+    async def _manage_app(
+        self, app_id: AppId, mode: InstallMode, keep_data: bool = True
+    ) -> AppManageResult:
         """
         Manages the installation or uninstallation process for a specified application.
 
@@ -315,16 +319,21 @@ class RaspiBlitzApps(AppsBase):
                     state=AppManagementProcessState.FAILURE,
                     message=ErrorMessage(
                         error_code=ApiErrors.APP_INVALID_FOR_PLATFORM,
-                        detail=f"{app_id} not available for Core Lightning nodes",
+                        detail=f"{app_id.value} not available for Core Lightning nodes",
                     ),
                 )
             )
             return
 
+        if installing:
+            params = "on"
+        else:
+            # the bonus scripts require an explicit keep/delete flag,
+            # otherwise they fall back to an interactive prompt
+            params = f"off {'--keep-data' if keep_data else '--delete-data'}"
+
         try:
-            async for data in self.run_bonus_script(
-                app_id, "on" if installing else "off"
-            ):
+            async for data in self.run_bonus_script(app_id, params):
                 if isinstance(data, str):
                     yield Ok(
                         AppManageTaskMessage(
@@ -377,7 +386,7 @@ class RaspiBlitzApps(AppsBase):
             return
 
         try:
-            log_file_name = f"/var/cache/raspiblitz/temp/install.{app_id}.log"
+            log_file_name = f"/var/cache/raspiblitz/temp/install.{app_id.value}.log"
             stdout_full = ""
             stderr_full = ""
             data = {}
