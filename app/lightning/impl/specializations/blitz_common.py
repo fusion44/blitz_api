@@ -1,4 +1,5 @@
 import asyncio
+import shlex
 
 from fastapi.exceptions import HTTPException
 from loguru import logger
@@ -19,8 +20,12 @@ async def blitz_cln_unlock(network: str, password: str) -> bool:
             status.HTTP_412_PRECONDITION_FAILED, detail="wallet already unlocked"
         )
 
+    # shell-quote the interpolated values (password is user-controlled) and
+    # mark the call sensitive so the plaintext password is never logged
     res = await exec_bash_command(
-        f"/home/admin/config.scripts/cl.hsmtool.sh unlock {network} {password}"
+        "/home/admin/config.scripts/cl.hsmtool.sh unlock "
+        f"{shlex.quote(network)} {shlex.quote(password)}",
+        sensitive=True,
     )
 
     match res:

@@ -40,14 +40,17 @@ from app.lightning.utils import alias_or_empty, generic_grpc_error_handler
 
 
 @logger.catch(exclude=(HTTPException,))
-async def _make_local_call(cmd: str):
+async def _make_local_call(*args: str):
     # FIXME: this is a hack because some of the commands are not exposed
     # in the CLN grpc interface yet.
 
+    # Pass the command as a discrete argv list (create_subprocess_exec, not
+    # _shell) so user-controlled arguments such as the bolt11 in decodepay
+    # can never be interpreted as shell syntax.
     testnet = config("BAPI_NETWORK") == "testnet"
-    cmd = f"lightning-cli -k {'--testnet ' if testnet else ''}{cmd}"
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
+    argv = ["lightning-cli", "-k", *(["--testnet"] if testnet else []), *args]
+    proc = await asyncio.create_subprocess_exec(
+        *argv,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -544,7 +547,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
         logger.trace(f"decode_pay_request(pay_req={pay_req})")
 
-        res = await _make_local_call(f"decodepay bolt11={pay_req}")
+        res = await _make_local_call("decodepay", f"bolt11={pay_req}")
 
         if not res:
             raise HTTPException(
