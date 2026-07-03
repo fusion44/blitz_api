@@ -45,7 +45,8 @@ coverage:
 	uv run python -m coverage html
 
 update-requirements-file:
-	uv pip compile --all-extras --universal --output-file requirements.txt pyproject.toml
+	# --upgrade: don't keep stale pins from the existing requirements.txt
+	uv pip compile --all-extras --universal --upgrade --output-file requirements.txt pyproject.toml
 
 sync-to-blitz:
 	bash scripts/sync_to_blitz.sh
