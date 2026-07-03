@@ -361,68 +361,77 @@ async def warmup_new_connections():
         return
 
     warmup_running = True
-    is_ready = api_startup_status.is_fully_initialized()
+    try:
+        is_ready = api_startup_status.is_fully_initialized()
 
-    if is_ready:
-        # when lightning is active
-        if node_type != "" and node_type != "none":
-            res = await get_full_client_warmup_data()
+        if is_ready:
+            # when lightning is active
+            if node_type != "" and node_type != "none":
+                res = await get_full_client_warmup_data()
+                for id in new_connections:
+                    await asyncio.gather(
+                        *[
+                            _handle(id, SSE.SYSTEM_INFO, res[0]),
+                            _handle(id, SSE.BTC_INFO, res[1]),
+                            _handle(id, SSE.LN_INFO, res[2]),
+                            _handle(id, SSE.LN_FEE_REVENUE, res[3]),
+                            _handle(id, SSE.WALLET_BALANCE, res[4]),
+                            _handle(id, SSE.APP_STATE_MESSAGE, res[5]),
+                            _handle(id, SSE.HARDWARE_INFO, res[6]),
+                        ]
+                    )
+
+            # when its bitcoin only
+            else:
+                res = await get_full_client_warmup_data_bitcoinonly()
+                for id in new_connections:
+                    await asyncio.gather(
+                        *[
+                            _handle(id, SSE.SYSTEM_INFO, res[0]),
+                            _handle(id, SSE.BTC_INFO, res[1]),
+                            _handle(id, SSE.APP_STATE_MESSAGE, res[2]),
+                            _handle(id, SSE.HARDWARE_INFO, res[3]),
+                        ]
+                    )
+
+            new_connections.clear()
+            return
+
+        if (
+            api_startup_status.bitcoin == StartupState.DONE
+            and api_startup_status.lightning != StartupState.DONE
+        ):
+            res = await get_bitcoin_client_warmup_data()
             for id in new_connections:
                 await asyncio.gather(
                     *[
-                        _handle(id, SSE.SYSTEM_INFO, res[0]),
-                        _handle(id, SSE.BTC_INFO, res[1]),
-                        _handle(id, SSE.LN_INFO, res[2]),
-                        _handle(id, SSE.LN_FEE_REVENUE, res[3]),
-                        _handle(id, SSE.WALLET_BALANCE, res[4]),
-                        _handle(id, SSE.APP_STATE_MESSAGE, res[5]),
-                        _handle(id, SSE.HARDWARE_INFO, res[6]),
+                        _handle(id, SSE.BTC_INFO, res[0]),
+                        _handle(id, SSE.HARDWARE_INFO, res[1]),
                     ]
                 )
 
-        # when its bitcoin only
-        else:
-            res = await get_full_client_warmup_data_bitcoinonly()
+            # don't clear new_connections,
+            # we'll try again later when api is initialized
+
+        if (
+            api_startup_status.bitcoin != StartupState.DONE
+            and api_startup_status.lightning != StartupState.DONE
+        ):
+            # send only the most minimal available data without
+            # Bitcoin Core and Lightning running
+            res = await get_hardware_info()
             for id in new_connections:
-                await asyncio.gather(
-                    *[
-                        _handle(id, SSE.SYSTEM_INFO, res[0]),
-                        _handle(id, SSE.BTC_INFO, res[1]),
-                        _handle(id, SSE.INSTALLED_APP_STATUS, res[2]),
-                        _handle(id, SSE.HARDWARE_INFO, res[3]),
-                    ]
-                )
+                await _send_sse_event(id, SSE.HARDWARE_INFO, res)
 
-        new_connections.clear()
+            # don't clear new_connections,
+            # we'll try again later when api is initialized
 
-    if (
-        api_startup_status.bitcoin == StartupState.DONE
-        and api_startup_status.lightning != StartupState.DONE
-    ):
-        res = await get_bitcoin_client_warmup_data()
-        for id in new_connections:
-            await asyncio.gather(
-                *[
-                    _handle(id, SSE.BTC_INFO, res[0]),
-                    _handle(id, SSE.HARDWARE_INFO, res[1]),
-                ]
-            )
-
-        # don't clear new_connections, we'll try again later when api is initialized
-
-    if (
-        api_startup_status.bitcoin != StartupState.DONE
-        and api_startup_status.lightning != StartupState.DONE
-    ):
-        # send only the most minimal available data without
-        # Bitcoin Core and Lightning running
-        res = await get_hardware_info()
-        for id in new_connections:
-            await _send_sse_event(id, SSE.HARDWARE_INFO, res)
-
-        # don't clear new_connections, we'll try again later when api is initialized
-
-    warmup_running = False
+    except Exception as e:
+        # never let an error escape: this runs as a fire-and-forget task and
+        # a stuck warmup_running flag would starve all future SSE clients
+        logger.exception(f"Error during warmup of new SSE connections: {e}")
+    finally:
+        warmup_running = False
 
 
 register_handlers_finished = False

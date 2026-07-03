@@ -34,7 +34,6 @@ async def _get_app_status_data() -> Result[
     """Transform the result of get_app_status."""
     try:
         result = await app_cache.get_cached_app_status()
-        cached_status_raw = None
         match result:
             case Ok(cached_status_data) if cached_status_data:
                 return Ok(
@@ -52,13 +51,15 @@ async def _get_app_status_data() -> Result[
                 # TODO: return error message
                 logger.error(f"Failed to fetch app status: {report.format_verbose()}")
 
+        # The cache read failed; check whether an update is already running
+        # before triggering a new one
         result = await get_lock_status(AppsServiceKeys.APP_STATUS_LOCK_KEY)
         match result:
             case Ok(True):
                 logger.info(
                     "App status update lock exists. Assuming update is in progress."
                 )
-            case Ok(False) if not cached_status_raw:
+            case Ok(False):
                 logger.info(
                     "App status cache is missing and no update lock exists. "
                     "Triggering update task."
@@ -69,10 +70,33 @@ async def _get_app_status_data() -> Result[
 
     except Exception as e:
         return Err(
-            Report(f"Error during app status cache handling for new client {id}: {e}")
+            Report(f"Error during app status cache handling for new client: {e}")
         )
 
     return Ok(None)
+
+
+def _convert_warmup_exceptions(res: List) -> List:
+    """Convert exceptions from a gather(..., return_exceptions=True) call so
+    that a single failing data source doesn't wipe out the whole data set."""
+    for i, r in enumerate(res):
+        if isinstance(r, HTTPException):
+            if r.status_code == status.HTTP_501_NOT_IMPLEMENTED:
+                logger.trace(f"Not implemented Error in warmup data {i}: {r.detail}")
+            # TODO: find a better way to handle this, client receives an error but
+            # disguised as a valid response. For example:
+            # event: app_state_update_message
+            # data: {
+            #   "status_code": 501,
+            #   "detail": "Not available in native python mode.",
+            #   "headers": null
+            # }
+            res[i] = r
+        elif isinstance(r, Exception):
+            logger.error(f"Error in warmup data {i}: {r}")
+            res[i] = HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return res
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -92,24 +116,7 @@ async def get_full_client_warmup_data() -> List:
         return_exceptions=True,
     )
 
-    for i, r in enumerate(res):
-        if isinstance(r, HTTPException):
-            if r.status_code == status.HTTP_501_NOT_IMPLEMENTED:
-                logger.trace(f"Not implemented Error in warmup data {i}: {r.detail}")
-            # TODO: find a better way to handle this, client receives an error but
-            # disguised as a valid response. For example:
-            # event: installed_app_status
-            # data: {
-            #   "status_code": 501,
-            #   "detail": "Not available in native python mode.",
-            #   "headers": null
-            # }
-            res[i] = r
-        elif isinstance(r, Exception):
-            logger.error(f"Error in warmup data {i}: {r}")
-            res[i] = HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    return [*res]
+    return [*_convert_warmup_exceptions(res)]
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -122,6 +129,7 @@ async def get_full_client_warmup_data_bitcoinonly() -> List:
             get_btc_info(),
             _get_app_status_data(),
             get_hardware_info(),
-        ]
+        ],
+        return_exceptions=True,
     )
-    return [*res]
+    return [*_convert_warmup_exceptions(res)]

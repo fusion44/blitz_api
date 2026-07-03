@@ -327,7 +327,6 @@ class SSE:
     HARDWARE_INFO = "hardware_info"
 
     INSTALL_APP = "install"
-    INSTALLED_APP_STATUS = "installed_app_status"
     APP_MANAGE_MESSAGE = "app_manage_message"
     APP_STATE_MESSAGE = "app_state_update_message"
 
