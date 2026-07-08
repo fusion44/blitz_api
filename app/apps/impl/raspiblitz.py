@@ -565,14 +565,17 @@ async def _do_electrs_status_advanced() -> Result[AppStatus, Report]:
         if data.get("installed", "0") == "0":
             s.installed = False
             return Ok(s)
+        s.installed = True
 
         if data.get("configured", "0") == "0":
             s.configured = False
             return Ok(s)
+        s.configured = True
 
         if data.get("serviceRunning", "0") == "0":
             s.status = AppOnlineStatus.OFFLINE
             return Ok(s)
+        s.status = AppOnlineStatus.ONLINE
 
         if "initialSynced" not in data:
             return Err(
