@@ -162,6 +162,11 @@ async def handle_block_sub(request: Request, verbosity: int = 1) -> str:
         hash = binascii.hexlify(body).decode("utf-8")
         r = await bitcoin_rpc_async("getblock", [hash, verbosity])
 
+        # strict JSON-RPC 2.0: an errored reply has no "result" key
+        if "result" not in r or r.get("error") is not None:
+            logger.error(f"getblock failed, skipping block: {r.get('error')}")
+            continue
+
         yield json.dumps(r["result"])
 
 
@@ -180,6 +185,11 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
             hash = binascii.hexlify(body).decode("utf-8")
         elif bitcoin_config.zmq_block_rpc == BlockRpcFunc.RAWBLOCK:
             r1 = await bitcoin_rpc_async("getbestblockhash", [])
+            if "result" not in r1 or r1.get("error") is not None:
+                logger.error(
+                    f"getbestblockhash failed, skipping block: {r1.get('error')}"
+                )
+                continue
             hash = r1["result"]
         else:
             raise NotImplementedError(
@@ -187,6 +197,11 @@ async def handle_block_sub_redis(verbosity: int = 1) -> str:
             )
 
         r = await bitcoin_rpc_async("getblock", [hash, verbosity])
+        # strict JSON-RPC 2.0: an errored reply has no "result" key
+        if "result" not in r or r.get("error") is not None:
+            logger.error(f"getblock failed, skipping block: {r.get('error')}")
+            continue
+
         await broadcast_sse_msg(SSE.BTC_NEW_BLOC, r["result"])
 
 
