@@ -55,6 +55,20 @@ GET_PASSWORD_CHECK_SCRIPT = os.path.join(
 os.environ["TERM"] = "xterm"
 
 
+def _safe_int(value: str, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: str, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 class RaspiBlitzSystem(SystemBase):
     def __init__(self) -> None:
         self._check_shell_scripts_status()
@@ -375,36 +389,41 @@ class RaspiBlitzSystem(SystemBase):
     async def get_hardware_info(self) -> map:
         info = {}
 
-        loads = (await redis_get("system_cpu_load")).split(",")
-        iloads = []
-        total = 0
-        for load in loads:
-            value = float(load)
-            total += value
-            iloads.append(value)
-        info["cpu_overall_percent"] = round(total / len(loads), 2)
+        # On VM setups (e.g. Proxmox) the RaspiBlitz monitor scripts may not
+        # populate these keys, so redis returns empty strings. Fall back to
+        # zero values instead of crashing the hardware-info gatherer.
+        raw_load = await redis_get("system_cpu_load")
+        loads = raw_load.split(",") if raw_load else []
+        iloads = [_safe_float(load) for load in loads]
+        info["cpu_overall_percent"] = (
+            round(sum(iloads) / len(iloads), 2) if iloads else 0
+        )
         info["cpu_per_cpu_percent"] = iloads
 
-        info["vram_total_bytes"] = int(await redis_get("system_ram_mb")) * 1000 * 1000
+        info["vram_total_bytes"] = (
+            _safe_int(await redis_get("system_ram_mb")) * 1000 * 1000
+        )
 
         info["vram_available_bytes"] = (
-            int(await redis_get("system_ram_available_mb")) * 1000 * 1000
+            _safe_int(await redis_get("system_ram_available_mb")) * 1000 * 1000
         )
 
         info["vram_used_bytes"] = (
             info["vram_total_bytes"] - info["vram_available_bytes"]
         )
-        info["vram_usage_percent"] = round(
-            (100 / info["vram_total_bytes"]) * info["vram_used_bytes"], 2
+        info["vram_usage_percent"] = (
+            round((100 / info["vram_total_bytes"]) * info["vram_used_bytes"], 2)
+            if info["vram_total_bytes"]
+            else 0
         )
 
         info["temperatures_celsius"] = {
-            "system_temp": float(await redis_get("system_temp_celsius")),
+            "system_temp": _safe_float(await redis_get("system_temp_celsius")),
             "coretemp": [],
         }
 
         now = time.time()
-        boot = float(await redis_get("system_up"))
+        boot = _safe_float(await redis_get("system_up"))
         info["boot_time_timestamp"] = now - boot
 
         info["networks"] = {

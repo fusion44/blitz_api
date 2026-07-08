@@ -134,10 +134,15 @@ async def get_debug_logs_raw() -> RawDebugLogData:
 async def _handle_gather_hardware_info():
     last_info = {}
     while True:
-        info = await get_hardware_info()
-        if last_info != info:
-            await broadcast_sse_msg(SSE.HARDWARE_INFO, info)
-            last_info = info
+        try:
+            info = await get_hardware_info()
+            if last_info != info:
+                await broadcast_sse_msg(SSE.HARDWARE_INFO, info)
+                last_info = info
+        except Exception as e:
+            # never let a single failure kill the gatherer task, otherwise
+            # hardware SSE updates would stop until the API is restarted
+            logger.error(f"Error gathering hardware info: {e}")
 
         await asyncio.sleep(HW_INFO_YIELD_TIME)
 
