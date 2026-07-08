@@ -90,10 +90,43 @@ async def bitcoin_rpc_async(method: str, params: list = []) -> coroutine:
         }
 
 
-async def _process_response(resp: aiohttp.ClientResponse):
-    if resp.status == status.HTTP_200_OK:
-        return await resp.json()
+def _classify_rpc_error(message: str, fallback_status: int, reason: str) -> dict:
+    """Map a Bitcoin Core JSON-RPC error message to an {error, status} dict."""
+    if (
+        "Loading block index" in message
+        or "Verifying blocks" in message
+        or "Starting network threads" in message
+    ):
+        return {
+            "error": (
+                "Initializing Bitcoin Core (loading, verifying "
+                "blocks or starting network threads etc)"
+            ),
+            "status": status.HTTP_425_TOO_EARLY,
+        }
+    if "No such mempool or blockchain transaction." in message:
+        return {
+            "error": "No such mempool or blockchain transaction.",
+            "status": status.HTTP_404_NOT_FOUND,
+        }
+    if "parameter 1 must be of length 64" in message:
+        return {
+            "error": message,
+            "status": status.HTTP_400_BAD_REQUEST,
+        }
+    if "Use -txindex" in message:
+        return {
+            "error": "-txindex option for Bitcoin Core not enabled",
+            "status": status.HTTP_400_BAD_REQUEST,
+        }
 
+    return {
+        "error": f"Unknown answer from Bitcoin Core. Reason: {reason}",
+        "status": fallback_status,
+    }
+
+
+async def _process_response(resp: aiohttp.ClientResponse):
     if resp.status == status.HTTP_401_UNAUTHORIZED:
         return {
             "error": (
@@ -112,39 +145,25 @@ async def _process_response(resp: aiohttp.ClientResponse):
             "status": status.HTTP_403_FORBIDDEN,
         }
 
-    e = await resp.json()
-    m = e["error"]["message"]
+    body = await resp.json()
 
-    if e["error"]:
-        if (
-            "Loading block index" in m
-            or "Verifying blocks" in m
-            or "Starting network threads" in m
-        ):
-            return {
-                "error": (
-                    "Initializing Bitcoin Core (loading, verifying "
-                    "blocks or starting network threads etc)"
-                ),
-                "status": status.HTTP_425_TOO_EARLY,
-            }
-        if "No such mempool or blockchain transaction." in m:
-            return {
-                "error": "No such mempool or blockchain transaction.",
-                "status": status.HTTP_404_NOT_FOUND,
-            }
-        if "parameter 1 must be of length 64" in m:
-            return {
-                "error": m,
-                "status": status.HTTP_400_BAD_REQUEST,
-            }
-        if "Use -txindex" in m:
-            return {
-                "error": "-txindex option for Bitcoin Core not enabled",
-                "status": status.HTTP_400_BAD_REQUEST,
-            }
+    # Bitcoin Core may return a JSON-RPC error either with a non-200 HTTP status
+    # or, during warmup (e.g. code -28 "Loading block index"), with HTTP 200.
+    # Normalize any JSON-RPC error to an {error, status} dict so callers can rely
+    # on a "status" key being present (previously a 200 + error body was passed
+    # through unchanged and crashed callers with KeyError: 'status').
+    rpc_error = body.get("error") if isinstance(body, dict) else None
+    if rpc_error:
+        message = (
+            rpc_error.get("message", "")
+            if isinstance(rpc_error, dict)
+            else str(rpc_error)
+        )
+        fallback_status = (
+            resp.status
+            if resp.status != status.HTTP_200_OK
+            else status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        return _classify_rpc_error(message, fallback_status, resp.reason)
 
-    return {
-        "error": f"Unknown answer from Bitcoin Core. Reason: {resp.reason}",
-        "status": resp.status,
-    }
+    return body
