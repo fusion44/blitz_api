@@ -179,10 +179,20 @@ class LnNodeCLNgRPCBlitz(LnNodeCLNgRPC):
             yield i
 
     async def channel_open(
-        self, local_funding_amount: int, node_URI: str, target_confs: int
+        self,
+        local_funding_amount: int,
+        node_URI: str,
+        target_confs: int,
+        push_amount_sat: int,
     ) -> str:
         self._check_if_locked()
-        return await super().channel_open(local_funding_amount, node_URI, target_confs)
+
+        return await super().channel_open(
+            local_funding_amount,
+            node_URI,
+            target_confs,
+            push_amount_sat,
+        )
 
     async def peer_resolve_alias(self, node_pub: str) -> str:
         self._check_if_locked()

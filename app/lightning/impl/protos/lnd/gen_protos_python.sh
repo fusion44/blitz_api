@@ -3,6 +3,8 @@
 # clone lnd repo
 # cd into lnd/lnrpc
 # git clone https://github.com/googleapis/googleapis.git
+# poetry shell
+# bash gen_protos_python.sh
 
 set -e
 
