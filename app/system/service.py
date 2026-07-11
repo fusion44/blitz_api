@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, Optional
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, status
 from loguru import logger
 
 from app.api.config import config
@@ -111,15 +111,6 @@ async def shutdown(reboot: bool) -> bool:
         raise
     except NotImplementedError as r:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
-
-
-async def subscribe_hardware_info(request: Request):
-    while True:
-        if await request.is_disconnected():
-            # stop if client disconnects
-            break
-        yield await get_hardware_info()
-        await asyncio.sleep(HW_INFO_YIELD_TIME)
 
 
 async def get_debug_logs_raw() -> RawDebugLogData:

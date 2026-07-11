@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends, Query
 
 from app.auth.auth_bearer import JWTBearer
-from app.bitcoind.docs import blocks_sub_doc, estimate_fee_mode_desc
+from app.bitcoind.docs import estimate_fee_mode_desc
 from app.bitcoind.models import (
     BlockchainInfo,
     BtcInfo,
@@ -16,10 +16,8 @@ from app.bitcoind.service import (
     get_btc_info,
     get_network_info,
     get_raw_transaction,
-    handle_block_sub,
 )
 from app.bitcoind.utils import bitcoin_rpc
-from app.external.sse_starlette import EventSourceResponse
 
 _PREFIX = "bitcoin"
 
@@ -135,15 +133,3 @@ async def get_raw_transaction_path(
     ),
 ):
     return await get_raw_transaction(txid)
-
-
-@router.get(
-    "/block-sub",
-    name=f"{_PREFIX}.block-sub",
-    summary="Subscribe to incoming blocks.",
-    description=blocks_sub_doc,
-    response_description="A JSON object with information about the new block.",
-    dependencies=[Depends(JWTBearer())],
-)
-async def zmq_sub(request: Request, verbosity: int = 1):
-    return EventSourceResponse(handle_block_sub(request, verbosity))

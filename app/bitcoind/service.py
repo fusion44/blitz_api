@@ -1,11 +1,9 @@
 import asyncio
 import binascii
-import json
 
 import zmq
 import zmq.asyncio
 from aiohttp import client_exceptions
-from fastapi import Request
 from fastapi.exceptions import HTTPException
 from loguru import logger
 from starlette import status
@@ -143,31 +141,6 @@ async def get_btc_info() -> BtcInfo:
         )
 
     return BtcInfo.from_rpc(binfo, ninfo)
-
-
-@logger.catch(exclude=(HTTPException,))
-async def handle_block_sub(request: Request, verbosity: int = 1) -> str:
-    ctx = zmq.asyncio.Context()
-    zmq_socket = ctx.socket(zmq.SUB)
-    zmq_socket.setsockopt(zmq.RCVHWM, 0)
-    zmq_socket.setsockopt_string(zmq.SUBSCRIBE, "hashblock")
-    zmq_socket.connect(bitcoin_config.zmq_url)
-
-    while True:
-        if await request.is_disconnected():
-            ctx.destroy()
-            break
-
-        _, body, _ = await zmq_socket.recv_multipart()
-        hash = binascii.hexlify(body).decode("utf-8")
-        r = await bitcoin_rpc_async("getblock", [hash, verbosity])
-
-        # strict JSON-RPC 2.0: an errored reply has no "result" key
-        if "result" not in r or r.get("error") is not None:
-            logger.error(f"getblock failed, skipping block: {r.get('error')}")
-            continue
-
-        yield json.dumps(r["result"])
 
 
 @logger.catch(exclude=(HTTPException,))

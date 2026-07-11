@@ -1,10 +1,9 @@
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.params import Depends, Query
 
 from app.api.utils import Event
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
-from app.external.sse_starlette import EventSourceResponse
 from app.system.docs import (
     get_debug_logs_raw_desc,
     get_debug_logs_raw_resp_desc,
@@ -20,7 +19,6 @@ from app.system.models import (
     SystemInfo,
 )
 from app.system.service import (
-    HW_INFO_YIELD_TIME,
     change_password,
     get_connection_info,
     get_debug_logs_raw,
@@ -28,7 +26,6 @@ from app.system.service import (
     get_system_info,
     login,
     shutdown,
-    subscribe_hardware_info,
     system_health,
 )
 
@@ -135,21 +132,6 @@ async def connection_info():
 )
 async def get_debug_logs_raw_route() -> RawDebugLogData:
     return await get_debug_logs_raw()
-
-
-@router.get(
-    "/hardware-info-sub",
-    name=f"{_PREFIX}.hardware-info-sub",
-    summary="Subscribe to hardware status information.",
-    response_description=(
-        "Yields a JSON string with hardware information "
-        f"every {HW_INFO_YIELD_TIME} seconds\n"
-    )
-    + get_hw_info_json,
-    dependencies=[Depends(JWTBearer())],
-)
-async def hw_info_sub(request: Request):
-    return EventSourceResponse(subscribe_hardware_info(request))
 
 
 @router.get(
