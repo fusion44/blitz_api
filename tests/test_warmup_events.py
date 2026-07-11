@@ -7,7 +7,7 @@ name the WebUI does not listen to.
 """
 
 from app.api.models import ApiStartupStatus, StartupState
-from app.api.utils import SSE
+from app.api.utils import Event
 from app.apps.constants import AppManagementProcessState
 from app.apps.models import AppStatusQueryResult, AppStatusUpdateTaskMessage
 from app.external.result_type.src.result.result import Ok
@@ -37,7 +37,7 @@ def _patch_common(monkeypatch, sent, *, node_type: str, lightning: StartupState)
         "api_startup_status",
         ApiStartupStatus(bitcoin=StartupState.DONE, lightning=lightning),
     )
-    monkeypatch.setattr(main, "_send_sse_event", fake_send)
+    monkeypatch.setattr(main, "_send_ws_event", fake_send)
     monkeypatch.setattr(
         main, "get_bitcoin_client_warmup_data", fake_bitcoin_warmup_data
     )
@@ -46,7 +46,7 @@ def _patch_common(monkeypatch, sent, *, node_type: str, lightning: StartupState)
 
 
 async def test_bitcoinonly_warmup_sends_app_status_as_app_state_message(monkeypatch):
-    """The WebUI only listens for SSE.APP_STATE_MESSAGE to populate the Apps
+    """The WebUI only listens for Event.APP_STATE_MESSAGE to populate the Apps
     tab. In bitcoin-only mode the warmup app status must be sent under that
     event, exactly like in lightning mode."""
     sent = []
@@ -69,8 +69,8 @@ async def test_bitcoinonly_warmup_sends_app_status_as_app_state_message(monkeypa
     await main.warmup_new_connections()
 
     events = [event for (_, event, _) in sent]
-    assert SSE.APP_STATE_MESSAGE in events, (
-        f"expected app status under event '{SSE.APP_STATE_MESSAGE}', "
+    assert Event.APP_STATE_MESSAGE in events, (
+        f"expected app status under event '{Event.APP_STATE_MESSAGE}', "
         f"got events: {events}"
     )
 

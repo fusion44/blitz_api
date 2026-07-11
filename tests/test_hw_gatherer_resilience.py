@@ -33,7 +33,7 @@ async def test_gatherer_survives_get_hardware_info_error(monkeypatch):
             raise asyncio.CancelledError()
 
     monkeypatch.setattr(service, "get_hardware_info", flaky_hardware_info)
-    monkeypatch.setattr(service, "broadcast_sse_msg", fake_broadcast)
+    monkeypatch.setattr(service, "broadcast_msg", fake_broadcast)
     monkeypatch.setattr(service.asyncio, "sleep", fake_sleep)
 
     with pytest.raises(asyncio.CancelledError):
