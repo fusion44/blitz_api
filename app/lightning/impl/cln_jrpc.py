@@ -38,7 +38,7 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
-from app.lightning.utils import alias_or_empty
+from app.lightning.utils import alias_or_empty, raise_for_pay_req_decode_error
 
 _WAIT_ANY_INVOICE_ID = 0
 _SOCKET_BUFFER_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
@@ -477,6 +477,8 @@ class LnNodeCLNjRPC(LightningNodeBase):
 
         m = res["error"]["message"]
         logger.error(m)
+
+        raise_for_pay_req_decode_error(m)
 
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,

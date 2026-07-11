@@ -36,7 +36,11 @@ from app.lightning.models import (
     TxStatus,
     WalletBalance,
 )
-from app.lightning.utils import alias_or_empty, generic_grpc_error_handler
+from app.lightning.utils import (
+    alias_or_empty,
+    generic_grpc_error_handler,
+    raise_for_pay_req_decode_error,
+)
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -563,11 +567,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         decoded = res[0].decode()
 
-        if "Invalid bolt11: Bad bech32 string" in decoded:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail="Invalid bolt11: Bad bech32 string",
-            )
+        raise_for_pay_req_decode_error(decoded)
 
         return PaymentRequest.from_cln_json(json.loads(decoded))
 

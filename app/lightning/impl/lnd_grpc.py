@@ -37,7 +37,7 @@ from app.lightning.models import (
     SendCoinsResponse,
     WalletBalance,
 )
-from app.lightning.utils import alias_or_empty
+from app.lightning.utils import alias_or_empty, raise_for_pay_req_decode_error
 
 
 @logger.catch(exclude=(HTTPException,))
@@ -530,17 +530,11 @@ This will show more debug information.
             return PaymentRequest.from_lnd_grpc(res)
         except grpc.aio._call.AioRpcError as error:
             _check_transient_ln_error(error)
-            if (
-                error.details() is not None
-                and error.details().find("checksum failed.") > -1
-            ):
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST, detail="Invalid payment request string"
-                )
-            else:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
-                )
+            details = error.details() or ""
+            raise_for_pay_req_decode_error(details)
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, detail=details
+            )
 
     @logger.catch(exclude=(HTTPException,))
     async def get_fee_revenue(self) -> FeeRevenue:
