@@ -41,13 +41,33 @@ from app.lightning.utils import alias_or_empty
 
 
 @logger.catch(exclude=(HTTPException,))
-def _check_if_locked(error):
-    logger.debug("logger._check_if_locked()")
+def _check_transient_ln_error(error):
+    """Map known transient LND gRPC errors to appropriate HTTP statuses.
 
-    if error.details() is not None and error.details().find("wallet locked") > -1:
+    Returns without raising for unknown errors, leaving the caller to turn
+    them into a 500.
+    """
+    logger.debug("logger._check_transient_ln_error()")
+
+    details = error.details()
+    if details is None:
+        return
+
+    if details.find("wallet locked") > -1:
         raise HTTPException(
             status.HTTP_423_LOCKED,
             detail="Wallet is locked. Unlock via /lightning/unlock-wallet",
+        )
+
+    if "the RPC server is in the process of starting up" in details:
+        # LND is up but its RPC server isn't ready yet; signal a retryable
+        # status instead of a generic 500 (blitz_api#247)
+        raise HTTPException(
+            status.HTTP_425_TOO_EARLY,
+            detail=(
+                "The Lightning RPC server is starting up and not yet ready. "
+                "Please try again shortly."
+            ),
         )
 
 
@@ -298,7 +318,7 @@ This will show more debug information.
 
             return WalletBalance.from_lnd_grpc(onchain, channel)
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -379,7 +399,7 @@ This will show more debug information.
 
             return tx[index_offset : index_offset + max_tx]
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -404,7 +424,7 @@ This will show more debug information.
             response = await self._lnd_stub.ListInvoices(req)
             return [Invoice.from_lnd_grpc(i) for i in response.invoices]
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -418,7 +438,7 @@ This will show more debug information.
             response = await self._lnd_stub.GetTransactions(req)
             return [OnChainTransaction.from_lnd_grpc(t) for t in response.transactions]
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -449,7 +469,7 @@ This will show more debug information.
             response = await self._lnd_stub.ListPayments(req)
             return [Payment.from_lnd_grpc(p) for p in response.payments]
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -495,7 +515,7 @@ This will show more debug information.
 
             return invoice
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -509,7 +529,7 @@ This will show more debug information.
             res = await self._lnd_stub.DecodePayReq(req)
             return PaymentRequest.from_lnd_grpc(res)
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             if (
                 error.details() is not None
                 and error.details().find("checksum failed.") > -1
@@ -540,7 +560,7 @@ This will show more debug information.
             response = await self._lnd_stub.NewAddress(req)
             return response.address
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -576,7 +596,7 @@ This will show more debug information.
             await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
             return r
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             details = error.details()
             if details and details.find("invalid bech32 string") > -1:
                 raise HTTPException(
@@ -623,7 +643,7 @@ This will show more debug information.
                 await broadcast_sse_msg(SSE.LN_PAYMENT_STATUS, p.model_dump())
             return p
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             if (
                 error.details() is not None
                 and error.details().find("invalid bech32 string") > -1
@@ -692,7 +712,7 @@ This will show more debug information.
             response = await self._lnd_stub.GetInfo(req)
             return LnInfo.from_lnd_grpc(self.get_implementation_name(), response)
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -771,7 +791,7 @@ This will show more debug information.
             async for r in self._lnd_stub.SubscribeInvoices(request):
                 yield Invoice.from_lnd_grpc(r)
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
@@ -811,7 +831,7 @@ This will show more debug information.
                     del _fwd_cache[e.incoming_htlc_id]
 
         except grpc.aio._call.AioRpcError as error:
-            _check_if_locked(error)
+            _check_transient_ln_error(error)
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error.details()
             )
