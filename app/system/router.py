@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.params import Depends, Query
 
-from app.api.utils import SSE
+from app.api.utils import Event
 from app.auth.auth_bearer import JWTBearer
 from app.auth.auth_handler import sign_jwt
 from app.external.sse_starlette import EventSourceResponse
@@ -172,11 +172,11 @@ async def get_system_health(
     name=f"{_PREFIX}.reboot",
     summary="Reboots the system",
     description=f"""Attempts to reboot the system.
-    Will send a `{SSE.SYSTEM_REBOOT_NOTICE}` SSE message immediately to
+    Will send a `{Event.SYSTEM_REBOOT_NOTICE}` SSE message immediately to
     all connected clients.
     """,
     response_description=f"""True if successful. False on failure.
-    A failure will also send an error message with id `{SSE.SYSTEM_REBOOT_ERROR}`
+    A failure will also send an error message with id `{Event.SYSTEM_REBOOT_ERROR}`
     to all connected clients.
     """,
     dependencies=[Depends(JWTBearer())],
@@ -190,11 +190,11 @@ async def reboot_system() -> bool:
     name=f"{_PREFIX}.shutdown",
     summary="Shuts the system down",
     description=f"""Attempts to shutdown the system.
-    Will send a `{SSE.SYSTEM_SHUTDOWN_NOTICE}` SSE message immediately to all
+    Will send a `{Event.SYSTEM_SHUTDOWN_NOTICE}` SSE message immediately to all
     connected clients.
     """,
     response_description=f"""True if successful. False on failure.
-    A failure will also send an error message with id {SSE.SYSTEM_SHUTDOWN_ERROR}
+    A failure will also send an error message with id {Event.SYSTEM_SHUTDOWN_ERROR}
     to all connected clients.
     """,
     dependencies=[Depends(JWTBearer())],
