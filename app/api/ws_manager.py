@@ -3,6 +3,7 @@ import json
 
 from fastapi.encoders import jsonable_encoder
 from loguru import logger
+from starlette.websockets import WebSocketDisconnect
 
 from app.auth.auth_bearer import JWTBearer
 
@@ -27,10 +28,15 @@ class WebSocketManager:
         except (asyncio.TimeoutError, TimeoutError):
             await websocket.close(code=4408)
             return None, False
+        except WebSocketDisconnect:
+            return None, False
 
         try:
             msg = json.loads(raw)
-            token = msg["token"] if msg.get("type") == "auth" else None
+            if not isinstance(msg, dict):
+                token = None
+            else:
+                token = msg["token"] if msg.get("type") == "auth" else None
         except (ValueError, TypeError, KeyError):
             token = None
 
