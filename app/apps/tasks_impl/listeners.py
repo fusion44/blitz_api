@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from app.api.channel import BaseChannelListener
 from app.api.config import config
-from app.api.utils import SSE, broadcast_sse_msg
+from app.api.utils import Event, broadcast_msg
 from app.apps.constants import AppsServiceKeys
 from app.apps.models import (
     AppManagementProcessState,
@@ -65,7 +65,7 @@ class AppManageListener(BaseChannelListener):
             return logger.error(f"Failed to parse app install message: {e}")
 
         logger.trace("Broadcasting app management message")
-        await broadcast_sse_msg(SSE.APP_MANAGE_MESSAGE, message.model_dump())
+        await broadcast_msg(Event.APP_MANAGE_MESSAGE, message.model_dump())
 
         if message.state == AppManagementProcessState.FINISHED:
             await self.stop()
@@ -110,7 +110,7 @@ class AppStatusUpdateListener(BaseChannelListener):
             return logger.error(f"Failed to parse app status update message: {e}")
 
         logger.trace("Broadcasting app management message")
-        await broadcast_sse_msg(SSE.APP_STATE_MESSAGE, message.model_dump())
+        await broadcast_msg(Event.APP_STATE_MESSAGE, message.model_dump())
 
         # Note: the app status listener will listen for the entire duration of the
         #       API running, so we don't need to stop it here

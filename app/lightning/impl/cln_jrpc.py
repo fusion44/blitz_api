@@ -10,7 +10,7 @@ from loguru import logger
 from starlette import status
 
 from app.api.config import config
-from app.api.utils import SSE, broadcast_sse_msg, next_push_id
+from app.api.utils import Event, broadcast_msg, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
 from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.cln_utils import (
@@ -530,7 +530,7 @@ class LnNodeCLNjRPC(LightningNodeBase):
         if "error" not in res:
             res = res["result"]
             r = SendCoinsResponse.from_cln_json(res, input)
-            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
+            await broadcast_msg(Event.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
 
             return r
 

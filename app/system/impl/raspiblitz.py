@@ -11,8 +11,8 @@ from app.api.config import config
 from app.api.constants import API_VERSION
 from app.api.error_report.report import Report
 from app.api.utils import (
-    SSE,
-    broadcast_sse_msg,
+    Event,
+    broadcast_msg,
     exec_bash_command,
     parse_key_value_text,
     redis_get,
@@ -133,10 +133,10 @@ class RaspiBlitzSystem(SystemBase):
         if proc.returncode > 0:
             err = stderr.decode()
             if reboot:
-                await broadcast_sse_msg(SSE.SYSTEM_REBOOT_ERROR, {"error_message": err})
+                await broadcast_msg(Event.SYSTEM_REBOOT_ERROR, {"error_message": err})
             else:
-                await broadcast_sse_msg(
-                    SSE.SYSTEM_SHUTDOWN_ERROR, {"error_message": err}
+                await broadcast_msg(
+                    Event.SYSTEM_SHUTDOWN_ERROR, {"error_message": err}
                 )
 
             return False

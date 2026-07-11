@@ -6,7 +6,7 @@ from loguru import logger
 
 from app.api.config import config
 from app.api.error_report.report import Frame
-from app.api.utils import SSE, broadcast_sse_msg
+from app.api.utils import Event, broadcast_msg
 from app.external.result_type.src.result.result import Err, Ok
 from app.system.models import (
     APIPlatform,
@@ -101,9 +101,9 @@ async def get_connection_info() -> ConnectionInfo:
 
 async def shutdown(reboot: bool) -> bool:
     if reboot:
-        await broadcast_sse_msg(SSE.SYSTEM_REBOOT_NOTICE, {"reboot": True})
+        await broadcast_msg(Event.SYSTEM_REBOOT_NOTICE, {"reboot": True})
     else:
-        await broadcast_sse_msg(SSE.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
+        await broadcast_msg(Event.SYSTEM_SHUTDOWN_NOTICE, {"shutdown": True})
 
     try:
         return await system.shutdown(reboot=reboot)
@@ -137,7 +137,7 @@ async def _handle_gather_hardware_info():
         try:
             info = await get_hardware_info()
             if last_info != info:
-                await broadcast_sse_msg(SSE.HARDWARE_INFO, info)
+                await broadcast_msg(Event.HARDWARE_INFO, info)
                 last_info = info
         except Exception as e:
             # never let a single failure kill the gatherer task, otherwise

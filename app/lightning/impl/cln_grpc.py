@@ -12,7 +12,7 @@ import app.lightning.impl.protos.cln.node_pb2 as ln
 import app.lightning.impl.protos.cln.node_pb2_grpc as clnrpc
 import app.lightning.impl.protos.cln.primitives_pb2 as lnp
 from app.api.config import config
-from app.api.utils import SSE, broadcast_sse_msg, config_get_hex_str, next_push_id
+from app.api.utils import Event, broadcast_msg, config_get_hex_str, next_push_id
 from app.bitcoind.utils import bitcoin_rpc_async
 from app.lightning.exceptions import NodeNotFoundError
 from app.lightning.impl.cln_utils import cln_classify_fee_revenue, parse_cln_msat
@@ -656,7 +656,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
             )
             response = await self._cln_stub.Withdraw(req)
             r = SendCoinsResponse.from_cln_grpc(response, input)
-            await broadcast_sse_msg(SSE.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
+            await broadcast_msg(Event.LN_ONCHAIN_PAYMENT_STATUS, r.model_dump())
             return r
         except grpc.aio._call.AioRpcError as error:
             details = error.details()

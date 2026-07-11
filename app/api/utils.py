@@ -1,13 +1,11 @@
 import array
 import asyncio
-import json
 import os
 import random
 import re
 import time
 from typing import Any, Dict, Optional
 
-from fastapi.encoders import jsonable_encoder
 from loguru import logger
 # NB: do not import redis's TimeoutError here — it would shadow the builtin
 # and asyncio.wait_for's builtin TimeoutError would never be caught below.
@@ -15,33 +13,14 @@ from redis.asyncio import Redis
 
 from app.api.error_report.report import Report
 from app.api.models import ProcessResult
-from app.api.sse_manager import SSEManager
+from app.api.ws_manager import ws_mgr
 from app.external.fastapi_plugins_redis import redis_plugin
 from app.external.result_type.src.result import Err, Ok, Result
-from app.external.sse_starlette import ServerSentEvent
-
-sse_mgr = SSEManager()
 
 
-def build_sse_event(event: str, json_data: Optional[Dict]):
-    return ServerSentEvent(
-        event=event,
-        data=json.dumps(jsonable_encoder(json_data)),
-    )
-
-
-async def broadcast_sse_msg(event: str, json_data: Optional[Dict]):
-    """Broadcasts a message to all connected clients
-
-    Parameters
-    ----------
-    event : str
-        The SSE event
-    data : dictionary, optional
-        The data to include
-    """
-
-    await sse_mgr.broadcast_to_all(build_sse_event(event, json_data))
+async def broadcast_msg(event: str, json_data: Optional[Dict]):
+    """Broadcast an event to all connected WebSocket clients."""
+    await ws_mgr.broadcast_to_all(event, json_data)
 
 
 async def redis_set(
@@ -318,7 +297,7 @@ async def redis_publish(
 # the WebUI
 
 
-class SSE:
+class Event:
     SYSTEM_INFO = "system_info"
     SYSTEM_SHUTDOWN_NOTICE = "system_shutdown_initiated"
     SYSTEM_SHUTDOWN_ERROR = "system_shutdown_error"
