@@ -46,7 +46,7 @@ from app.external.fastapi_plugins_redis import (
     redis_plugin,
     registered_configuration,
 )
-from app.external.result_type.src.result.result import Ok
+from app.external.result_type.src.result.result import Err, Ok
 from app.lightning.models import LnInitState
 from app.lightning.router import router as ln_router
 from app.lightning.service import initialize_ln_repo, register_lightning_listener
@@ -348,14 +348,24 @@ async def warmup_new_connections():
             case Ok(data) if not data:
                 logger.debug(f"No data to send for warmup event {event}")
                 return
-            case data:
+            case HTTPException():
+                # A data source failed while gathering warmup data. The
+                # underlying error is already logged in _convert_warmup_exceptions;
+                # forward a clear error so the client isn't left waiting for this
+                # event.
+                logger.info(f"Error while fetching warmup data for {event}: {res}")
+                return await _send_ws_event(id, event, {"error": f"{res}"})
+            case Err(report):
+                logger.error(
+                    f"Error while fetching warmup data for {event}: {report.format()}"
+                )
+                return await _send_ws_event(id, event, {"error": report.format()})
+            case _:
                 logger.warning(
                     f"Got unknown data type while handling warmup "
                     f"data {event}: {type(res)}"
                 )
-
-        logger.error(f"Error while fetching warmup_data for {event}: {res}")
-        return await _send_ws_event(id, event, {"error": f"{res}"})
+                return await _send_ws_event(id, event, {"error": f"{res}"})
 
     global new_connections
     if len(new_connections) == 0:
