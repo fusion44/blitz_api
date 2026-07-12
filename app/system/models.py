@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Optional
 
 from fastapi import Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic.types import constr
 
 from app.api.config import config
@@ -127,16 +127,18 @@ class ConnectionInfo(BaseModel):
 
 
 class SubSystemHealthInfo(BaseModel):
-    name: str = Query(..., description="Name of the subsystem")
-    health: bool = Query(..., description="Whether this system is healthy or not")
-    message: str = Query(
-        "", description="Optional message describing the systems health"
+    name: str = Field(..., description="Name of the subsystem")
+    healthy: bool = Field(..., description="Whether this subsystem is healthy or not")
+    message: str = Field(
+        "", description="Optional message describing the subsystem's health"
     )
 
 
 class SystemHealthInfo(BaseModel):
-    healthy: bool = Query(..., description="")
-    message: str = Query("", description="")
-    subsystems: list[SubSystemHealthInfo] = Query(
-        [], description="Health information of running subsystems"
+    healthy: bool = Field(
+        ..., description="Whether the API and all its subsystems are ready"
+    )
+    message: str = Field("", description="Set to a reason string when not healthy")
+    subsystems: list[SubSystemHealthInfo] = Field(
+        [], description="Per-subsystem health; populated only when verbose=true"
     )
