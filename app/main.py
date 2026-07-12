@@ -18,7 +18,8 @@ from starlette.websockets import WebSocketDisconnect
 from app.api.config import config as dconfig
 from app.api.error_report.report import Report
 from app.api.error_report.response import build_error_response
-from app.api.models import ApiErrors, ApiStartupStatus, StartupState
+from app.api.models import ApiErrors, StartupState
+from app.api.startup_status import api_startup_status
 from app.api.utils import Event, broadcast_msg
 from app.api.warmup import (
     get_bitcoin_client_warmup_data,
@@ -192,9 +193,6 @@ async def unhandled_e_handler(_: Request, exc: Exception):
         report=report.format_verbose(),
         trace=tb,
     )
-
-
-api_startup_status = ApiStartupStatus()
 
 
 async def _set_startup_status(
