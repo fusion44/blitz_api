@@ -10,13 +10,15 @@ from loguru import logger
 from pydantic import BaseModel
 from redis.asyncio import Redis
 from starlette import status
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse, RedirectResponse
+from starlette.responses import RedirectResponse
 from starlette.websockets import WebSocketDisconnect
 
 from app.api.config import config as dconfig
 from app.api.error_report.report import Report
-from app.api.models import ApiErrors, ApiStartupStatus, ErrorMessage, StartupState
+from app.api.error_report.response import build_error_response
+from app.api.models import ApiErrors, ApiStartupStatus, StartupState
 from app.api.utils import Event, broadcast_msg
 from app.api.warmup import (
     get_bitcoin_client_warmup_data,
@@ -136,39 +138,60 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(StarletteHTTPException)
 @app.exception_handler(HTTPException)
 async def http_e_handler(_: Request, e: HTTPException):
-    # Take the HTTPException and return it as a plain JSONResponse
-    # We do this because the default HTTPException won't have any other
-    # fields than detail
-    return JSONResponse(status_code=e.status_code, content=e.detail)
+    # Normalize every HTTPException into the ErrorMessage shape.
+    detail = e.detail
+    if isinstance(detail, dict) and "detail" in detail:
+        # already an ErrorMessage-shaped dict (e.g. the apps code)
+        return build_error_response(
+            e.status_code,
+            detail=str(detail.get("detail", "")),
+            error_code=str(detail.get("error_code", "") or ""),
+            report=detail.get("report"),
+            trace=detail.get("trace"),
+            report_sensitive=True,
+        )
+    return build_error_response(e.status_code, detail=str(detail))
 
 
 @app.exception_handler(RequestValidationError)
 async def valid_e_handler(_: Request, exc: RequestValidationError):
     errors = exc.errors()
     try:
-        return JSONResponse(
-            status_code=422,
-            content=ErrorMessage(
-                detail=errors[0]["msg"],
-                error_code=ApiErrors.INVALID_REQUEST_INPUT,
-                report=errors,
-            ).model_dump(),
+        return build_error_response(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=errors[0]["msg"],
+            error_code=ApiErrors.INVALID_REQUEST_INPUT,
+            report=errors,
+            report_sensitive=False,  # field-error array is non-sensitive
         )
     except Exception as e:
         tb = traceback.format_exception(e)
         logger.error(f"error processing RequestValidationError: {e}\n{tb}")
         report = Report("error while processing RequestValidationError", e).attach(exc)
-        return JSONResponse(
-            status_code=500,
-            content=ErrorMessage(
-                detail="error processing RequestValidationError",
-                error_code=ApiErrors.UNABLE_TO_PROCESS_ERROR,
-                report=report.format_verbose(),
-                trace=tb,
-            ).model_dump(),
+        return build_error_response(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="error processing RequestValidationError",
+            error_code=ApiErrors.UNABLE_TO_PROCESS_ERROR,
+            report=report.format_verbose(),
+            trace=tb,
         )
+
+
+@app.exception_handler(Exception)
+async def unhandled_e_handler(_: Request, exc: Exception):
+    tb = traceback.format_exception(exc)
+    logger.error(f"unhandled exception: {exc}\n{''.join(tb)}")
+    report = Report("unhandled exception", exc)
+    return build_error_response(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Internal server error",
+        error_code=ApiErrors.UNKNOWN,
+        report=report.format_verbose(),
+        trace=tb,
+    )
 
 
 api_startup_status = ApiStartupStatus()

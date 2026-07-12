@@ -5,14 +5,13 @@ from loguru import logger
 
 from app.api.config import config
 from app.api.error_report.report import Report
-from app.api.models import ApiErrors
+from app.api.models import ApiErrors, ErrorMessage
 from app.api.task_utils import get_lock_status
 from app.apps.cache import cache as app_cache
 from app.apps.constants import AppsServiceKeys, InstallMode
 from app.apps.models import AppId, AppStatus, AppStatusQueryResult, AppUninstallInput
 from app.apps.tasks import manage_app_task, update_app_state_task
 from app.external.result_type.src.result import Err, Ok
-from app.main import ErrorMessage
 from app.system.models import APIPlatform
 
 PLATFORM = config("BAPI_PLATFORM", default=APIPlatform.UNKNOWN)
@@ -159,5 +158,5 @@ def _handle_error(report: Report):
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=ErrorMessage(
                 detail=f"{report.format()}",
-            ),
+            ).model_dump(),
         )
