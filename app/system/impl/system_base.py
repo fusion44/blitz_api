@@ -7,7 +7,6 @@ from app.system.models import (
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
-    SystemHealthInfo,
     SystemInfo,
 )
 
@@ -15,10 +14,6 @@ from app.system.models import (
 class SystemBase:
     @abstractmethod
     async def get_system_info(self) -> SystemInfo:
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def get_system_health(self, verbose: bool) -> SystemHealthInfo:
         raise NotImplementedError()
 
     @abstractmethod

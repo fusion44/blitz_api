@@ -17,7 +17,6 @@ from app.system.models import (
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
-    SystemHealthInfo,
     SystemInfo,
 )
 
@@ -54,10 +53,6 @@ class NativePythonSystem(SystemBase):
             ssh_address=ssh_address,
             chain=lninfo.chains[0].network,
         )
-
-    @logger.catch(exclude=(HTTPException,))
-    async def get_system_health(self, verbose: bool) -> SystemHealthInfo:
-        return SystemHealthInfo(healthy=True)
 
     @logger.catch(exclude=(HTTPException,))
     async def shutdown(self, reboot: bool) -> bool:

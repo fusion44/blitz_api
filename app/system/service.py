@@ -6,8 +6,10 @@ from loguru import logger
 
 from app.api.config import config
 from app.api.error_report.report import Frame
+from app.api.startup_status import api_startup_status
 from app.api.utils import Event, broadcast_msg
 from app.external.result_type.src.result.result import Err, Ok
+from app.system.health import build_health_info
 from app.system.models import (
     APIPlatform,
     ConnectionInfo,
@@ -57,12 +59,8 @@ async def get_system_info() -> SystemInfo:
 
 
 async def system_health(verbose: bool) -> SystemHealthInfo:
-    try:
-        return await system.get_system_health(verbose)
-    except HTTPException:
-        raise
-    except NotImplementedError as r:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, detail=r.args[0])
+    # Readiness is platform independent: read the shared startup state directly.
+    return build_health_info(api_startup_status, verbose)
 
 
 async def get_hardware_info() -> map:

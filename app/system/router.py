@@ -137,16 +137,21 @@ async def get_debug_logs_raw_route() -> RawDebugLogData:
 @router.get(
     "/health",
     name=f"{_PREFIX}.health",
-    summary="Returns info about the systems health",
-    dependencies=[Depends(JWTBearer())],
+    summary="Returns info about the system's health",
+    response_model=SystemHealthInfo,
+    responses={503: {"description": "One or more subsystems are not ready"}},
 )
 async def get_system_health(
+    response: Response,
     verbose: bool = Query(
         False,
-        description="Returns info about each subsytem running on this node if true. Currently not implemented.",
+        description="If true, include a per-subsystem (api, bitcoind, lightning) health breakdown.",
     ),
 ) -> SystemHealthInfo:
-    return await system_health(verbose)
+    result = await system_health(verbose)
+    if not result.healthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return result
 
 
 @router.post(

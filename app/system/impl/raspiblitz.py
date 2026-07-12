@@ -27,7 +27,6 @@ from app.system.models import (
     ConnectionInfo,
     LoginInput,
     RawDebugLogData,
-    SystemHealthInfo,
     SystemInfo,
 )
 
@@ -104,9 +103,6 @@ class RaspiBlitzSystem(SystemBase):
             ssh_address=f"admin@{lan}",
             chain=data_chain,
         )
-
-    async def get_system_health(self, verbose: bool) -> SystemHealthInfo:
-        return SystemHealthInfo(healthy=True)
 
     async def shutdown(self, reboot: bool) -> bool:
         params = ""
