@@ -49,7 +49,7 @@ async def _make_local_call(*args: str):
     # in the CLN grpc interface yet.
 
     # Pass the command as a discrete argv list (create_subprocess_exec, not
-    # _shell) so user-controlled arguments such as the bolt11 in decodepay
+    # _shell) so user-controlled arguments such as the string in decode
     # can never be interpreted as shell syntax.
     testnet = config("BAPI_NETWORK") == "testnet"
     argv = ["lightning-cli", "-k", *(["--testnet"] if testnet else []), *args]
@@ -551,7 +551,7 @@ class LnNodeCLNgRPC(LightningNodeBase):
     async def decode_pay_request(self, pay_req: str) -> PaymentRequest:
         logger.trace(f"decode_pay_request(pay_req={pay_req})")
 
-        res = await _make_local_call("decodepay", f"bolt11={pay_req}")
+        res = await _make_local_call("decode", f"string={pay_req}")
 
         if not res:
             raise HTTPException(
@@ -569,7 +569,21 @@ class LnNodeCLNgRPC(LightningNodeBase):
 
         raise_for_pay_req_decode_error(decoded)
 
-        return PaymentRequest.from_cln_json(json.loads(decoded))
+        data = json.loads(decoded)
+        if not data.get("valid", True):
+            # unlike decodepay, decode reports recognized-but-invalid strings
+            # as a normal result with valid=false + warning_* fields instead
+            # of an RPC error
+            m = "; ".join(
+                str(data[k]) for k in sorted(data) if k.startswith("warning")
+            ) or "invalid payment request"
+            logger.error(m)
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not decode the payment request: {m}",
+            )
+
+        return PaymentRequest.from_cln_json(data)
 
     @logger.catch(exclude=(HTTPException,))
     async def get_fee_revenue(self) -> FeeRevenue:
