@@ -169,7 +169,7 @@ rich==15.0.0
     #   typer
 rich-toolkit==0.20.1
     # via fastapi-cli
-setuptools==82.0.1
+setuptools==83.0.0
     # via grpcio-tools
 shellingham==1.5.4
     # via typer
