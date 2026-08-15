@@ -36,6 +36,13 @@
   inherit (lib) mkOption mkIf mkEnableOption types literalExpression strings;
   inherit (config.services) bitcoind lnd;
 in {
+  imports = [
+    (lib.mkRemovedOptionModule ["services" name "localCookieAuth"] ''
+      Local cookie authentication has been removed: it wrote a live admin JWT
+      to disk for a client that no longer consumes it.
+    '')
+  ];
+
   options = {
     services.${name} = {
       enable = mkEnableOption "${name}";
@@ -132,15 +139,6 @@ in {
             '';
           };
         };
-      };
-
-      localCookieAuth = mkOption {
-        type = types.bool;
-        default = false;
-        description = ''
-          Whether to enable local cookie autentication.
-          This will create a file called `~/user/.cookie` with a JWT token
-        '';
       };
 
       logLevel = lib.mkOption {
@@ -330,7 +328,6 @@ in {
           echo "BAPI_JWT_SECRET=${jwtSecretScript}" >> .env
           echo "BAPI_JWT_ALGORITHM=${cfg.jwt.algorithm}" >> .env
           echo "BAPI_JWT_EXPIRY_TIME=${toString cfg.jwt.expiry}" >> .env
-          echo "BAPI_ENABLE_LOCAL_COOKIE_AUTH=${toString cfg.localCookieAuth}" >> .env
           echo "BAPI_LOG_LEVEL=${cfg.logLevel}" >> .env
           echo "BAPI_ROOT_PATH=${cfg.rootPath}" >> .env
           echo "BAPI_PLATFORM=native_python" >> .env

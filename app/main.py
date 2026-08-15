@@ -29,11 +29,6 @@ from app.api.warmup import (
 from app.api.ws_manager import ws_mgr
 from app.apps.router import register_app_status_update_handlers
 from app.apps.router import router as app_router
-from app.auth.auth_handler import (
-    handle_local_cookie,
-    register_cookie_updater,
-    remove_local_cookie,
-)
 from app.bitcoind.router import router as bitcoin_router
 from app.bitcoind.service import (
     initialize_bitcoin_repo,
@@ -100,12 +95,10 @@ async def lifespan(app: FastAPI):
     if not isinstance(redis, Redis):
         raise RuntimeError("Redis not initialized correctly, got a Sentinel")
 
-    register_cookie_updater()
     await broadcast_msg(Event.SYSTEM_STARTUP_INFO, api_startup_status.model_dump())
     btc_task = asyncio.create_task(_initialize_bitcoin())
     ln_task = asyncio.create_task(_initialize_lightning())
     await register_all_handlers()
-    handle_local_cookie()
 
     yield
 
@@ -113,7 +106,6 @@ async def lifespan(app: FastAPI):
     await redis_plugin.terminate()
     await btc_task
     await ln_task
-    remove_local_cookie()
 
 
 app = FastAPI(lifespan=lifespan)
