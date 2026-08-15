@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
@@ -78,9 +79,14 @@ async def setup_start_info():
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
+    # `state` is attacker-writable (the key-value store is unauthenticated), so
+    # also check setupPhase, which only becomes "done" after provisioning.
+    if setupPhase == "done":
+        logging.warning("/setup-start-info blocked: node setup is already finalized")
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
     if state != "waitsetup":
         logging.warning("/setup-start-info can only be called when nodes awaits setup")
-        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # get all the additional info needed to do setup dialog
     hddGotMigrationData = await redis_get("hddGotMigrationData")
@@ -100,7 +106,12 @@ async def setup_start_info():
 
 
 def write_text_file(filename: str, arrayOfLines):
-    with open(filename, "w", encoding="utf-8") as f:
+    # Holds passwords in cleartext, and provisioning appends the seed words to
+    # it, on a mode=0777 tmpfs. fchmod also covers a pre-existing file, whose
+    # permissions os.open() would otherwise leave alone.
+    fd = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write("\n".join(arrayOfLines))
 
 
@@ -123,9 +134,13 @@ async def setup_start_done(data: StartDoneData):
     state = await redis_get("state")
     hddGotBlockchain = await redis_get("hddBlocksBitcoin")
 
+    # Hands out an admin JWT, so it must never be reachable post-setup.
+    if setupPhase == "done":
+        logging.warning("/setup-start-done blocked: node setup is already finalized")
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
     if state != "waitsetup":
         logging.warning("/setup-start-done can only be called when nodes awaits setup")
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # check if a fresh setup is forced
     if data.forceFreshSetup:
@@ -136,7 +151,7 @@ async def setup_start_done(data: StartDoneData):
     if setupPhase == "setup":
         if name_valid(data.hostname) is False:
             logging.warning("hostname is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if (
             data.lightning != "lnd"
             and data.lightning != "cl"
@@ -145,16 +160,16 @@ async def setup_start_done(data: StartDoneData):
             logging.warning("lightning is not valid")
         if password_valid(data.passwordA) is False:
             logging.warning("passwordA is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordB) is False:
             logging.warning("passwordB is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if data.lightning != "none" and password_valid(data.passwordC) is False:
             logging.warning("passwordC is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if hddGotBlockchain != "1" and data.keepBlockchain:
             logging.warning("cannot keep blockchain that does not exists")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if data.keepBlockchain:
             formatHDD = 0
             cleanHDD = 1
@@ -185,7 +200,7 @@ async def setup_start_done(data: StartDoneData):
         logging.warning("check recovery data")
         if password_valid(data.passwordA) is False:
             logging.warning("passwordA is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(
             setupFilePath, ["setPasswordA=1", f"passwordA='{data.passwordA}'"]
         )
@@ -196,16 +211,16 @@ async def setup_start_done(data: StartDoneData):
         hddGotMigrationData = await redis_get("hddGotMigrationData")
         if hddGotMigrationData == "":
             logging.warning("hddGotMigrationData is not available")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordA) is False:
             logging.warning("passwordA is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordB) is False:
             logging.warning("passwordB is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if password_valid(data.passwordC) is False:
             logging.warning("passwordC is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(
             setupFilePath,
             [
@@ -221,7 +236,7 @@ async def setup_start_done(data: StartDoneData):
 
     else:
         logging.warning(f"not handled setupPhase state ({setupPhase})")
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     await _call_script("/home/admin/_cache.sh set state waitprovision")
 
@@ -262,7 +277,7 @@ async def setup_final_info():
         logging.warning(
             f"/setup-final-info can only be called when nodes awaits final ({state})"
         )
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     result_lines = []
     with open(setupFilePath, "r") as setup_file:
@@ -284,7 +299,7 @@ async def setup_final_done():
     state = await redis_get("state")
     if state != "waitfinal":
         logging.warning("/setup-final-done can only be called when nodes awaits final")
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     await _call_script("/home/admin/_cache.sh set state donefinal")
     return {"state": "donefinal"}
@@ -297,10 +312,10 @@ async def get_shutdown():
     state = await redis_get("state")
     if setupPhase == "done":
         logging.warning("can only be called when the nodes is not finalized yet")
-        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
     if state != "waitsetup":
         logging.warning("can only be called when nodes awaits setup")
-        return HTTPException(status.status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # do the shutdown
     system = RaspiBlitzSystem()
@@ -314,7 +329,7 @@ async def setup_sync_info():
     setupPhase = await redis_get("setupPhase")
     if setupPhase != "done":
         logging.warning("sync info not available yet")
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     try:
         blitz_sync_initial_done = await redis_get("blitz_sync_initial_done")
