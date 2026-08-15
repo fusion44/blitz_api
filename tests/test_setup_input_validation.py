@@ -114,6 +114,70 @@ async def test_setup_start_done_rejects_shell_metacharacter_password(monkeypatch
     assert exc.status_code == 400
 
 
+async def _reject_before_shell(monkeypatch, call):
+    """Run `call` and return the shell commands it attempted."""
+    from app.system.impl import raspiblitz as rb
+
+    monkeypatch.setattr(
+        rb.RaspiBlitzSystem, "_check_shell_scripts_status", lambda self: None
+    )
+    commands = []
+
+    async def fake_exec(command, **kwargs):
+        commands.append(command)
+        raise AssertionError(f"reached the shell with: {command!r}")
+
+    monkeypatch.setattr(rb, "exec_bash_command", fake_exec)
+    await call(rb.RaspiBlitzSystem())
+    return commands
+
+
+async def test_login_rejects_metacharacters_before_shell(monkeypatch):
+    """Login interpolates the password into a shell string; gate it first."""
+    from fastapi import HTTPException
+
+    from app.system.models import LoginInput
+
+    for candidate in SHELL_METACHAR_INPUTS:
+
+        async def call(system, candidate=candidate):
+            try:
+                await system.login(LoginInput(password=candidate))
+            except HTTPException as e:
+                assert e.status_code == 401, f"unexpected status for {candidate!r}"
+
+        assert await _reject_before_shell(monkeypatch, call) == []
+
+
+async def test_change_password_rejects_metacharacters_before_shell(monkeypatch):
+    from fastapi import HTTPException
+
+    for candidate in SHELL_METACHAR_INPUTS:
+
+        async def call(system, candidate=candidate):
+            try:
+                await system.change_password("a", candidate, "goodpassword1")
+            except HTTPException as e:
+                assert e.status_code == 400, f"unexpected status for {candidate!r}"
+
+        assert await _reject_before_shell(monkeypatch, call) == []
+
+
+async def test_change_password_rejects_metacharacter_type(monkeypatch):
+    """`type` is interpolated unquoted, so the a|b|c gate is load-bearing."""
+    from fastapi import HTTPException
+
+    async def call(system):
+        try:
+            await system.change_password(
+                "a;touch/tmp/pwned", "goodpassword1", "goodpassword2"
+            )
+        except HTTPException as e:
+            assert e.status_code == 400
+
+    assert await _reject_before_shell(monkeypatch, call) == []
+
+
 def test_setup_file_is_created_private(tmp_path):
     """Holds cleartext passwords and seed words on a mode=0777 tmpfs."""
     from app.setup.impl.raspiblitz.router import write_text_file
