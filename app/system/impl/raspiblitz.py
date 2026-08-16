@@ -289,7 +289,7 @@ class RaspiBlitzSystem(SystemBase):
 
         # first check if old password is correct
         result = await exec_bash_command(
-            f'/home/admin/config.scripts/blitz.passwords.sh check {type} "{old_password}"',  # noqa: E501
+            f'/home/admin/config.scripts/blitz.passwords.sh check "{type}" "{old_password}"',  # noqa: E501
             sensitive=True,
         )
         data = {}
@@ -306,7 +306,8 @@ class RaspiBlitzSystem(SystemBase):
 
         # second set new password
         script_call = (
-            f'/home/admin/config.scripts/blitz.passwords.sh set {type} "{new_password}"'
+            "/home/admin/config.scripts/blitz.passwords.sh "
+            f'set "{type}" "{new_password}"'
         )
         if type == "c":
             # will set password c of both lnd & core lightning if installed/activated
