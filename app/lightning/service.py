@@ -211,7 +211,6 @@ async def register_lightning_listener():
 
 async def _handle_info_listener():
     last_info = None
-    last_info_lite = None
     while True:
         info = await ln.get_ln_info()
 

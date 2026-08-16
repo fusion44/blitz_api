@@ -733,7 +733,8 @@ class Invoice(BaseModel):
 
     @classmethod
     def from_cln_json(cls, i) -> "Invoice":
-        # Handle missing amount_msat field (e.g., in BOLT12 offers or certain invoice types)
+        # Handle missing amount_msat field (e.g., in BOLT12 offers or
+        # certain invoice types)
         # Use amount_received_msat if amount_msat is not present and invoice is paid
         amt = 0
         if "amount_msat" in i:

@@ -1,7 +1,6 @@
 import asyncio
 import json
 
-import pytest
 from starlette.websockets import WebSocketDisconnect
 
 from app.api.ws_manager import WebSocketManager

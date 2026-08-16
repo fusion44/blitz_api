@@ -113,7 +113,8 @@ class AppCache(CacheOperations):
                     return Err(e)
 
             logger.debug(
-                f"App status cache updated. Key: {AppsServiceKeys.APP_STATUS_MESSAGE_KEY}"
+                "App status cache updated. Key: "
+                f"{AppsServiceKeys.APP_STATUS_MESSAGE_KEY}"
             )
 
             return Ok(None)

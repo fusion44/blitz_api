@@ -145,7 +145,10 @@ async def get_system_health(
     response: Response,
     verbose: bool = Query(
         False,
-        description="If true, include a per-subsystem (api, bitcoind, lightning) health breakdown.",
+        description=(
+            "If true, include a per-subsystem (api, bitcoind, lightning) "
+            "health breakdown."
+        ),
     ),
 ) -> SystemHealthInfo:
     result = await system_health(verbose)

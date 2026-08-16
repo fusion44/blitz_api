@@ -55,14 +55,6 @@ build-backend = "hatchling.build"
 profile = "black"
 
 [tool.ruff]
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
-select = ["E", "F"]
-ignore = []
-
-# Allow auto fix for all enabled rules (when `--fix`) is provided.
-fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
-unfixable = []
-
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -86,18 +78,36 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
-    "app/lightning/impl/protos/*"
+    # generated from the LND/CLN .proto files
+    "app/lightning/impl/protos/*",
+    # vendored third-party Result type, kept close to upstream
+    "app/external/result_type/*",
 ]
 
 # Same as Black.
 line-length = 88
 
+target-version = "py311"
+
+[tool.ruff.lint]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+select = ["E", "F"]
+ignore = []
+
+# Allow auto fix for all enabled rules (when `--fix`) is provided.
+fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
+unfixable = []
+
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-target_version = "py311"
+[tool.ruff.lint.per-file-ignores]
+# Long lines here are verbatim example payloads (sample API error bodies, a Nix
+# config snippet). Wrapping them would misrepresent what they document.
+"app/apps/docs.py" = ["E501"]
+"app/system/impl/native_python.py" = ["E501"]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
 
