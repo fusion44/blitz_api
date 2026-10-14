@@ -467,10 +467,22 @@ class LnNodeCLNjRPC(LightningNodeBase):
             return self._bolt11_cache[pay_req]
 
         params = [pay_req]
-        res = await self._send_request("decodepay", params)
+        res = await self._send_request("decode", params)
 
         if "error" not in res:
             res = res["result"]
+            if not res.get("valid", True):
+                # unlike decodepay, decode reports recognized-but-invalid
+                # strings as a normal result with valid=false + warning_*
+                # fields instead of an RPC error
+                m = "; ".join(
+                    str(res[k]) for k in sorted(res) if k.startswith("warning")
+                ) or "invalid payment request"
+                logger.error(m)
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f"Could not decode the payment request: {m}",
+                )
             req = PaymentRequest.from_cln_json(res)
             self._bolt11_cache[pay_req] = req
             return req

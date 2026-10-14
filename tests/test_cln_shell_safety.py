@@ -45,7 +45,7 @@ async def test_make_local_call_passes_args_without_a_shell(capture_exec):
     from app.lightning.impl import cln_grpc
 
     payload = "lnbc1pdummy; touch /tmp/pwned"
-    await cln_grpc._make_local_call("decodepay", f"bolt11={payload}")
+    await cln_grpc._make_local_call("decode", f"string={payload}")
 
     assert capture_exec["shell_used"] is False, (
         "must not run user input through a shell"
@@ -54,7 +54,7 @@ async def test_make_local_call_passes_args_without_a_shell(capture_exec):
     assert argv is not None, "create_subprocess_exec was not called"
     # the whole bolt11 value, metacharacters and all, must arrive as one
     # discrete argv token so the shell never sees it
-    assert f"bolt11={payload}" in argv
+    assert f"string={payload}" in argv
     assert argv[0] == "lightning-cli"
 
 
