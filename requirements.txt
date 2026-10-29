@@ -26,7 +26,7 @@ billiard==4.2.1
     # via celery
 celery==5.6.2
     # via blitz-api (pyproject.toml)
-certifi==2025.4.26
+certifi==2026.10.19
     # via
     #   httpcore
     #   httpx
