@@ -30,7 +30,7 @@ cachebox==5.2.3
     # via deepdiff
 celery==5.6.2
     # via blitz-api (pyproject.toml)
-certifi==2026.6.17
+certifi==2026.10.19
     # via
     #   httpcore
     #   httpx
