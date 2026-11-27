@@ -16,7 +16,7 @@ from app.system.impl.raspiblitz_utils import name_valid, password_valid
 
 router = APIRouter(prefix="/setup", tags=["RaspiBlitz Setup"])
 
-setupFilePath = "/var/cache/raspiblitz/temp/raspiblitz.setup"
+setupFilePath = "/run/raspiblitz-setup/raspiblitz.setup"
 configFilePath = "/mnt/hdd/raspiblitz.conf"
 
 
@@ -110,6 +110,9 @@ def write_text_file(filename: str, arrayOfLines):
         try:
             f.write("\n".join(arrayOfLines))
             f.flush()
+            # The bootstrap created this directory setgid admin. SSH and API
+            # both need to read the record for the authenticated final dialog.
+            os.fchmod(f.fileno(), 0o640)
             os.replace(f.name, filename)
         finally:
             if os.path.exists(f.name):
@@ -138,6 +141,13 @@ async def setup_start_done(data: StartDoneData):
     if state != "waitsetup":
         logging.warning("/setup-start-done can only be called when nodes awaits setup")
         raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    if not os.path.isdir(os.path.dirname(setupFilePath)):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "The running RaspiBlitz does not provide the private setup handoff. "
+            "Use its SSH setup or update the system and API together.",
+        )
 
     # check if a fresh setup is forced
     if data.forceFreshSetup:
@@ -253,7 +263,7 @@ async def setup_start_done(data: StartDoneData):
     # seedWords= (might be used later if we offer recover from seed words)
     # seedPassword= (might be used later if we offer recover from seed words)
     # migrationFile=[path] (might be used later if we offer raspiblitz migration)
-    # those values get stored in: /var/cache/raspiblitz/temp/raspiblitz.setup
+    # those values get stored in: /run/raspiblitz-setup/raspiblitz.setup
     # also a skeleton raspiblitz.conf gets created (see controlSetupDialog.sh Line 318)
     # and then API sets state to `waitprovision` to kick-off provision
 
@@ -265,7 +275,7 @@ async def setup_start_done(data: StartDoneData):
 async def setup_final_info():
     # TODO: return info on setup final
     # during the process some data might be written to
-    # /var/cache/raspiblitz/temp/raspiblitz.setup
+    # /run/raspiblitz-setup/raspiblitz.setup
     # seedwordsNEW='${seedwords}
     # seedwords6x4NEW='${seedwords6x4}
     # syncProgressFull=[percent] = (later WebUi can offer sync from another RaspiBlitz)

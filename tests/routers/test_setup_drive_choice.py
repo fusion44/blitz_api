@@ -39,11 +39,19 @@ def test_fresh_setup_from_recovery(setup_client, keep, action, format_disk, clea
     values["setupPhase"] = "recovery"
     response = submit(client, forceFreshSetup=True, keepBlockchain=keep)
     assert response.status_code == 200
-    assert S_IMODE(handoff.stat().st_mode) == 0o600
+    assert S_IMODE(handoff.stat().st_mode) == 0o640
     lines = handoff.read_text().splitlines()
     assert {"menuchoice=setup", "systemCopy=0", f"deleteData={action}",
             f"formatHDD={format_disk}", f"cleanHDD={clean_disk}"}.issubset(lines)
     advance.assert_awaited_once()
+
+
+def test_mismatched_system_requires_a_matching_frontend(setup_client, monkeypatch, tmp_path):
+    client, _, advance, _ = setup_client
+    monkeypatch.setattr(setup, "setupFilePath", str(tmp_path / "missing" / "raspiblitz.setup"))
+    response = submit(client, keepBlockchain=False)
+    assert response.status_code == 409
+    advance.assert_not_awaited()
 
 
 @pytest.mark.parametrize("changes, expected", [
