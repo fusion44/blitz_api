@@ -326,6 +326,17 @@ warmup_running = False
 
 
 async def warmup_new_connections():
+    global warmup_running
+    if not new_connections or warmup_running:
+        return
+    warmup_running = True
+    try:
+        await _send_dashboard_warmup()
+    finally:
+        warmup_running = False
+
+
+async def _send_dashboard_warmup():
     # This doesn't keep track of which connection has received
     # which data already, so it may send data twice data to the client
     # when the startup state changes. Especially the hardware info
@@ -348,19 +359,9 @@ async def warmup_new_connections():
                     f"data {event}: {type(res)}"
                 )
 
-        logger.error(f"Error while fetching warmup_data for {event}: {res}")
-        return await _send_sse_event(id, event, {"error": f"{res}"})
+        logger.warning("Warmup data unavailable for {}", event)
+        return await _send_sse_event(id, event, {"error": "Warmup data unavailable"})
 
-    global new_connections
-    if len(new_connections) == 0:
-        return
-
-    global warmup_running
-    if warmup_running:
-        logger.debug("Warmup already running, skipping")
-        return
-
-    warmup_running = True
     is_ready = api_startup_status.is_fully_initialized()
 
     if is_ready:
@@ -388,12 +389,14 @@ async def warmup_new_connections():
                     *[
                         _handle(id, SSE.SYSTEM_INFO, res[0]),
                         _handle(id, SSE.BTC_INFO, res[1]),
+                        _handle(id, SSE.APP_STATE_MESSAGE, res[2]),
                         _handle(id, SSE.INSTALLED_APP_STATUS, res[2]),
                         _handle(id, SSE.HARDWARE_INFO, res[3]),
                     ]
                 )
 
         new_connections.clear()
+        return
 
     if (
         api_startup_status.bitcoin == StartupState.DONE
@@ -421,8 +424,6 @@ async def warmup_new_connections():
             await _send_sse_event(id, SSE.HARDWARE_INFO, res)
 
         # don't clear new_connections, we'll try again later when api is initialized
-
-    warmup_running = False
 
 
 register_handlers_finished = False

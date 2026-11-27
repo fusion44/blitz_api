@@ -30,7 +30,9 @@ class SSEManager:
         return (event_source, id)
 
     async def send_to_single(self, id: int, data: ServerSentEvent):
-        await self._connections[id].put(data)
+        queue = self._connections.get(id)
+        if queue is not None:
+            await queue.put(data)
 
     async def broadcast_to_all(self, data: ServerSentEvent):
         await self._sse_queue.put(data)

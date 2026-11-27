@@ -145,7 +145,9 @@ class RaspiBlitzApps(AppsBase):
             s.version = str(data["version"]) if "version" in keys else None
             s.status = AppOnlineStatus.OFFLINE
             if "installed" in keys and data["installed"] == "1":
-                s.status = AppOnlineStatus.ONLINE
+                # Legacy scripts only reported whether the app was installed.
+                if data.get("serviceRunning", "1") == "1":
+                    s.status = AppOnlineStatus.ONLINE
                 s.installed = True
 
             if not s.installed:
