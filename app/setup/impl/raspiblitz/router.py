@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import tempfile
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Depends
@@ -100,8 +102,18 @@ async def setup_start_info():
 
 
 def write_text_file(filename: str, arrayOfLines):
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write("\n".join(arrayOfLines))
+    # A previous SSH setup may own the old record. Publish a complete,
+    # private file from the API account before notifying the bootstrap.
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=os.path.dirname(filename), delete=False
+    ) as f:
+        try:
+            f.write("\n".join(arrayOfLines))
+            f.flush()
+            os.replace(f.name, filename)
+        finally:
+            if os.path.exists(f.name):
+                os.unlink(f.name)
 
 
 class StartDoneData(BaseModel):
@@ -125,7 +137,7 @@ async def setup_start_done(data: StartDoneData):
 
     if state != "waitsetup":
         logging.warning("/setup-start-done can only be called when nodes awaits setup")
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     # check if a fresh setup is forced
     if data.forceFreshSetup:
@@ -134,36 +146,39 @@ async def setup_start_done(data: StartDoneData):
 
     #### SETUP ####
     if setupPhase == "setup":
-        if name_valid(data.hostname) is False:
+        if not name_valid(data.hostname):
             logging.warning("hostname is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if (
-            data.lightning != "lnd"
-            and data.lightning != "cl"
-            and data.lightning != "none"
-        ):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if data.lightning not in ("lnd", "cl", "none"):
             logging.warning("lightning is not valid")
-        if password_valid(data.passwordA) is False:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if not password_valid(data.passwordA):
             logging.warning("passwordA is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(data.passwordB) is False:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if not password_valid(data.passwordB):
             logging.warning("passwordB is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if data.lightning != "none" and password_valid(data.passwordC) is False:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if data.lightning != "none" and not password_valid(data.passwordC):
             logging.warning("passwordC is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if hddGotBlockchain != "1" and data.keepBlockchain:
             logging.warning("cannot keep blockchain that does not exists")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         if data.keepBlockchain:
+            delete_data = "keepBlockchain"
             formatHDD = 0
             cleanHDD = 1
         else:
+            delete_data = "all"
             formatHDD = 1
             cleanHDD = 0
         write_text_file(
             setupFilePath,
             [
+                "menuchoice=setup",
+                "systemCopy=0",
+                f"deleteData={delete_data}",
+                # Older bootstraps read these two flags.
                 f"formatHDD={formatHDD}",
                 f"cleanHDD={cleanHDD}",
                 "network=bitcoin",
@@ -172,10 +187,10 @@ async def setup_start_done(data: StartDoneData):
                 f"hostname={data.hostname}",
                 "setPasswordA=1",
                 "setPasswordB=1",
-                "setPasswordC=1",
+                f"setPasswordC={int(data.lightning != 'none')}",
                 f"passwordA='{data.passwordA}'",
                 f"passwordB='{data.passwordB}'",
-                f"passwordC='{data.passwordC}'",
+                f"passwordC='{data.passwordC}'" if data.lightning != "none" else "passwordC=''",
                 "",
             ],
         )
@@ -183,9 +198,9 @@ async def setup_start_done(data: StartDoneData):
     #### RECOVERY ####
     elif setupPhase == "recovery" or setupPhase == "update":
         logging.warning("check recovery data")
-        if password_valid(data.passwordA) is False:
+        if not password_valid(data.passwordA):
             logging.warning("passwordA is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(
             setupFilePath, ["setPasswordA=1", f"passwordA='{data.passwordA}'"]
         )
@@ -196,16 +211,16 @@ async def setup_start_done(data: StartDoneData):
         hddGotMigrationData = await redis_get("hddGotMigrationData")
         if hddGotMigrationData == "":
             logging.warning("hddGotMigrationData is not available")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(data.passwordA) is False:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if not password_valid(data.passwordA):
             logging.warning("passwordA is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(data.passwordB) is False:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if not password_valid(data.passwordB):
             logging.warning("passwordB is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
-        if password_valid(data.passwordC) is False:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
+        if not password_valid(data.passwordC):
             logging.warning("passwordC is not valid")
-            return HTTPException(status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(
             setupFilePath,
             [
@@ -221,7 +236,7 @@ async def setup_start_done(data: StartDoneData):
 
     else:
         logging.warning(f"not handled setupPhase state ({setupPhase})")
-        return HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+        raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
 
     await _call_script("/home/admin/_cache.sh set state waitprovision")
 
