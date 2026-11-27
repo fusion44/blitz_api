@@ -122,6 +122,7 @@ async def get_full_client_warmup_data_bitcoinonly() -> List:
             get_btc_info(),
             _get_app_status_data(),
             get_hardware_info(),
-        ]
+        ],
+        return_exceptions=True,
     )
     return [*res]
