@@ -10,14 +10,16 @@ from app.setup.impl.raspiblitz import router as setup
 
 @pytest.fixture
 def setup_client(monkeypatch, tmp_path):
-    values = {"setupPhase": "setup", "state": "waitsetup", "hddBlocksBitcoin": "1"}
+    values = {"setupPhase": "setup", "state": "waitsetup", "system_setup_storageHasReusableBlocks": "1"}
 
     async def get_value(key):
         return values.get(key)
 
     handoff = tmp_path / "raspiblitz.setup"
+    (tmp_path / "submit.lock").touch()
     advance = AsyncMock()
-    monkeypatch.setattr(setup, "setupFilePath", str(handoff))
+    monkeypatch.setattr(setup, "setupFilePath", str(tmp_path / "accepted"))
+    monkeypatch.setattr(setup, "setupRequestPath", str(handoff))
     monkeypatch.setattr(setup, "redis_get", get_value)
     monkeypatch.setattr(setup, "_call_script", advance)
     monkeypatch.setattr(setup, "sign_jwt", lambda: {"token": "fixture"})
@@ -60,7 +62,7 @@ def test_mismatched_system_requires_a_matching_frontend(setup_client, monkeypatc
 ])
 def test_rejected_input_leaves_handoff_untouched(setup_client, changes, expected):
     client, handoff, advance, values = setup_client
-    values["hddBlocksBitcoin"] = "0"
+    values["system_setup_storageHasReusableBlocks"] = "0"
     response = submit(client, **{"keepBlockchain": False, **changes})
     assert response.status_code == expected
     assert not handoff.exists()

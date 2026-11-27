@@ -1,4 +1,5 @@
 import asyncio
+import fcntl
 import logging
 import os
 import tempfile
@@ -17,6 +18,7 @@ from app.system.impl.raspiblitz_utils import name_valid, password_valid
 router = APIRouter(prefix="/setup", tags=["RaspiBlitz Setup"])
 
 setupFilePath = "/run/raspiblitz-setup/raspiblitz.setup"
+setupRequestPath = "/run/raspiblitz-setup/request/raspiblitz.setup"
 configFilePath = "/mnt/hdd/raspiblitz.conf"
 
 
@@ -86,7 +88,7 @@ async def setup_start_info():
 
     # get all the additional info needed to do setup dialog
     hddGotMigrationData = await redis_get("hddGotMigrationData")
-    hddGotBlockchain = await redis_get("hddBlocksBitcoin")
+    hddGotBlockchain = await redis_get("system_setup_storageHasReusableBlocks")
     migrationMode = await redis_get("migrationMode")
     lan = await redis_get("internet_localip")
     tor = await redis_get("tor_web_addr")
@@ -133,21 +135,31 @@ class StartDoneData(BaseModel):
 # call to
 @router.post("/setup-start-done")
 async def setup_start_done(data: StartDoneData):
+    lock_path = os.path.join(os.path.dirname(setupFilePath), "submit.lock")
+    try:
+        lock_file = open(lock_path, "rb")
+    except FileNotFoundError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Use the running system's SSH setup or update the system and API together.",
+        ) from None
+    with lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Another setup is in progress.") from None
+        return await _complete_setup(data)
+
+
+async def _complete_setup(data: StartDoneData):
     # first check that node is really in setup state
     setupPhase = await redis_get("setupPhase")
     state = await redis_get("state")
-    hddGotBlockchain = await redis_get("hddBlocksBitcoin")
+    hddGotBlockchain = await redis_get("system_setup_storageHasReusableBlocks")
 
     if state != "waitsetup":
         logging.warning("/setup-start-done can only be called when nodes awaits setup")
         raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
-
-    if not os.path.isdir(os.path.dirname(setupFilePath)):
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "The running RaspiBlitz does not provide the private setup handoff. "
-            "Use its SSH setup or update the system and API together.",
-        )
 
     # check if a fresh setup is forced
     if data.forceFreshSetup:
@@ -156,6 +168,8 @@ async def setup_start_done(data: StartDoneData):
 
     #### SETUP ####
     if setupPhase == "setup":
+        if "keepBlockchain" not in data.model_fields_set:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Confirm which drive data to keep.")
         if not name_valid(data.hostname):
             logging.warning("hostname is not valid")
             raise HTTPException(status.HTTP_400_BAD_REQUEST)
@@ -183,7 +197,7 @@ async def setup_start_done(data: StartDoneData):
             formatHDD = 1
             cleanHDD = 0
         write_text_file(
-            setupFilePath,
+            setupRequestPath,
             [
                 "menuchoice=setup",
                 "systemCopy=0",
@@ -212,7 +226,7 @@ async def setup_start_done(data: StartDoneData):
             logging.warning("passwordA is not valid")
             raise HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(
-            setupFilePath, ["setPasswordA=1", f"passwordA='{data.passwordA}'"]
+            setupRequestPath, ["setPasswordA=1", f"passwordA='{data.passwordA}'"]
         )
 
     #### MIGRATION ####
@@ -232,7 +246,7 @@ async def setup_start_done(data: StartDoneData):
             logging.warning("passwordC is not valid")
             raise HTTPException(status.HTTP_400_BAD_REQUEST)
         write_text_file(
-            setupFilePath,
+            setupRequestPath,
             [
                 f"migrationOS={hddGotMigrationData}",
                 "setPasswordA=1",
